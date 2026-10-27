@@ -11,6 +11,8 @@ export interface OwnerSignalConfig {
   /** Owner's personal Sepolia address (not the vault). */
   evmAddress?: string;
   github?: string;
+  /** Where to email the owner (optional; without Resend configured, notices go to the UI log). */
+  email?: string;
 }
 
 export interface Notification {
