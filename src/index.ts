@@ -1,36 +1,23 @@
 // Load .env before any other module reads process.env (no-op in the TEE, where there is no .env file)
 import "dotenv/config";
-import { Hono } from "hono";
 import { serve } from "@hono/node-server";
-import { cors } from "hono/cors";
 import { ShadeClient } from "@neardefi/shade-agent-js";
-import agentInfo from "./routes/agentInfo";
-import ethInfo from "./routes/ethAccountInfo";
-import transaction from "./routes/transaction";
+import { api } from "./api";
+import { BtcVault } from "./chains/btc";
+import { EvmVault } from "./chains/evm";
+import { config, env } from "./config";
+import { Driver } from "./escalation/driver";
+import { StagedExecutor } from "./executor/executor";
+import { ShadeWillContract } from "./near/will-contract";
+import { EvmNonceAdapter, GithubAdapter, NearOnchainAdapter, SIMULATED_SOURCES, SimulatedAdapter } from "./signals/adapters";
+import { Store } from "./state/store";
 
-const agentContractId = process.env.AGENT_CONTRACT_ID;
-const sponsorAccountId = process.env.SPONSOR_ACCOUNT_ID;
-const sponsorPrivateKey = process.env.SPONSOR_PRIVATE_KEY;
-if (!agentContractId || !sponsorAccountId || !sponsorPrivateKey) {
-  throw new Error(
-    "Missing required environment variables AGENT_CONTRACT_ID, SPONSOR_ACCOUNT_ID, SPONSOR_PRIVATE_KEY",
-  );
-}
-
-// Initialize app
-const app = new Hono();
-
-// Middleware
-app.use(cors());
-
-// Routes
-app.get("/", (c) => c.json({ message: "App is running" }));
-app.route("/api/agent-info", agentInfo);
-app.route("/api/eth-info", ethInfo);
-app.route("/api/transaction", transaction);
+const agentContractId = config.contractId();
+const sponsorAccountId = env("SPONSOR_ACCOUNT_ID");
+const sponsorPrivateKey = env("SPONSOR_PRIVATE_KEY");
 
 // Initialize Shade Agent client
-export const agent = await ShadeClient.create({
+const agent = await ShadeClient.create({
   networkId: "testnet",
   agentContractId: agentContractId, // Agent contract the agent will interact with
   sponsor: {
@@ -91,6 +78,41 @@ setInterval(async () => {
     console.error("Error re-registering agent:", error);
   }
 }, SIX_DAYS_MS);
+
+// The will agent
+const store = Store.inDir(config.dataDir());
+const contract = new ShadeWillContract(agent);
+const vaults = [
+  new EvmVault(agentContractId, contract, store, config.sepoliaRpc()),
+  new BtcVault(agentContractId, contract, store, config.btcApi()),
+];
+const adapters = [
+  new NearOnchainAdapter(config.fastnearTxApi()),
+  new EvmNonceAdapter(config.sepoliaRpc(), store),
+  new GithubAdapter(config.githubToken()),
+  ...SIMULATED_SOURCES.map((s) => new SimulatedAdapter(s.source, s.trustWeight, store)),
+];
+const driver = new Driver({ contract, adapters, store, executor: new StagedExecutor(contract, vaults, store) });
+
+const app = api({
+  contract,
+  store,
+  vaults,
+  demoMode: config.demoMode(),
+  agentInfo: async () => ({ accountId: agent.accountId(), balance: await agent.balance(), agentContractId }),
+});
+
+// Ticks never overlap: the next one is scheduled after the previous one finishes.
+const tickMs = config.tickSeconds() * 1000;
+const loop = async () => {
+  try {
+    await driver.tick();
+  } catch (e) {
+    console.error("[driver] tick failed:", e);
+  }
+  setTimeout(loop, tickMs);
+};
+loop();
 
 // Start server after registration is complete
 const port = Number(process.env.PORT || "3000");

@@ -44,3 +44,5 @@ target
 
 # new releases
 new-release/
+# Agent state (local runs)
+data/
