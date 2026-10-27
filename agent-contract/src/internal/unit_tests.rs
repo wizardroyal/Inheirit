@@ -71,6 +71,21 @@ fn non_default_ppid() -> Ppid {
     HexBytes::from([1u8; 16])
 }
 
+// The template's ungated request_signature, kept as a test helper so the template's agent-validity
+// tests still exercise require_valid_agent + internal_request_signature. The contract's public
+// request_signature is the gated one in will::agent (tested in will::tests).
+fn template_request_signature(
+    contract: &mut Contract,
+    path: String,
+    payload: String,
+    key_type: String,
+) -> Promise {
+    if let Some(failure_promise) = contract.require_valid_agent() {
+        return failure_promise;
+    }
+    contract.internal_request_signature(path, payload, key_type)
+}
+
 // Helper function to initialize contract (with default measurements and PPID approved for local mode)
 fn setup_contract() -> Contract {
     let owner = accounts(0);
@@ -632,7 +647,8 @@ fn test_request_signature_not_whitelisted() {
     // Call request_signature - should remove agent because it's not whitelisted
     let context = get_context(agent.clone(), false);
     testing_env!(context.build());
-    let _promise = contract.request_signature(
+    let _promise = template_request_signature(
+        &mut contract,
         "path".to_string(),
         "payload".to_string(),
         "Ecdsa".to_string(),
@@ -653,7 +669,8 @@ fn test_request_signature_not_registered() {
 
     let context = get_context(agent, false);
     testing_env!(context.build());
-    let _ = contract.request_signature(
+    let _ = template_request_signature(
+        &mut contract,
         "path".to_string(),
         "payload".to_string(),
         "Ecdsa".to_string(),
@@ -796,7 +813,8 @@ fn test_request_signature_measurements_removed() {
 
     let context = get_context(agent.clone(), false);
     testing_env!(context.build());
-    let _promise = contract.request_signature(
+    let _promise = template_request_signature(
+        &mut contract,
         "path".to_string(),
         "payload".to_string(),
         "Ecdsa".to_string(),
@@ -816,7 +834,8 @@ fn test_request_signature_measurements_removed() {
     // The agent is removed, so on next call it will panic
     let context = get_context(agent.clone(), false);
     testing_env!(context.build());
-    let _promise2 = contract.request_signature(
+    let _promise2 = template_request_signature(
+        &mut contract,
         "path".to_string(),
         "payload".to_string(),
         "Ecdsa".to_string(),
@@ -841,7 +860,8 @@ fn test_request_signature_ppid_removed() {
 
     let context = get_context(agent.clone(), false);
     testing_env!(context.build());
-    let _promise = contract.request_signature(
+    let _promise = template_request_signature(
+        &mut contract,
         "path".to_string(),
         "payload".to_string(),
         "Ecdsa".to_string(),
@@ -861,7 +881,8 @@ fn test_request_signature_ppid_removed() {
     // The agent is removed, so on next call it will panic
     let context = get_context(agent.clone(), false);
     testing_env!(context.build());
-    let _promise2 = contract.request_signature(
+    let _promise2 = template_request_signature(
+        &mut contract,
         "path".to_string(),
         "payload".to_string(),
         "Ecdsa".to_string(),
@@ -885,7 +906,8 @@ fn test_request_signature_success() {
 
     let context = get_context(agent, false);
     testing_env!(context.build());
-    let _promise = contract.request_signature(
+    let _promise = template_request_signature(
+        &mut contract,
         "path".to_string(),
         "payload".to_string(),
         "Ecdsa".to_string(),
@@ -906,7 +928,8 @@ fn test_request_signature_with_eddsa() {
 
     let context = get_context(agent, false);
     testing_env!(context.build());
-    let _promise = contract.request_signature(
+    let _promise = template_request_signature(
+        &mut contract,
         "path".to_string(),
         "payload".to_string(),
         "Eddsa".to_string(),
@@ -928,7 +951,8 @@ fn test_request_signature_invalid_key_type() {
 
     let context = get_context(agent, false);
     testing_env!(context.build());
-    let _ = contract.request_signature(
+    let _ = template_request_signature(
+        &mut contract,
         "path".to_string(),
         "payload".to_string(),
         "invalid".to_string(),
@@ -960,7 +984,8 @@ fn test_request_signature_expired_attestation() {
 
     // Call request_signature - should remove agent
     // Promise will fail but this can't be tested in unit tests
-    let _promise = contract.request_signature(
+    let _promise = template_request_signature(
+        &mut contract,
         "path".to_string(),
         "payload".to_string(),
         "Ecdsa".to_string(),

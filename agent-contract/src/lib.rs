@@ -1,13 +1,13 @@
 use hex;
 use near_sdk::{
-    AccountId, BorshStorageKey, Gas, NearToken, PanicOnDefault, Promise,
+    AccountId, BorshStorageKey, Gas, NearToken, PanicOnDefault, Promise, PromiseError,
     env::{self, block_timestamp_ms},
     ext_contract,
     json_types::U64,
     log, near, require,
     serde::Serialize,
     serde_json,
-    store::{IterableMap, IterableSet},
+    store::{IterableMap, IterableSet, LookupMap},
 };
 use shade_attestation::{
     attestation::{AcceptedDstackAttestation, DstackAttestation},
@@ -19,11 +19,12 @@ use shade_attestation::{
 pub use internal::events::Event;
 pub use internal::helpers::AgentRemovalReason;
 pub use views::{AgentValidity, AgentView, ContractInfo};
+pub use will::{AgentKey, Will};
 
 mod internal;
 mod owner;
 pub mod views;
-mod your_functions;
+pub mod will;
 
 pub type Ppid = HexBytes<16>;
 
@@ -38,6 +39,12 @@ pub struct Contract {
     pub approved_ppids: IterableSet<Ppid>,
     pub agents: IterableMap<AccountId, Agent>,
     pub whitelisted_agents_for_local: IterableSet<AccountId>,
+    /// Wills keyed by owner (CLAUDE.md §5).
+    pub wills: LookupMap<AccountId, Will>,
+    /// TEE sealed-notes key, set once by the agent (CLAUDE.md §7.5).
+    pub agent_key: Option<AgentKey>,
+    /// Sum of all wills' NEAR vault balances, held in this contract's balance.
+    pub total_vault_near: u128,
 }
 
 #[near(serializers = [borsh])]
@@ -54,6 +61,7 @@ pub enum StorageKey {
     ApprovedPpids,
     Agents,
     WhitelistedAgentsForLocal,
+    Wills,
 }
 
 const STORAGE_BYTES_TO_REGISTER: u128 = 486;
@@ -77,6 +85,9 @@ impl Contract {
             approved_ppids: IterableSet::new(StorageKey::ApprovedPpids),
             agents: IterableMap::new(StorageKey::Agents),
             whitelisted_agents_for_local: IterableSet::new(StorageKey::WhitelistedAgentsForLocal),
+            wills: LookupMap::new(StorageKey::Wills),
+            agent_key: None,
+            total_vault_near: 0,
         }
     }
 
