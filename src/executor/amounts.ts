@@ -27,3 +27,43 @@ export function splitByShares(amount: bigint, shares: Record<string, number>): M
   });
   return out;
 }
+
+/**
+ * Splits `amount` by integer weights (any total). Used when some heirs of a stage were already
+ * paid and the rest share what is left in proportion to their original shares.
+ */
+export function splitWeighted(amount: bigint, weights: Record<string, number>): Map<string, bigint> {
+  const paid = Object.entries(weights).filter(([, w]) => w > 0);
+  const total = BigInt(paid.reduce((s, [, w]) => s + w, 0));
+  const out = new Map<string, bigint>();
+  if (total === 0n) return out;
+  let left = amount;
+  paid.forEach(([id, w], i) => {
+    const part = i === paid.length - 1 ? left : (amount * BigInt(w)) / total;
+    left -= part;
+    out.set(id, part);
+  });
+  return out;
+}
+
+/**
+ * What each still-unpaid heir receives in a stage, given the total fees the transfers will cost.
+ * Non-last stage: each heir's percent of `gross`; fees are paid from what stays in the vault and
+ * rounding dust waits for the last stage. Last stage: everything left after fees, split by the
+ * unpaid heirs' shares.
+ */
+export function stageTargets(
+  job: { isLast: boolean; gross: bigint; unpaidShares: Record<string, number> },
+  fees: bigint,
+): Map<string, bigint> {
+  if (job.isLast) {
+    const pool = job.gross - fees;
+    if (pool <= 0n) throw new Error(`vault balance ${job.gross} does not cover fees ${fees}`);
+    return splitWeighted(pool, job.unpaidShares);
+  }
+  const out = new Map<string, bigint>();
+  for (const [id, pct] of Object.entries(job.unpaidShares)) {
+    if (pct > 0) out.set(id, (job.gross * BigInt(pct)) / 100n);
+  }
+  return out;
+}

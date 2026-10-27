@@ -24,6 +24,14 @@ export interface Notification {
   body: string;
 }
 
+export interface PendingTx {
+  /** Serialized signed tx (EVM hex / BTC hex). */
+  raw: string;
+  hash: string;
+  /** What this tx pays: heir id -> [address, amount in smallest units]. */
+  pays: Record<string, [string, string]>;
+}
+
 export interface AgentState {
   owners: Record<string, OwnerSignalConfig>;
   policies: Record<string, Policy>;
@@ -33,6 +41,11 @@ export interface AgentState {
   evmNonces: Record<string, { nonce: number; seenAt: string }>;
   /** Foreign vault balances at execution start: `${owner}:${round}:${chain}` -> smallest units. */
   snapshots: Record<string, string>;
+  /**
+   * Signed foreign txs saved before broadcast, so a crash or RPC failure rebroadcasts the same tx
+   * instead of signing a second one: `${owner}:${round}:${stage}:${chain}` -> pending tx.
+   */
+  pendingTxs: Record<string, PendingTx>;
   /** Last will state the driver notified about: owner -> state name. */
   notifiedState: Record<string, string>;
   notifications: Notification[];
@@ -44,6 +57,7 @@ const EMPTY: AgentState = {
   simulated: {},
   evmNonces: {},
   snapshots: {},
+  pendingTxs: {},
   notifiedState: {},
   notifications: [],
 };

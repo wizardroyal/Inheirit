@@ -29,3 +29,30 @@ describe("splitByShares", () => {
     expect(() => splitByShares(100n, { h1: 60 })).toThrow();
   });
 });
+
+import { splitWeighted, stageTargets } from "../src/executor/amounts";
+
+describe("splitWeighted", () => {
+  it("splits by any weights with dust to the last", () => {
+    expect(splitWeighted(10n, { a: 1, b: 2 })).toEqual(new Map([["a", 3n], ["b", 7n]]));
+  });
+});
+
+describe("stageTargets", () => {
+  it("non-last stage pays each unpaid heir its percent of gross; fees stay in the vault", () => {
+    expect(stageTargets({ isLast: false, gross: 1000n, unpaidShares: { h1: 80, h2: 20 } }, 50n)).toEqual(
+      new Map([["h1", 800n], ["h2", 200n]]),
+    );
+  });
+  it("non-last stage after a partial failure pays only the rest, same amounts", () => {
+    expect(stageTargets({ isLast: false, gross: 1000n, unpaidShares: { h2: 20 } }, 25n)).toEqual(new Map([["h2", 200n]]));
+  });
+  it("last stage sweeps balance minus fees by share", () => {
+    expect(stageTargets({ isLast: true, gross: 1050n, unpaidShares: { h1: 80, h2: 20 } }, 50n)).toEqual(
+      new Map([["h1", 800n], ["h2", 200n]]),
+    );
+  });
+  it("last stage refuses when fees exceed the balance", () => {
+    expect(() => stageTargets({ isLast: true, gross: 10n, unpaidShares: { h1: 100 } }, 50n)).toThrow(/does not cover fees/);
+  });
+});
