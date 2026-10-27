@@ -1,0 +1,122 @@
+// Signal adapters (CLAUDE.md §7.1). Each returns only the time of the owner's latest activity
+// for one source — never content. Simulated adapters are flagged and read what the demo panel
+// wrote (POST /demo/signal); they are labelled SIMULATED everywhere they surface.
+import type { SignalSource } from "../liveness/score";
+import type { OwnerSignalConfig, Store } from "../state/store";
+
+export type Fetch = typeof fetch;
+
+export interface SignalAdapter {
+  source: SignalSource;
+  simulated: boolean;
+  /** 0..1: how hard the signal is to fake. */
+  trustWeight: number;
+  /** Most recent activity time for this owner, or null if unknown. Never returns content. */
+  lastActivity(owner: OwnerSignalConfig): Promise<Date | null>;
+}
+
+/** Any NEAR transaction signed with the owner's keys (FastNEAR tx API, no key needed). */
+export class NearOnchainAdapter implements SignalAdapter {
+  source = "near_onchain" as const;
+  simulated = false;
+  trustWeight = 0.9;
+  constructor(private readonly apiBase: string, private readonly fetchImpl: Fetch = fetch) {}
+
+  async lastActivity(owner: OwnerSignalConfig): Promise<Date | null> {
+    const res = await this.fetchImpl(`${this.apiBase}/v0/account`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ account_id: owner.owner, max_block_height: null }),
+    });
+    if (!res.ok) throw new Error(`FastNEAR tx API ${res.status}`);
+    const body = (await res.json()) as { account_txs?: { is_any_signer?: boolean; tx_block_timestamp: string }[] };
+    let latestNs = 0n;
+    for (const tx of body.account_txs ?? []) {
+      if (!tx.is_any_signer) continue;
+      const ns = BigInt(tx.tx_block_timestamp);
+      if (ns > latestNs) latestNs = ns;
+    }
+    return latestNs ? new Date(Number(latestNs / 1_000_000n)) : null;
+  }
+}
+
+/**
+ * Outgoing txs from the owner's personal Sepolia address, detected by its nonce going up between
+ * polls (plain JSON-RPC, no explorer key). Accurate to one poll interval; the first poll only
+ * records the nonce, since the time of earlier txs is unknown.
+ */
+export class EvmNonceAdapter implements SignalAdapter {
+  source = "evm_onchain" as const;
+  simulated = false;
+  trustWeight = 0.9;
+  constructor(
+    private readonly rpcUrl: string,
+    private readonly store: Store,
+    private readonly fetchImpl: Fetch = fetch,
+    private readonly now: () => Date = () => new Date(),
+  ) {}
+
+  async lastActivity(owner: OwnerSignalConfig): Promise<Date | null> {
+    if (!owner.evmAddress) return null;
+    const res = await this.fetchImpl(this.rpcUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_getTransactionCount", params: [owner.evmAddress, "latest"] }),
+    });
+    if (!res.ok) throw new Error(`Sepolia RPC ${res.status}`);
+    const body = (await res.json()) as { result?: string; error?: { message: string } };
+    if (!body.result) throw new Error(`Sepolia RPC: ${body.error?.message ?? "no result"}`);
+    const nonce = Number(BigInt(body.result));
+    const prev = this.store.get().evmNonces[owner.owner];
+    if (!prev) {
+      this.store.update((s) => (s.evmNonces[owner.owner] = { nonce, seenAt: "" }));
+      return null;
+    }
+    if (nonce > prev.nonce) {
+      const seenAt = this.now().toISOString();
+      this.store.update((s) => (s.evmNonces[owner.owner] = { nonce, seenAt }));
+      return new Date(seenAt);
+    }
+    return prev.seenAt ? new Date(prev.seenAt) : null;
+  }
+}
+
+/** Latest public GitHub event (push, comment, …). Weak: can be automated. */
+export class GithubAdapter implements SignalAdapter {
+  source = "github" as const;
+  simulated = false;
+  trustWeight = 0.5;
+  constructor(private readonly token: string | undefined, private readonly fetchImpl: Fetch = fetch) {}
+
+  async lastActivity(owner: OwnerSignalConfig): Promise<Date | null> {
+    if (!owner.github) return null;
+    const headers: Record<string, string> = { Accept: "application/vnd.github+json", "User-Agent": "inheirit-agent" };
+    if (this.token) headers.Authorization = `Bearer ${this.token}`;
+    const res = await this.fetchImpl(`https://api.github.com/users/${encodeURIComponent(owner.github)}/events/public?per_page=1`, { headers });
+    if (!res.ok) throw new Error(`GitHub API ${res.status}`);
+    const events = (await res.json()) as { created_at?: string }[];
+    return events[0]?.created_at ? new Date(events[0].created_at) : null;
+  }
+}
+
+/** SIMULATED source: returns what the demo panel recorded for it. */
+export class SimulatedAdapter implements SignalAdapter {
+  simulated = true;
+  constructor(
+    public readonly source: SignalSource,
+    public readonly trustWeight: number,
+    private readonly store: Store,
+  ) {}
+
+  async lastActivity(owner: OwnerSignalConfig): Promise<Date | null> {
+    const at = this.store.get().simulated[owner.owner]?.[this.source];
+    return at ? new Date(at) : null;
+  }
+}
+
+export const SIMULATED_SOURCES: { source: SignalSource; trustWeight: number }[] = [
+  { source: "x", trustWeight: 0.4 },
+  { source: "instagram", trustWeight: 0.4 },
+  { source: "google_calendar", trustWeight: 0.7 },
+  { source: "gmail", trustWeight: 0.7 },
+];
