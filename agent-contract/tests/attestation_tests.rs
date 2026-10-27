@@ -155,9 +155,10 @@ async fn test_measurements_and_ppid_lifecycle()
         &contract_id,
         "request_signature",
         json!({
-            "path": "path",
-            "payload": "test_payload",
-            "key_type": "Ecdsa"
+            "owner": "nobody.test.near",
+            "chain": "Eth",
+            "payload": "0000000000000000000000000000000000000000000000000000000000000000",
+            "purpose": { "Release": { "stage": 0 } }
         }),
         &agent1_id,
         &agent1_signer,
@@ -334,14 +335,14 @@ async fn test_measurements_and_ppid_lifecycle()
     );
 
     // Agent1 was removed, so request_signature should fail with "Agent not registered"
-    // Agent2 can request signatures again (will fail with AccountDoesNotExist for mpc-contract)
     let result = call_transaction(
         &contract_id,
         "request_signature",
         json!({
-            "path": "path",
-            "payload": "test_payload",
-            "key_type": "Ecdsa"
+            "owner": "nobody.test.near",
+            "chain": "Eth",
+            "payload": "0000000000000000000000000000000000000000000000000000000000000000",
+            "purpose": { "Release": { "stage": 0 } }
         }),
         &agent1_id,
         &agent1_signer,
@@ -365,14 +366,15 @@ async fn test_measurements_and_ppid_lifecycle()
         }
     }
 
-    // Agent2 can request signatures again (will fail with AccountDoesNotExist for mpc-contract)
+    // Agent2 is valid again: it passes the agent check and stops at the will gate (no will exists)
     let result = call_transaction(
         &contract_id,
         "request_signature",
         json!({
-            "path": "path",
-            "payload": "test_payload",
-            "key_type": "Ecdsa"
+            "owner": "nobody.test.near",
+            "chain": "Eth",
+            "payload": "0000000000000000000000000000000000000000000000000000000000000000",
+            "purpose": { "Release": { "stage": 0 } }
         }),
         &agent2_id,
         &agent2_signer,
@@ -385,14 +387,14 @@ async fn test_measurements_and_ppid_lifecycle()
     match result {
         Ok(_) => {
             panic!(
-                "Expected transaction to fail with AccountDoesNotExist for mpc-contract, but it succeeded"
+                "Expected the gated request_signature to fail at the will check, but it succeeded"
             );
         }
         Err(e) => {
             let error_str = format!("{:?}", e);
             assert!(
-                error_str.contains("AccountDoesNotExist") && error_str.contains("mpc-contract"),
-                "Expected AccountDoesNotExist error for mpc-contract, but got: {:?}",
+                error_str.contains("No will for this owner"),
+                "Expected the valid agent to pass the agent check and stop at the will gate, but got: {:?}",
                 e
             );
         }
@@ -437,9 +439,10 @@ async fn test_measurements_and_ppid_lifecycle()
         &contract_id,
         "request_signature",
         json!({
-            "path": "path",
-            "payload": "test_payload",
-            "key_type": "Ecdsa"
+            "owner": "nobody.test.near",
+            "chain": "Eth",
+            "payload": "0000000000000000000000000000000000000000000000000000000000000000",
+            "purpose": { "Release": { "stage": 0 } }
         }),
         &agent2_id,
         &agent2_signer,
@@ -527,9 +530,10 @@ async fn test_measurements_and_ppid_lifecycle()
         &contract_id,
         "request_signature",
         json!({
-            "path": "path",
-            "payload": "test_payload",
-            "key_type": "Ecdsa"
+            "owner": "nobody.test.near",
+            "chain": "Eth",
+            "payload": "0000000000000000000000000000000000000000000000000000000000000000",
+            "purpose": { "Release": { "stage": 0 } }
         }),
         &agent1_id,
         &agent1_signer,
@@ -815,9 +819,10 @@ async fn test_attestation_expiration() -> Result<(), Box<dyn std::error::Error +
         &contract_id,
         "request_signature",
         json!({
-            "path": "path",
-            "payload": "test_payload",
-            "key_type": "Ecdsa"
+            "owner": "nobody.test.near",
+            "chain": "Eth",
+            "payload": "0000000000000000000000000000000000000000000000000000000000000000",
+            "purpose": { "Release": { "stage": 0 } }
         }),
         &agent_id,
         &agent_signer,
@@ -891,9 +896,10 @@ async fn test_attestation_expiration() -> Result<(), Box<dyn std::error::Error +
         &contract_id,
         "request_signature",
         json!({
-            "path": "path",
-            "payload": "test_payload",
-            "key_type": "Ecdsa"
+            "owner": "nobody.test.near",
+            "chain": "Eth",
+            "payload": "0000000000000000000000000000000000000000000000000000000000000000",
+            "purpose": { "Release": { "stage": 0 } }
         }),
         &agent_id,
         &agent_signer,
