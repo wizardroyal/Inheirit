@@ -1,7 +1,9 @@
 import { contracts, chainAdapters } from "chainsig.js";
 import { createPublicClient, http } from "viem";
 
-export const ethRpcUrl = "https://sepolia.drpc.org";
+// sepolia.drpc.org no longer serves Sepolia on its free plan
+export const ethRpcUrl =
+  process.env.SEPOLIA_RPC_URL || "https://ethereum-sepolia-rpc.publicnode.com";
 export const ethContractAddress = "0xb8d9b079F1604e9016137511464A1Fe97F8e2Bd8";
 
 export const ethContractAbi = [
