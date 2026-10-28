@@ -36,6 +36,7 @@ const english =
   `I leave all my NEAR to my son Bola, whose NEAR account is ${heir}. ` +
   `Release it in two stages, half and half. My guardians are ${g1} and ${g2}; both must confirm.`;
 let policy: Policy;
+let fromEnglish = false;
 const att = await agent("/api/attestation/ai");
 if (att.status === 200) {
   console.log(`NEAR AI model ${att.json.model} attested: ${att.json.ok} (${att.json.ok ? "all checks pass" : att.json.error})`);
@@ -46,6 +47,7 @@ if (att.status === 200) {
   console.log("Summary for the owner to approve:");
   for (const line of draft.json.summary as string[]) console.log(`  - ${line}`);
   policy = draft.json.policy;
+  fromEnglish = true;
 } else {
   console.log(`NEAR AI not configured on the agent (${att.json.error}); using a hand-written policy`);
   const check = checkPolicy({
@@ -130,7 +132,8 @@ while (Date.now() - t0 < 30 * 60_000) {
     const strangerFails = await openSealed(ct, stranger).then(() => false, () => true);
     console.log(`Another key can't open it: ${strangerFails}`);
     if (text !== NOTE || !strangerFails) throw new Error("sealed note check failed");
-    console.log(`\nDay 3 passed on ${CONTRACT}: English will → sealed note → execution → only the heir can decrypt.`);
+    const start = fromEnglish ? "English will (NEAR AI, attested + signed)" : "hand-written policy (NEAR AI not configured)";
+    console.log(`\nPassed on ${CONTRACT}: ${start} → sealed note → execution → only the heir can decrypt.`);
     process.exit(0);
   }
   await sleep(10);
