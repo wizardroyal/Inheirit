@@ -1,0 +1,8 @@
+{
+  "app_name": "inheirit-agent",
+  "vm_uuid": "e3685437-e716-493a-ac4e-3717a72e7fdd",
+  "app_id": "d5b714731becca502b6bd054a5cf6ffa5ce71f61",
+  "dstack_version": "0.5.12",
+  "instance_type": "tdx.small",
+  "provisioned_at": "2026-10-28T11:55:39.359Z"
+}
