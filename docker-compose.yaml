@@ -7,7 +7,7 @@ services:
       DEMO_MODE: ${DEMO_MODE}
     platform: linux/amd64
     # Pinned by digest: the compose hash (and so the approved measurements) covers this line
-    image: unwizarding/inheirit-agent@sha256:IMAGE_DIGEST
+    image: unwizarding/inheirit-agent@sha256:3724f713edaf37fe0acd01ae10b8d3726cf0b8600f661eda9130a35158a6b416
     container_name: shade-agent-app
     ports:
       - 3000:3000
