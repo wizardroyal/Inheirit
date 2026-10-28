@@ -152,4 +152,6 @@ loop();
 // Start server after registration is complete
 const port = Number(process.env.PORT || "3000");
 console.log(`Server starting on port ${port}...`);
-serve({ fetch: app.fetch, port });
+// Keep the native Request/Response globals: dcap-qvl's WASM fetch checks `instanceof Response`, and
+// node-server's lightweight replacements make Intel collateral fetches fail ("Failed to get collateral").
+serve({ fetch: app.fetch, port, overrideGlobalObjects: false });
