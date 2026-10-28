@@ -1,5 +1,5 @@
 // ETH vault on Sepolia: an address derived by the MPC network from (contract account, vault path).
-// One 21000-gas transfer per heir per stage, signed through the contract's gated request_signature.
+// One native transfer per heir per stage, signed through the contract's gated request_signature.
 import { chainAdapters, contracts, utils, type MPCSignature } from "chainsig.js";
 import { createPublicClient, http, keccak256, type Hex } from "viem";
 import { sepolia } from "viem/chains";
@@ -10,7 +10,9 @@ import type { Store } from "../state/store";
 import { MPC_CONTRACT_ID, vaultPath } from "./vault-path";
 
 const { toRSV, uint8ArrayToHex } = utils.cryptography;
-const TRANSFER_GAS = 21_000n;
+// A transfer is not always 21000 gas: Sepolia charges ~207k for the first value transfer to an empty
+// account (new-account state surcharge). So estimate per recipient and keep a margin.
+const GAS_MARGIN_PCT = 120n;
 const ALREADY_SENT = /already known|nonce too low|known transaction|replacement transaction underpriced/i;
 
 export class EvmVault implements ChainVault {
@@ -47,8 +49,14 @@ export class EvmVault implements ChainVault {
   async sendStage(job: StageJob): Promise<SentTransfer[]> {
     const from = await this.address(job.owner);
     const { maxFeePerGas, maxPriorityFeePerGas } = await this.client.estimateFeesPerGas();
-    const feePerTx = TRANSFER_GAS * maxFeePerGas;
-    const targets = stageTargets(job, feePerTx * BigInt(Object.keys(job.unpaidShares).length));
+    const gasFor: Record<string, bigint> = {};
+    for (const heirId of Object.keys(job.unpaidShares)) {
+      // Nonzero value: a zero-value call to an empty account doesn't create it, so it would underestimate.
+      const estimate = await this.client.estimateGas({ account: from, to: job.recipients[heirId] as Hex, value: 1n });
+      gasFor[heirId] = (estimate * GAS_MARGIN_PCT) / 100n;
+    }
+    const totalFees = Object.values(gasFor).reduce((sum, g) => sum + g * maxFeePerGas, 0n);
+    const targets = stageTargets(job, totalFees);
     const sent: SentTransfer[] = [];
 
     for (const [heirId, amount] of targets) {
@@ -56,6 +64,8 @@ export class EvmVault implements ChainVault {
       const key = `${job.owner}:${job.round}:${job.stage}:Eth:${heirId}`;
       let pending = this.store.get().pendingTxs[key];
       if (!pending) {
+        const gas = gasFor[heirId];
+        const feePerTx = gas * maxFeePerGas;
         const balance = await this.client.getBalance({ address: from });
         if (balance < amount + feePerTx) throw new Error(`vault ${from} has ${balance} wei, needs ${amount + feePerTx}`);
         const nonce = await this.client.getTransactionCount({ address: from, blockTag: "pending" });
@@ -63,7 +73,7 @@ export class EvmVault implements ChainVault {
           from,
           to,
           value: amount,
-          gas: TRANSFER_GAS,
+          gas,
           maxFeePerGas,
           maxPriorityFeePerGas,
           nonce,
@@ -78,7 +88,12 @@ export class EvmVault implements ChainVault {
       }
       await this.broadcast(pending.raw as Hex);
       const receipt = await this.client.waitForTransactionReceipt({ hash: pending.hash as Hex, timeout: 180_000 });
-      if (receipt.status !== "success") throw new Error(`tx ${pending.hash} reverted`);
+      if (receipt.status !== "success") {
+        // A reverted transfer moved no value but used up its nonce. Drop it so the next attempt
+        // signs a fresh tx at the next nonce instead of rebroadcasting a dead one forever.
+        this.store.update((s) => delete s.pendingTxs[key]);
+        throw new Error(`tx ${pending.hash} reverted (gas ${receipt.gasUsed}); will re-sign`);
+      }
       const [paidTo, paidAmount] = pending.pays[heirId];
       sent.push({ heirId, to: paidTo, amount: BigInt(paidAmount), txHash: pending.hash });
     }
