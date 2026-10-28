@@ -124,3 +124,30 @@ export function nearShareBps(policy: Policy): Record<string, number> {
   const shares = sharesFor(policy, "NEAR");
   return Object.fromEntries(policy.heirs.map((h) => [h.near_account, (shares[h.id] ?? 0) * 100]));
 }
+
+/**
+ * The plain-English summary the owner approves before policy_hash goes on-chain. Built by code from the
+ * validated policy, never by the model, so what the owner reads is exactly what will be enforced.
+ */
+export function summarizePolicy(p: Policy): string[] {
+  const lines: string[] = [];
+  for (const h of p.heirs) {
+    const parts: string[] = [];
+    for (const a of p.allocations) {
+      const share = a.shares[h.id] ?? 0;
+      if (share === 0) continue;
+      const to = a.asset === "ETH" ? ` (to ${h.receive.eth})` : a.asset === "BTC" ? ` (to ${h.receive.btc})` : "";
+      parts.push(`${share}% of your ${a.asset}${to}`);
+    }
+    lines.push(`${h.name} (${h.near_account}) receives ${parts.length ? parts.join(", ") : "nothing"}.`);
+  }
+  const stages = p.stages_pct.map((s) => `${s}%`).join(", ");
+  lines.push(`Released in ${p.stages_pct.length} stage${p.stages_pct.length > 1 ? "s" : ""}: ${stages}. Any sign of life between stages stops the rest.`);
+  lines.push(`Guardians: ${p.guardians.join(", ")}. ${p.guardian_threshold} of ${p.guardians.length} must confirm before anything is released.`);
+  if (p.contacts.length) lines.push(`Welfare-check contacts: ${p.contacts.join(", ")}.`);
+  for (const c of p.conditions) {
+    const name = p.heirs.find((h) => h.id === c.heir)?.name ?? c.heir;
+    lines.push(`Condition (shown, not enforced yet): ${c.asset} to ${name} not before ${c.date}${c.note ? ` (${c.note})` : ""}.`);
+  }
+  return lines;
+}

@@ -16,4 +16,8 @@ export const config = {
   dataDir: () => env("DATA_DIR", "./data"),
   tickSeconds: () => Number(env("TICK_SECONDS", "15")),
   demoMode: () => env("DEMO_MODE", "false") === "true",
+  nearaiBaseUrl: () => env("NEARAI_BASE_URL", "https://cloud-api.near.ai/v1"),
+  nearaiApiKey: () => process.env.NEARAI_API_KEY || undefined,
+  // Attested (TEE) model; see Decision log 2026-10-27. Proxied models fail the attestation gate.
+  nearaiModel: () => env("NEARAI_MODEL", "z-ai/glm-5.3-flash"),
 };

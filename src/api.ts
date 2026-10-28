@@ -2,6 +2,8 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { z } from "zod";
+import type { AttestationResult } from "./ai/attestation";
+import type { PolicyDraft } from "./ai/policy-parser";
 import type { ChainVault } from "./executor/executor";
 import { stateName, type WillContract } from "./near/will-contract";
 import { checkPolicy, policyHash } from "./policy/policy";
@@ -14,7 +16,14 @@ export interface ApiDeps {
   vaults: ChainVault[];
   demoMode: boolean;
   agentInfo: () => Promise<Record<string, unknown>>;
+  /** Absent when NEARAI_API_KEY isn't configured. */
+  ai?: {
+    attestation(): Promise<AttestationResult>;
+    draftPolicy(owner: string, text: string): Promise<PolicyDraft>;
+  };
 }
+
+const DraftRequest = z.object({ owner: z.string().min(2), text: z.string().min(10).max(4000) });
 
 const OwnerConfig = z.object({
   owner: z.string().min(2),
@@ -48,6 +57,26 @@ export function api(deps: ApiDeps): Hono {
     if (!(await contract.getWill(owner))) return c.json({ error: `No will for ${owner}` }, 404);
     store.update((s) => (s.owners[owner] = { owner, evmAddress: evm_address, github, email }));
     return c.json({ ok: true, watching: store.get().owners[owner] });
+  });
+
+  // NEAR AI Cloud attestation for the configured model: public, contains no will content.
+  app.get("/api/attestation/ai", async (c) => {
+    if (!deps.ai) return c.json({ error: "NEAR AI is not configured (NEARAI_API_KEY)" }, 503);
+    return c.json(await deps.ai.attestation());
+  });
+
+  // Plain-English will → validated draft + summary for the owner to approve. It spends our NEAR AI
+  // credit and carries will content, so like /api/owners it is demo-only until owner-signed requests.
+  app.post("/api/policy/draft", async (c) => {
+    if (!deps.ai) return c.json({ error: "NEAR AI is not configured (NEARAI_API_KEY)" }, 503);
+    if (!deps.demoMode) return c.json({ error: "Policy drafting needs an owner signature (not implemented yet); demo mode only" }, 403);
+    const parsed = DraftRequest.safeParse(await c.req.json());
+    if (!parsed.success) return c.json({ error: parsed.error.issues }, 400);
+    try {
+      return c.json(await deps.ai.draftPolicy(parsed.data.owner, parsed.data.text));
+    } catch (e) {
+      return c.json({ error: e instanceof Error ? e.message : String(e) }, 503);
+    }
   });
 
   // The approved policy. No auth needed: it is accepted only if its hash is the will's policy_hash,

@@ -2,6 +2,9 @@
 import "dotenv/config";
 import { serve } from "@hono/node-server";
 import { ShadeClient } from "@neardefi/shade-agent-js";
+import { AttestationGate, liveDeps } from "./ai/attestation";
+import { NearAiClient } from "./ai/nearai";
+import { draftPolicy } from "./ai/policy-parser";
 import { api } from "./api";
 import { BtcVault } from "./chains/btc";
 import { EvmVault } from "./chains/evm";
@@ -109,7 +112,19 @@ const notes = new NoteReleaser(contract, notesEnabled ? sealed.keypair : null);
 
 const driver = new Driver({ contract, adapters, store, notes, executor: new StagedExecutor(contract, vaults, store) });
 
+// NEAR AI Cloud: will contents go only to a model whose TEE attestation passes (checked before each use, cached 10 min)
+const nearaiKey = config.nearaiApiKey();
+const ai = nearaiKey
+  ? (() => {
+      const client = new NearAiClient(config.nearaiBaseUrl(), nearaiKey, config.nearaiModel());
+      const gate = new AttestationGate(client.model, liveDeps(client.baseUrl, nearaiKey));
+      return { attestation: () => gate.current(), draftPolicy: (owner: string, text: string) => draftPolicy(owner, text, client, gate) };
+    })()
+  : undefined;
+if (!ai) console.warn("[ai] NEARAI_API_KEY not set: policy drafting and the AI attestation badge are off");
+
 const app = api({
+  ai,
   contract,
   store,
   vaults,
