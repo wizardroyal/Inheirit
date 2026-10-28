@@ -33,7 +33,29 @@ interface Record {
   provisioned_at: string;
 }
 
-const cliRoot = path.join(execSync("npm root -g").toString().trim(), "@neardefi/shade-agent-cli/dist/src/utils");
+// Find the CLI through the `shade` binary: `npm root -g` points at whichever Node is active (nvm vs fnm),
+// which may not be the one the CLI was installed under. SHADE_CLI_DIR overrides.
+function shadeCliDir(): string {
+  if (process.env.SHADE_CLI_DIR) return process.env.SHADE_CLI_DIR;
+  const pkg = "@neardefi/shade-agent-cli";
+  const candidates: string[] = [];
+  try {
+    let dir = path.dirname(fs.realpathSync(execSync("command -v shade", { shell: "/bin/sh" }).toString().trim()));
+    while (dir !== path.dirname(dir) && !dir.endsWith("shade-agent-cli")) dir = path.dirname(dir);
+    candidates.push(dir);
+  } catch {
+    // shade not on PATH in this shell
+  }
+  candidates.push(path.join(execSync("npm root -g").toString().trim(), pkg));
+  const fnm = path.join(process.env.HOME ?? "", ".local/share/fnm/node-versions");
+  if (fs.existsSync(fnm)) {
+    for (const v of fs.readdirSync(fnm)) candidates.push(path.join(fnm, v, "installation/lib/node_modules", pkg));
+  }
+  const found = candidates.find((d) => fs.existsSync(path.join(d, "dist/src/utils/keystore.js")));
+  if (!found) throw new Error(`Can't find ${pkg}; set SHADE_CLI_DIR to its install directory`);
+  return found;
+}
+const cliRoot = path.join(shadeCliDir(), "dist/src/utils");
 const cli = async (mod: string) => import(path.join(cliRoot, mod));
 
 async function phalaKey(): Promise<string> {
