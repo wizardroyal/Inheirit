@@ -54,6 +54,14 @@ export interface WillContract {
   recordExecution(owner: string, stage: number, chain: ForeignChain, to: string, amount: string, txHash: string): Promise<void>;
   markStageDone(owner: string, stage: number, chain: ForeignChain): Promise<void>;
   completeWithdrawal(owner: string, id: number, txHash: string): Promise<void>;
+  getAgentPubkey(): Promise<AgentKey | null>;
+  setAgentPubkey(x25519Pubkey: string, appId: string): Promise<void>;
+  storeReleasedNote(owner: string, noteId: number, heir: string, ciphertextB64: string): Promise<void>;
+}
+
+export interface AgentKey {
+  x25519_pubkey: string;
+  app_id: string;
 }
 
 const TGAS = 10n ** 12n;
@@ -87,5 +95,19 @@ export class ShadeWillContract implements WillContract {
   }
   async completeWithdrawal(owner: string, id: number, txHash: string) {
     await this.agent.call({ methodName: "complete_withdrawal", args: { owner, id, tx_hash: txHash }, gas: 30n * TGAS });
+  }
+  async getAgentPubkey() {
+    const key = await this.agent.view<object>({ methodName: "get_agent_pubkey", args: {} });
+    return (key as AgentKey | null) ?? null;
+  }
+  async setAgentPubkey(x25519Pubkey: string, appId: string) {
+    await this.agent.call({ methodName: "set_agent_pubkey", args: { x25519_pubkey: x25519Pubkey, app_id: appId }, gas: 30n * TGAS });
+  }
+  async storeReleasedNote(owner: string, noteId: number, heir: string, ciphertextB64: string) {
+    await this.agent.call({
+      methodName: "store_released_note",
+      args: { owner, note_id: noteId, heir, ciphertext: ciphertextB64 },
+      gas: 30n * TGAS,
+    });
   }
 }

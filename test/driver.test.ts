@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Driver, isAdvanceDue } from "../src/escalation/driver";
-import type { WillContract, WillState, WillView } from "../src/near/will-contract";
+import { stateName, type WillContract, type WillState, type WillView } from "../src/near/will-contract";
 import type { SignalAdapter } from "../src/signals/adapters";
 import { Store } from "../src/state/store";
 
@@ -56,6 +56,11 @@ class FakeContract implements WillContract {
   async recordExecution() {}
   async markStageDone() {}
   async completeWithdrawal() {}
+  async getAgentPubkey() {
+    return null;
+  }
+  async setAgentPubkey() {}
+  async storeReleasedNote() {}
 }
 
 function adapter(source: SignalAdapter["source"], trustWeight: number, at: () => Date | null | Error): SignalAdapter {
@@ -78,6 +83,7 @@ function setup(state: WillState = "Active", adapters: SignalAdapter[] = [], extr
   const contract = new FakeContract(will(state, extra), () => nowS);
   const logs: string[] = [];
   const executed: string[] = [];
+  const noted: string[] = [];
   const driver = new Driver({
     contract,
     adapters,
@@ -85,8 +91,9 @@ function setup(state: WillState = "Active", adapters: SignalAdapter[] = [], extr
     now: () => new Date(nowS * 1000),
     log: (m) => logs.push(m),
     executor: { run: async (o) => void executed.push(o) },
+    notes: { run: async (w) => (noted.push(stateName(w.state)), 0) },
   });
-  return { driver, contract, store, logs, executed, setNow: (s: number) => (nowS = s), getNow: () => nowS };
+  return { driver, contract, store, logs, executed, noted, setNow: (s: number) => (nowS = s), getNow: () => nowS };
 }
 
 describe("isAdvanceDue", () => {
@@ -147,5 +154,14 @@ describe("Driver", () => {
     const t = setup({ Executing: { stage: 0, since: T0, stage_started: T0 + 45 } });
     await t.driver.tick();
     expect(t.executed).toEqual(["alice.testnet"]);
+    expect(t.noted).toEqual(["Executing"]);
+  });
+  it("releases notes for Completed wills but never before execution", async () => {
+    const done = setup({ Completed: { at: T0 } });
+    await done.driver.tick();
+    expect(done.noted).toEqual(["Completed"]);
+    const challenge = setup({ Challenge: { since: T0 + 40 } });
+    await challenge.driver.tick();
+    expect(challenge.noted).toEqual([]);
   });
 });

@@ -2,7 +2,8 @@
 //  1. score liveness from the signal adapters and report a newer "alive" time on-chain;
 //  2. call advance() when the current period has elapsed (one step per tick);
 //  3. notify the right people when the will enters a new state;
-//  4. hand Executing wills to the executor.
+//  4. hand Executing wills to the executor;
+//  5. release sealed notes to heirs once execution has started.
 import { type Observation, scoreAlive } from "../liveness/score";
 import { stateName, type StateName, type WillContract, type WillView } from "../near/will-contract";
 import type { SignalAdapter } from "../signals/adapters";
@@ -15,11 +16,16 @@ export interface Executor {
   run(owner: string, will: WillView): Promise<void>;
 }
 
+export interface NoteReleaser {
+  run(will: WillView): Promise<number>;
+}
+
 export interface DriverDeps {
   contract: WillContract;
   adapters: SignalAdapter[];
   store: Store;
   executor?: Executor;
+  notes?: NoteReleaser;
   now?: () => Date;
   log?: (msg: string) => void;
 }
@@ -143,6 +149,8 @@ export class Driver {
     }
 
     if (state === "Executing" && this.deps.executor) await this.deps.executor.run(cfg.owner, will);
+    // After the executor, so a failing note can't hold up money; Completed too, for heirs who register late.
+    if ((state === "Executing" || state === "Completed") && this.deps.notes) await this.deps.notes.run(will);
   }
 
   private async observe(cfg: OwnerSignalConfig): Promise<Observation[]> {

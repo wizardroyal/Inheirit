@@ -9,6 +9,9 @@ import { config, env } from "./config";
 import { Driver } from "./escalation/driver";
 import { StagedExecutor } from "./executor/executor";
 import { ShadeWillContract } from "./near/will-contract";
+import { toHex } from "./sealed/crypto";
+import { loadSealedKey } from "./sealed/key-source";
+import { ensureAgentKey, NoteReleaser } from "./sealed/releaser";
 import { EvmNonceAdapter, GithubAdapter, NearOnchainAdapter, SIMULATED_SOURCES, SimulatedAdapter } from "./signals/adapters";
 import { Store } from "./state/store";
 
@@ -92,14 +95,31 @@ const adapters = [
   new GithubAdapter(config.githubToken()),
   ...SIMULATED_SOURCES.map((s) => new SimulatedAdapter(s.source, s.trustWeight, store)),
 ];
-const driver = new Driver({ contract, adapters, store, executor: new StagedExecutor(contract, vaults, store) });
+
+// Sealed-notes key (§7.5): derived in the TEE, never written to disk or returned by any route.
+// On a mismatch with the contract's key, sealed-note work stays disabled; money movement continues.
+const sealed = await loadSealedKey(config.dataDir());
+let notesEnabled = false;
+try {
+  notesEnabled = await ensureAgentKey(contract, sealed.keypair, sealed.appId);
+} catch (e) {
+  console.error("[notes] could not check the agent key; sealed-note work disabled:", e instanceof Error ? e.message : e);
+}
+const notes = new NoteReleaser(contract, notesEnabled ? sealed.keypair : null);
+
+const driver = new Driver({ contract, adapters, store, notes, executor: new StagedExecutor(contract, vaults, store) });
 
 const app = api({
   contract,
   store,
   vaults,
   demoMode: config.demoMode(),
-  agentInfo: async () => ({ accountId: agent.accountId(), balance: await agent.balance(), agentContractId }),
+  agentInfo: async () => ({
+    accountId: agent.accountId(),
+    balance: await agent.balance(),
+    agentContractId,
+    sealedNotes: { x25519_pubkey: toHex(sealed.keypair.publicKey), app_id: sealed.appId, tee: sealed.tee, enabled: notesEnabled },
+  }),
 });
 
 // Ticks never overlap: the next one is scheduled after the previous one finishes.
