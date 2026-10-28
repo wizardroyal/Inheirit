@@ -4,5 +4,12 @@
   "app_id": "d5b714731becca502b6bd054a5cf6ffa5ce71f61",
   "dstack_version": "0.5.12",
   "instance_type": "tdx.small",
-  "provisioned_at": "2026-10-28T11:55:39.359Z"
+  "provisioned_at": "2026-10-28T11:55:39.359Z",
+  "upgrades": [
+    {
+      "compose_hash": "7cfcdfb1a43435ccceb2752665a1ee9039df743f4476de7b0d03819fe780448f",
+      "image": "unwizarding/inheirit-agent@sha256:4d8a09010979b6d3667dc0fb109532a895575f9cf30b448b022f1fe274db9381",
+      "at": "2026-10-28T16:38:44.106Z"
+    }
+  ]
 }

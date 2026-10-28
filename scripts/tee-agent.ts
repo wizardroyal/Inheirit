@@ -6,6 +6,8 @@
 //   npx tsx scripts/tee-agent.ts approve     approve the running CVM's measurements + PPIDs on the contract
 //   npx tsx scripts/tee-agent.ts upgrade     ship docker-compose.yaml + .env to the SAME CVM in place
 //                                            (approves the new compose hash first, so the agent can register at boot)
+//   npx tsx scripts/tee-agent.ts env         push .env (ENV_KEYS) to the CVM; changing the key list changes the
+//                                            compose hash, which is approved before the restart
 //   npx tsx scripts/tee-agent.ts retire <compose_hash>   remove an old version's approved measurements
 //   npx tsx scripts/tee-agent.ts status      CVM status, app_id, compose hash, agent registration
 //   npx tsx scripts/tee-agent.ts stop|start  pause billing; app_id and the sealed-notes key survive
@@ -179,9 +181,8 @@ async function upgrade() {
   if (compose.includes("IMAGE_DIGEST")) throw new Error(`${COMPOSE} still has the IMAGE_DIGEST placeholder`);
   const image = compose.match(/image:\s*(\S+)/)?.[1] ?? "?";
   const apiKey = await phalaKey();
-  const { createClient, parseEnvVars } = await cli("phala-deploy.js");
+  const { createClient } = await cli("phala-deploy.js");
   const { buildAppComposeForDeploy } = await cli("measurements.js");
-  const { encryptEnvVars } = await phalaCloud();
   const client = createClient({ apiKey });
 
   const appCompose = buildAppComposeForDeploy(compose, ENV_KEYS, { publicLogs: true, publicSysinfo: true });
@@ -191,15 +192,7 @@ async function upgrade() {
   const current = await currentMeasurements(apiKey, record.vm_uuid);
   await approveMeasurements(await owner(), { ...current, app_compose_hash_payload: prov.compose_hash });
 
-  const envs = (parseEnvVars(fs.readFileSync("./.env", "utf8")) as { key: string; value: string }[]).filter((e) => ENV_KEYS.includes(e.key));
-  // Newer API versions nest the key under kms_info; fall back to asking the KMS for the app's key.
-  const info = await client.getCvmInfo({ id: record.vm_uuid });
-  let envPubkey: string | undefined = info.encrypted_env_pubkey ?? info.kms_info?.encrypted_env_pubkey ?? undefined;
-  if (!envPubkey && info.kms_info?.slug) {
-    envPubkey = (await client.getAppEnvEncryptPubKey({ app_id: record.app_id, kms: info.kms_info.slug })).public_key;
-  }
-  if (!envPubkey) throw new Error(`No env encryption key for the CVM (kms_type ${info.kms_type ?? "?"}); nothing committed`);
-  const encryptedEnv = await encryptEnvVars(envs, envPubkey);
+  const { envs, encryptedEnv } = await encryptedDotenv(client, record);
   await client.commitCvmComposeFileUpdate({
     id: record.vm_uuid,
     compose_hash: prov.compose_hash,
@@ -210,6 +203,47 @@ async function upgrade() {
   fs.writeFileSync(RECORD, JSON.stringify(record, null, 2) + "\n");
   console.log(`committed with env keys ${envs.map((e) => e.key).join(", ")}; the CVM reboots (~70 s).`);
   console.log(`Previous compose hash ${current.app_compose_hash_payload} stays approved until: npx tsx scripts/tee-agent.ts retire ${current.app_compose_hash_payload}`);
+}
+
+/** .env values for ENV_KEYS, encrypted to the CVM's env key (only the TEE can decrypt them). */
+async function encryptedDotenv(client: any, record: Record): Promise<{ envs: { key: string; value: string }[]; encryptedEnv: string }> {
+  const { parseEnvVars } = await cli("phala-deploy.js");
+  const { encryptEnvVars } = await phalaCloud();
+  const envs = (parseEnvVars(fs.readFileSync("./.env", "utf8")) as { key: string; value: string }[]).filter((e) => ENV_KEYS.includes(e.key));
+  // Newer API versions nest the key under kms_info; fall back to asking the KMS for the app's key.
+  const info = await client.getCvmInfo({ id: record.vm_uuid });
+  let envPubkey: string | undefined = info.encrypted_env_pubkey ?? info.kms_info?.encrypted_env_pubkey ?? undefined;
+  if (!envPubkey && info.kms_info?.slug) {
+    envPubkey = (await client.getAppEnvEncryptPubKey({ app_id: record.app_id, kms: info.kms_info.slug })).public_key;
+  }
+  if (!envPubkey) throw new Error(`No env encryption key for the CVM (kms_type ${info.kms_type ?? "?"}); nothing committed`);
+  return { envs, encryptedEnv: await encryptEnvVars(envs, envPubkey) };
+}
+
+/**
+ * Phala keeps a CVM's allowed_envs on a compose update; changing the key list is a separate two-phase
+ * env update. Phase 1 returns the new compose hash; we approve it on the contract, then confirm.
+ */
+async function pushEnv() {
+  const record = readRecord();
+  const apiKey = await phalaKey();
+  const { createClient } = await cli("phala-deploy.js");
+  const { updateCvmEnvs } = await phalaCloud();
+  const client = createClient({ apiKey });
+  const { envs, encryptedEnv } = await encryptedDotenv(client, record);
+  const req = { id: record.vm_uuid, encrypted_env: encryptedEnv, env_keys: envs.map((e) => e.key) };
+
+  let res = (await updateCvmEnvs(client, req, { schema: false })) as { status?: string; compose_hash?: string; correlation_id?: string };
+  if (res.status === "precondition_required" && res.compose_hash) {
+    console.log(`env keys change the compose hash to ${res.compose_hash}`);
+    const current = await currentMeasurements(apiKey, record.vm_uuid);
+    await approveMeasurements(await owner(), { ...current, app_compose_hash_payload: res.compose_hash });
+    res = (await updateCvmEnvs(client, { ...req, compose_hash: res.compose_hash }, { schema: false })) as typeof res;
+    record.upgrades = [...(record.upgrades ?? []), { compose_hash: res.compose_hash ?? "?", image: "(env keys update)", at: new Date().toISOString() }];
+    fs.writeFileSync(RECORD, JSON.stringify(record, null, 2) + "\n");
+  }
+  console.log(`env update: ${JSON.stringify(res)}`);
+  console.log(`keys: ${req.env_keys.join(", ")}. If the compose hash changed without a precondition, run approve after the restart.`);
 }
 
 async function retire(composeHash: string | undefined) {
@@ -242,13 +276,14 @@ const run = {
   provision,
   approve,
   upgrade,
+  env: pushEnv,
   retire: () => retire(process.argv[3]),
   status,
   stop: () => power("stopCvm"),
   start: () => power("startCvm"),
 }[cmd ?? ""];
 if (!run) {
-  console.log("usage: npx tsx scripts/tee-agent.ts provision|approve|upgrade|retire <hash>|status|stop|start");
+  console.log("usage: npx tsx scripts/tee-agent.ts provision|approve|upgrade|env|retire <hash>|status|stop|start");
   process.exit(1);
 }
 run().catch((e) => {
