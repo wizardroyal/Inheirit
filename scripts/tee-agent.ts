@@ -4,6 +4,9 @@
 //
 //   npx tsx scripts/tee-agent.ts provision   create the CVM once; refuses if deploy/tee-agent.json exists
 //   npx tsx scripts/tee-agent.ts approve     approve the running CVM's measurements + PPIDs on the contract
+//   npx tsx scripts/tee-agent.ts upgrade     ship docker-compose.yaml + .env to the SAME CVM in place
+//                                            (approves the new compose hash first, so the agent can register at boot)
+//   npx tsx scripts/tee-agent.ts retire <compose_hash>   remove an old version's approved measurements
 //   npx tsx scripts/tee-agent.ts status      CVM status, app_id, compose hash, agent registration
 //   npx tsx scripts/tee-agent.ts stop|start  pause billing; app_id and the sealed-notes key survive
 import { execSync } from "node:child_process";
@@ -18,7 +21,8 @@ const APP_NAME = "inheirit-agent";
 const DSTACK_VERSION = "0.5.12"; // CLI 2.4.0 only knows 0.5.7/0.5.8, which Phala no longer offers
 const INSTANCE_TYPE = "tdx.small";
 const COMPOSE = "./docker-compose.yaml";
-const ENV_KEYS = ["AGENT_CONTRACT_ID", "SPONSOR_ACCOUNT_ID", "SPONSOR_PRIVATE_KEY", "DEMO_MODE"];
+// Part of the compose hash (allowed_envs): changing this list is a new measured version
+const ENV_KEYS = ["AGENT_CONTRACT_ID", "SPONSOR_ACCOUNT_ID", "SPONSOR_PRIVATE_KEY", "DEMO_MODE", "NEARAI_API_KEY", "NEARAI_MODEL"];
 const RECORD = "deploy/tee-agent.json";
 const PHALA_API = "https://cloud-api.phala.network/api/v1";
 const CONTRACT = process.env.AGENT_CONTRACT_ID || "inheirit.testnet";
@@ -31,6 +35,13 @@ interface Record {
   dstack_version: string;
   instance_type: string;
   provisioned_at: string;
+  upgrades?: { compose_hash: string; image: string; at: string }[];
+}
+
+interface Measurements {
+  rtmrs: { mrtd: string; rtmr0: string; rtmr1: string; rtmr2: string };
+  key_provider_event_digest: string;
+  app_compose_hash_payload: string;
 }
 
 // Find the CLI through the `shade` binary: `npm root -g` points at whichever Node is active (nvm vs fnm),
@@ -55,8 +66,10 @@ function shadeCliDir(): string {
   if (!found) throw new Error(`Can't find ${pkg}; set SHADE_CLI_DIR to its install directory`);
   return found;
 }
-const cliRoot = path.join(shadeCliDir(), "dist/src/utils");
+const cliDir = shadeCliDir();
+const cliRoot = path.join(cliDir, "dist/src/utils");
 const cli = async (mod: string) => import(path.join(cliRoot, mod));
+const phalaCloud = async () => import(path.join(cliDir, "node_modules/@phala/cloud/dist/index.mjs"));
 
 async function phalaKey(): Promise<string> {
   const key = await (await cli("keystore.js")).getPhalaKey();
@@ -116,10 +129,9 @@ async function provision() {
   console.log("Wait for it to boot (~2-3 min), then run: npx tsx scripts/tee-agent.ts approve");
 }
 
-async function approve() {
-  const { vm_uuid } = readRecord();
-  const apiKey = await phalaKey();
-  const att = await phalaGet(apiKey, `/cvms/${vm_uuid}/attestation`);
+/** The CVM's current measurements, as reported in its tcb_info. */
+async function currentMeasurements(apiKey: string, vmUuid: string): Promise<Measurements> {
+  const att = await phalaGet(apiKey, `/cvms/${vmUuid}/attestation`);
   if (!att.tcb_info) throw new Error("No tcb_info yet; is the CVM running?");
   const tcb = typeof att.tcb_info === "string" ? JSON.parse(att.tcb_info) : att.tcb_info;
   const event = (name: string) => {
@@ -128,12 +140,22 @@ async function approve() {
     return e;
   };
   // Phala reports these; the backlog item is to recompute the OS measurements independently (dstack-mr).
-  const measurements = {
+  return {
     rtmrs: { mrtd: tcb.mrtd, rtmr0: tcb.rtmr0, rtmr1: tcb.rtmr1, rtmr2: tcb.rtmr2 },
     key_provider_event_digest: event("key-provider").digest,
     app_compose_hash_payload: event("compose-hash").event_payload,
   };
-  console.log("compose hash:", measurements.app_compose_hash_payload);
+}
+
+async function approveMeasurements(acct: Account, measurements: Measurements) {
+  await acct.callFunction({ contractId: CONTRACT, methodName: "approve_measurements", args: { measurements }, gas: 30_000_000_000_000n });
+  console.log(`approved measurements for compose hash ${measurements.app_compose_hash_payload}`);
+}
+
+async function approve() {
+  const { vm_uuid } = readRecord();
+  const apiKey = await phalaKey();
+  const measurements = await currentMeasurements(apiKey, vm_uuid);
 
   const ppidsRes = await fetch(`${PHALA_API}/attestations/ppids`);
   const allPpids: string[] = await ppidsRes.json();
@@ -141,10 +163,57 @@ async function approve() {
   const ppids = allPpids.filter((p) => /^[0-9a-f]{32}$/.test(p));
 
   const acct = await owner();
-  await acct.callFunction({ contractId: CONTRACT, methodName: "approve_measurements", args: { measurements }, gas: 30_000_000_000_000n });
+  await approveMeasurements(acct, measurements);
   await acct.callFunction({ contractId: CONTRACT, methodName: "approve_ppids", args: { ppids }, gas: 30_000_000_000_000n });
   const approved = (await provider.callFunction(CONTRACT, "get_approved_measurements", {})) as unknown[];
   console.log(`Approved on ${CONTRACT}: ${approved.length} measurement set(s), ${ppids.length} of ${allPpids.length} PPIDs`);
+}
+
+/**
+ * In-place upgrade (§7.5): same CVM, same app_id, same sealed-notes key. Only the compose hash changes
+ * (OS measurements and the key-provider digest stay), so the new hash is approved before the reboot.
+ */
+async function upgrade() {
+  const record = readRecord();
+  const compose = fs.readFileSync(COMPOSE, "utf8");
+  if (compose.includes("IMAGE_DIGEST")) throw new Error(`${COMPOSE} still has the IMAGE_DIGEST placeholder`);
+  const image = compose.match(/image:\s*(\S+)/)?.[1] ?? "?";
+  const apiKey = await phalaKey();
+  const { createClient, parseEnvVars } = await cli("phala-deploy.js");
+  const { buildAppComposeForDeploy } = await cli("measurements.js");
+  const { encryptEnvVars } = await phalaCloud();
+  const client = createClient({ apiKey });
+
+  const appCompose = buildAppComposeForDeploy(compose, ENV_KEYS, { publicLogs: true, publicSysinfo: true });
+  const prov = await client.provisionCvmComposeFileUpdate({ id: record.vm_uuid, app_compose: appCompose });
+  console.log(`provisioned compose hash ${prov.compose_hash} (image ${image})`);
+
+  const current = await currentMeasurements(apiKey, record.vm_uuid);
+  await approveMeasurements(await owner(), { ...current, app_compose_hash_payload: prov.compose_hash });
+
+  const envs = (parseEnvVars(fs.readFileSync("./.env", "utf8")) as { key: string; value: string }[]).filter((e) => ENV_KEYS.includes(e.key));
+  const info = await client.getCvmInfo({ id: record.vm_uuid });
+  if (!info.encrypted_env_pubkey) throw new Error("CVM has no env encryption key");
+  const encryptedEnv = await encryptEnvVars(envs, info.encrypted_env_pubkey);
+  await client.commitCvmComposeFileUpdate({
+    id: record.vm_uuid,
+    compose_hash: prov.compose_hash,
+    encrypted_env: encryptedEnv,
+    env_keys: envs.map((e) => e.key),
+  });
+  record.upgrades = [...(record.upgrades ?? []), { compose_hash: prov.compose_hash, image, at: new Date().toISOString() }];
+  fs.writeFileSync(RECORD, JSON.stringify(record, null, 2) + "\n");
+  console.log(`committed with env keys ${envs.map((e) => e.key).join(", ")}; the CVM reboots (~70 s).`);
+  console.log(`Previous compose hash ${current.app_compose_hash_payload} stays approved until: npx tsx scripts/tee-agent.ts retire ${current.app_compose_hash_payload}`);
+}
+
+async function retire(composeHash: string | undefined) {
+  if (!composeHash) throw new Error("usage: retire <compose_hash>");
+  const approved = (await provider.callFunction(CONTRACT, "get_approved_measurements", {})) as Measurements[];
+  const target = approved.find((m) => m.app_compose_hash_payload === composeHash);
+  if (!target) throw new Error(`no approved measurements with compose hash ${composeHash}`);
+  await (await owner()).callFunction({ contractId: CONTRACT, methodName: "remove_measurements", args: { measurements: target }, gas: 30_000_000_000_000n });
+  console.log(`removed measurements for ${composeHash}; ${approved.length - 1} set(s) remain`);
 }
 
 async function status() {
@@ -164,9 +233,17 @@ async function power(action: "stopCvm" | "startCvm") {
 }
 
 const cmd = process.argv[2];
-const run = { provision, approve, status, stop: () => power("stopCvm"), start: () => power("startCvm") }[cmd ?? ""];
+const run = {
+  provision,
+  approve,
+  upgrade,
+  retire: () => retire(process.argv[3]),
+  status,
+  stop: () => power("stopCvm"),
+  start: () => power("startCvm"),
+}[cmd ?? ""];
 if (!run) {
-  console.log("usage: npx tsx scripts/tee-agent.ts provision|approve|status|stop|start");
+  console.log("usage: npx tsx scripts/tee-agent.ts provision|approve|upgrade|retire <hash>|status|stop|start");
   process.exit(1);
 }
 run().catch((e) => {

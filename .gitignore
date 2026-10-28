@@ -46,3 +46,4 @@ target
 new-release/
 # Agent state (local runs)
 data/
+data-*/
