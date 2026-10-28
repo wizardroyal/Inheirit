@@ -192,9 +192,14 @@ async function upgrade() {
   await approveMeasurements(await owner(), { ...current, app_compose_hash_payload: prov.compose_hash });
 
   const envs = (parseEnvVars(fs.readFileSync("./.env", "utf8")) as { key: string; value: string }[]).filter((e) => ENV_KEYS.includes(e.key));
+  // Newer API versions nest the key under kms_info; fall back to asking the KMS for the app's key.
   const info = await client.getCvmInfo({ id: record.vm_uuid });
-  if (!info.encrypted_env_pubkey) throw new Error("CVM has no env encryption key");
-  const encryptedEnv = await encryptEnvVars(envs, info.encrypted_env_pubkey);
+  let envPubkey: string | undefined = info.encrypted_env_pubkey ?? info.kms_info?.encrypted_env_pubkey ?? undefined;
+  if (!envPubkey && info.kms_info?.slug) {
+    envPubkey = (await client.getAppEnvEncryptPubKey({ app_id: record.app_id, kms: info.kms_info.slug })).public_key;
+  }
+  if (!envPubkey) throw new Error(`No env encryption key for the CVM (kms_type ${info.kms_type ?? "?"}); nothing committed`);
+  const encryptedEnv = await encryptEnvVars(envs, envPubkey);
   await client.commitCvmComposeFileUpdate({
     id: record.vm_uuid,
     compose_hash: prov.compose_hash,
