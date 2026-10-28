@@ -1,5 +1,5 @@
 # environment: local | TEE
-environment: local
+environment: TEE  # contract requires_tee: true; the agent CVM is provisioned once (CLAUDE.md §7.5)
 
 # network: testnet | mainnet
 network: testnet
@@ -59,7 +59,7 @@ agent_contract:
 # Approve allowed measurements for registration
 # Optional, if not enabled the measurements will not be approved
 approve_measurements:
-  enabled: true
+  enabled: false  # CLI only knows dstack 0.5.7/0.5.8; approve by hand from the CVM's tcb_info (scripts/approve-measurements)
   method_name: approve_measurements
   # <MEASUREMENTS> will be replaced with calculated measurements
   # for local it will be set to default measurements (all zeros)
@@ -76,7 +76,7 @@ approve_measurements:
 # Approve allowed PPIDs for registration
 # Optional, if not enabled the PPIDs will not be approved
 approve_ppids:
-  enabled: true
+  enabled: false  # Phala's list has invalid entries that make approve_ppids panic; approve the filtered list by hand
   method_name: approve_ppids
   # <PPIDS> will be replaced with the PPIDs
   # for local it will be set to a default PPID (all zeros)
