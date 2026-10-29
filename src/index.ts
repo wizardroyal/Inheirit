@@ -6,6 +6,7 @@ import { AttestationGate, liveDeps } from "./ai/attestation";
 import { NearAiClient } from "./ai/nearai";
 import { draftPolicy } from "./ai/policy-parser";
 import { api } from "./api";
+import { Nep413Verifier, rpcAccessKey } from "./auth/nep413";
 import { BtcVault } from "./chains/btc";
 import { EvmVault } from "./chains/evm";
 import { config, env } from "./config";
@@ -15,7 +16,7 @@ import { ShadeWillContract } from "./near/will-contract";
 import { toHex } from "./sealed/crypto";
 import { loadSealedKey } from "./sealed/key-source";
 import { ensureAgentKey, NoteReleaser } from "./sealed/releaser";
-import { EvmNonceAdapter, GithubAdapter, NearOnchainAdapter, SIMULATED_SOURCES, SimulatedAdapter } from "./signals/adapters";
+import { EvmNonceAdapter, GithubAdapter, HeartbeatAdapter, NearOnchainAdapter, SIMULATED_SOURCES, SimulatedAdapter } from "./signals/adapters";
 import { Store } from "./state/store";
 
 const agentContractId = config.contractId();
@@ -105,6 +106,7 @@ const adapters = [
   new NearOnchainAdapter(config.fastnearTxApi()),
   new EvmNonceAdapter(config.sepoliaRpc(), store),
   new GithubAdapter(config.githubToken()),
+  new HeartbeatAdapter(store),
   ...SIMULATED_SOURCES.map((s) => new SimulatedAdapter(s.source, s.trustWeight, store)),
 ];
 
@@ -134,6 +136,7 @@ if (!ai) console.warn("[ai] NEARAI_API_KEY not set: policy drafting and the AI a
 
 const app = api({
   ai,
+  auth: new Nep413Verifier({ recipient: agentContractId, accessKey: rpcAccessKey(config.nearRpc()) }),
   contract,
   store,
   vaults,

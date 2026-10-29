@@ -164,6 +164,11 @@ export class Driver {
         this.log(`[signals] ${a.source} for ${cfg.owner} failed: ${e instanceof Error ? e.message : String(e)}`);
       }
     }
+    // Merge, so a source that failed this tick keeps its last known time in the UI
+    this.deps.store.update((s) => {
+      const seen = (s.observations[cfg.owner] ??= {});
+      for (const o of out) seen[o.source] = { at: o.at.toISOString(), trustWeight: o.trustWeight, simulated: o.simulated };
+    });
     return out;
   }
 }

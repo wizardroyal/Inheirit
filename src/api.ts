@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { z } from "zod";
 import type { AttestationResult } from "./ai/attestation";
+import { AuthError, type Nep413Verifier, type SignedAction, type Verified } from "./auth/nep413";
 import type { PolicyDraft } from "./ai/policy-parser";
 import type { ChainVault } from "./executor/executor";
 import { stateName, type WillContract } from "./near/will-contract";
@@ -16,6 +17,8 @@ export interface ApiDeps {
   vaults: ChainVault[];
   demoMode: boolean;
   agentInfo: () => Promise<Record<string, unknown>>;
+  /** Checks owner-signed (NEP-413) requests. */
+  auth: Pick<Nep413Verifier, "verify">;
   /** Absent when NEARAI_API_KEY isn't configured. */
   ai?: {
     attestation(): Promise<AttestationResult>;
@@ -23,14 +26,15 @@ export interface ApiDeps {
   };
 }
 
-const DraftRequest = z.object({ owner: z.string().min(2), text: z.string().min(10).max(4000) });
+const DraftText = z.object({ text: z.string().min(10).max(4000) });
+const DraftRequest = DraftText.extend({ owner: z.string().min(2) });
 
-const OwnerConfig = z.object({
-  owner: z.string().min(2),
+const OwnerFields = z.object({
   evm_address: z.string().regex(/^0x[0-9a-fA-F]{40}$/).optional(),
   github: z.string().regex(/^[A-Za-z0-9-]{1,39}$/).optional(),
   email: z.string().email().optional(),
 });
+const OwnerConfig = OwnerFields.extend({ owner: z.string().min(2) });
 
 const DemoSignal = z.object({
   owner: z.string().min(2),
@@ -46,17 +50,60 @@ export function api(deps: ApiDeps): Hono {
   app.get("/", (c) => c.json({ message: "Inheirit will agent is running", demoMode: deps.demoMode }));
   app.get("/api/agent-info", async (c) => c.json(await deps.agentInfo()));
 
+  // Body is either an owner-signed request ({ signed }) or, in demo mode only, plain fields.
+  // Returns the owner and the payload fields, or a response to send back.
+  async function ownerRequest<T extends z.ZodTypeAny>(body: unknown, action: SignedAction, fields: T, plain: z.ZodTypeAny) {
+    const signed = (body as { signed?: unknown } | null)?.signed;
+    if (signed) {
+      let v: Verified;
+      try {
+        v = await deps.auth.verify(signed, action);
+      } catch (e) {
+        const msg = e instanceof AuthError || e instanceof z.ZodError ? e.message : `could not check the signature: ${String(e)}`;
+        return { error: { status: 401 as const, body: { error: msg } } };
+      }
+      const data = fields.safeParse(v.data ?? {});
+      if (!data.success) return { error: { status: 400 as const, body: { error: data.error.issues } } };
+      return { owner: v.owner, data: data.data as z.infer<T>, signed: true };
+    }
+    if (!deps.demoMode) return { error: { status: 403 as const, body: { error: "This request needs an owner signature (NEP-413) outside demo mode" } } };
+    const data = plain.safeParse(body);
+    if (!data.success) return { error: { status: 400 as const, body: { error: data.error.issues } } };
+    const { owner, ...rest } = data.data as { owner: string };
+    return { owner, data: rest as z.infer<T>, signed: false };
+  }
+
   // Which public identities to watch for an owner. Anyone could claim a GitHub handle for someone
-  // else's will and keep it "alive", so outside demo mode this must be owner-signed (NEP-413,
-  // with the web app on Day 4). Until then it is demo-only.
+  // else's will and keep it "alive", so it must be signed by the owner (unsigned only in demo mode).
   app.post("/api/owners", async (c) => {
-    if (!deps.demoMode) return c.json({ error: "Owner registration needs an owner signature (not implemented yet); demo mode only" }, 403);
-    const parsed = OwnerConfig.safeParse(await c.req.json());
-    if (!parsed.success) return c.json({ error: parsed.error.issues }, 400);
-    const { owner, evm_address, github, email } = parsed.data;
-    if (!(await contract.getWill(owner))) return c.json({ error: `No will for ${owner}` }, 404);
-    store.update((s) => (s.owners[owner] = { owner, evmAddress: evm_address, github, email }));
-    return c.json({ ok: true, watching: store.get().owners[owner] });
+    const r = await ownerRequest(await c.req.json(), "register_owner", OwnerFields, OwnerConfig);
+    if (r.error) return c.json(r.error.body, r.error.status);
+    const { evm_address, github, email } = r.data;
+    if (!(await contract.getWill(r.owner))) return c.json({ error: `No will for ${r.owner}` }, 404);
+    store.update((s) => (s.owners[r.owner] = { owner: r.owner, evmAddress: evm_address, github, email }));
+    return c.json({ ok: true, signed: r.signed, watching: store.get().owners[r.owner] });
+  });
+
+  // Heartbeat app ping: a real, strong signal, because it is signed by a key on the owner's account
+  // (a full-access key, or a device key limited to the will contract).
+  app.post("/api/heartbeat", async (c) => {
+    const body = (await c.req.json()) as { signed?: unknown };
+    if (!body?.signed) return c.json({ error: "A heartbeat must be signed by the owner" }, 401);
+    const r = await ownerRequest(body, "heartbeat", z.object({}).passthrough(), z.never());
+    if (r.error) return c.json(r.error.body, r.error.status);
+    if (!(await contract.getWill(r.owner))) return c.json({ error: `No will for ${r.owner}` }, 404);
+    const at = new Date().toISOString();
+    store.update((s) => {
+      s.heartbeats[r.owner] = at;
+      s.owners[r.owner] ??= { owner: r.owner };
+    });
+    return c.json({ ok: true, owner: r.owner, at });
+  });
+
+  // Latest activity per source (timestamps only, never content) for the liveness timeline.
+  app.get("/api/signals/:owner", (c) => {
+    const owner = c.req.param("owner");
+    return c.json({ observations: store.get().observations[owner] ?? {}, heartbeat: store.get().heartbeats[owner] ?? null });
   });
 
   // NEAR AI Cloud attestation for the configured model: public, contains no will content.
@@ -66,14 +113,13 @@ export function api(deps: ApiDeps): Hono {
   });
 
   // Plain-English will → validated draft + summary for the owner to approve. It spends our NEAR AI
-  // credit and carries will content, so like /api/owners it is demo-only until owner-signed requests.
+  // credit and carries will content, so it must be owner-signed (unsigned only in demo mode).
   app.post("/api/policy/draft", async (c) => {
     if (!deps.ai) return c.json({ error: "NEAR AI is not configured (NEARAI_API_KEY)" }, 503);
-    if (!deps.demoMode) return c.json({ error: "Policy drafting needs an owner signature (not implemented yet); demo mode only" }, 403);
-    const parsed = DraftRequest.safeParse(await c.req.json());
-    if (!parsed.success) return c.json({ error: parsed.error.issues }, 400);
+    const r = await ownerRequest(await c.req.json(), "draft_policy", DraftText, DraftRequest);
+    if (r.error) return c.json(r.error.body, r.error.status);
     try {
-      return c.json(await deps.ai.draftPolicy(parsed.data.owner, parsed.data.text));
+      return c.json(await deps.ai.draftPolicy(r.owner, r.data.text));
     } catch (e) {
       return c.json({ error: e instanceof Error ? e.message : String(e) }, 503);
     }

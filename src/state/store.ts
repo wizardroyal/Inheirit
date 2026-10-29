@@ -35,6 +35,10 @@ export interface PendingTx {
 export interface AgentState {
   owners: Record<string, OwnerSignalConfig>;
   policies: Record<string, Policy>;
+  /** Owner-signed heartbeat pings (web /heartbeat): owner -> ISO time received. */
+  heartbeats: Record<string, string>;
+  /** Latest activity per source as last polled, for the UI timeline (timestamps only). */
+  observations: Record<string, Partial<Record<SignalSource, { at: string; trustWeight: number; simulated: boolean }>>>;
   /** SIMULATED signals written by the demo panel: owner -> source -> ISO time. */
   simulated: Record<string, Partial<Record<SignalSource, string>>>;
   /** EVM nonce tracking for the evm_onchain adapter: owner -> { nonce, seenAt }. */
@@ -54,6 +58,8 @@ export interface AgentState {
 const EMPTY: AgentState = {
   owners: {},
   policies: {},
+  heartbeats: {},
+  observations: {},
   simulated: {},
   evmNonces: {},
   snapshots: {},

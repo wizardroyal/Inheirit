@@ -99,6 +99,19 @@ export class GithubAdapter implements SignalAdapter {
   }
 }
 
+/** Owner-signed pings from the heartbeat app (POST /api/heartbeat checks the NEP-413 signature). */
+export class HeartbeatAdapter implements SignalAdapter {
+  source = "phone_heartbeat" as const;
+  simulated = false;
+  trustWeight = 0.9;
+  constructor(private readonly store: Store) {}
+
+  async lastActivity(owner: OwnerSignalConfig): Promise<Date | null> {
+    const at = this.store.get().heartbeats[owner.owner];
+    return at ? new Date(at) : null;
+  }
+}
+
 /** SIMULATED source: returns what the demo panel recorded for it. */
 export class SimulatedAdapter implements SignalAdapter {
   simulated = true;

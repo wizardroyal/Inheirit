@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { api } from "../src/api";
+import { AuthError, type SignedAction } from "../src/auth/nep413";
 import type { WillContract, WillView } from "../src/near/will-contract";
 import { checkPolicy, policyHash } from "../src/policy/policy";
 import { Store } from "../src/state/store";
@@ -17,12 +18,21 @@ const parsed = checkPolicy(policyInput);
 if (!parsed.ok) throw new Error("bad fixture");
 const HASH = policyHash(parsed.policy);
 
+// Stand-in for Nep413Verifier (tested in nep413.test.ts): `signed` is the already-verified message
+const verifier = {
+  async verify(input: unknown, action: SignedAction) {
+    const m = input as { owner: string; action: SignedAction; data?: unknown; bad?: boolean };
+    if (m.bad || m.action !== action) throw new AuthError("bad signature");
+    return { owner: m.owner, action, issuedAt: 0, data: m.data };
+  },
+};
+
 function setup(demoMode: boolean, onChainHash = HASH) {
   const store = new Store(null);
   const contract = {
     getWill: async (owner: string) => (owner === "alice.testnet" ? ({ owner, policy_hash: onChainHash, state: "Active" } as WillView) : null),
   } as unknown as WillContract;
-  const app = api({ contract, store, vaults: [], demoMode, agentInfo: async () => ({}) });
+  const app = api({ contract, store, vaults: [], demoMode, agentInfo: async () => ({}), auth: verifier });
   const post = (path: string, body: unknown) =>
     app.request(path, { method: "POST", body: JSON.stringify(body), headers: { "Content-Type": "application/json" } });
   return { store, post };
@@ -62,8 +72,34 @@ describe("demo-only routes", () => {
   it("only simulated sources can be written", async () => {
     expect((await setup(true).post("/demo/signal", { owner: "alice.testnet", source: "near_onchain" })).status).toBe(400);
   });
-  it("owner registration is demo-only until owner signatures exist", async () => {
+  it("unsigned owner registration works only in demo mode", async () => {
     expect((await setup(false).post("/api/owners", { owner: "alice.testnet" })).status).toBe(403);
     expect((await setup(true).post("/api/owners", { owner: "alice.testnet", github: "alice" })).status).toBe(200);
+  });
+});
+
+describe("owner-signed routes", () => {
+  it("registers signal identities from a signed request outside demo mode", async () => {
+    const t = setup(false);
+    const res = await t.post("/api/owners", { signed: { owner: "alice.testnet", action: "register_owner", data: { github: "alice" } } });
+    expect(await res.json()).toMatchObject({ ok: true, signed: true });
+    expect(t.store.get().owners["alice.testnet"]).toEqual({ owner: "alice.testnet", github: "alice" });
+  });
+  it("refuses a bad signature", async () => {
+    const res = await setup(true).post("/api/owners", { signed: { owner: "alice.testnet", action: "register_owner", bad: true } });
+    expect(res.status).toBe(401);
+  });
+  it("records a signed heartbeat and starts watching the owner", async () => {
+    const t = setup(false);
+    const res = await t.post("/api/heartbeat", { signed: { owner: "alice.testnet", action: "heartbeat" } });
+    expect(res.status).toBe(200);
+    expect(t.store.get().heartbeats["alice.testnet"]).toBeDefined();
+    expect(t.store.get().owners["alice.testnet"]).toEqual({ owner: "alice.testnet" });
+  });
+  it("never accepts an unsigned heartbeat, even in demo mode", async () => {
+    expect((await setup(true).post("/api/heartbeat", { owner: "alice.testnet" })).status).toBe(401);
+  });
+  it("refuses a heartbeat for an owner with no will", async () => {
+    expect((await setup(false).post("/api/heartbeat", { signed: { owner: "bob.testnet", action: "heartbeat" } })).status).toBe(404);
   });
 });
