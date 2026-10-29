@@ -51,8 +51,17 @@ if (balance < 0.5) {
 const REGISTER_RETRY_MIN_MS = 10_000;
 const REGISTER_RETRY_MAX_MS = 5 * 60_000;
 let registerRetryMs = REGISTER_RETRY_MIN_MS;
+// Failed attempts (e.g. before measurements are approved) drain the boot funding below what
+// register_agent needs, so top up again, but only a few times so a stuck agent can't drain the sponsor
+const REGISTER_MIN_BALANCE = 0.35;
+let topUpsLeft = 3;
 while (true) {
   try {
+    if (topUpsLeft > 0 && (await agent.balance()) < REGISTER_MIN_BALANCE) {
+      topUpsLeft--;
+      console.log(`Agent balance below ${REGISTER_MIN_BALANCE} NEAR; topping up 0.5 (${topUpsLeft} top-ups left)`);
+      await agent.fund(0.5);
+    }
     // Register the agent if whitelisted or if the agent contract requires TEE
     const isWhitelisted = await agent.isWhitelisted();
     if (isWhitelisted === null || isWhitelisted) {
