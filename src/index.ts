@@ -2,6 +2,7 @@
 import "dotenv/config";
 import { serve } from "@hono/node-server";
 import { ShadeClient } from "@neardefi/shade-agent-js";
+import { FailoverRpcProvider, JsonRpcProvider } from "@near-js/providers";
 import { AttestationGate, liveDeps } from "./ai/attestation";
 import { NearAiClient } from "./ai/nearai";
 import { heirGuide, type GuideTurn } from "./ai/heir-guide";
@@ -27,9 +28,15 @@ const agentContractId = config.contractId();
 const sponsorAccountId = env("SPONSOR_ACCOUNT_ID");
 const sponsorPrivateKey = env("SPONSOR_PRIVATE_KEY");
 
+// NEAR RPC: one URL or a comma-separated list with failover. The agent's calls all come from one IP,
+// and FastNEAR's free tier throttles it (429), so a keyed or second endpoint can be configured.
+const rpcUrls = config.nearRpc().split(",").map((u) => u.trim()).filter(Boolean);
+const rpc = rpcUrls.length > 1 ? new FailoverRpcProvider(rpcUrls.map((url) => new JsonRpcProvider({ url }))) : new JsonRpcProvider({ url: rpcUrls[0] });
+
 // Initialize Shade Agent client
 const agent = await ShadeClient.create({
   networkId: "testnet",
+  rpc,
   agentContractId: agentContractId, // Agent contract the agent will interact with
   sponsor: {
     // Sponsor account details that will fund the agent
@@ -125,7 +132,14 @@ try {
 }
 const notes = new NoteReleaser(contract, notesEnabled ? sealed.keypair : null);
 
-const driver = new Driver({ contract, adapters, store, notes, executor: new StagedExecutor(contract, vaults, store) });
+const driver = new Driver({
+  contract,
+  adapters,
+  store,
+  notes,
+  executor: new StagedExecutor(contract, vaults, store),
+  demoWatchMs: config.demoMode() ? config.demoWatchHours() * 3_600_000 : undefined,
+});
 
 // NEAR AI Cloud: will contents go only to a model whose TEE attestation passes (checked before each use, cached 10 min)
 const nearaiKey = config.nearaiApiKey();
@@ -171,7 +185,7 @@ const faucet =
 const app = api({
   faucet,
   ai,
-  auth: new Nep413Verifier({ recipient: agentContractId, accessKey: rpcAccessKey(config.nearRpc()) }),
+  auth: new Nep413Verifier({ recipient: agentContractId, accessKey: rpcAccessKey(rpcUrls[0]) }),
   contract,
   store,
   vaults,

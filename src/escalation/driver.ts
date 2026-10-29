@@ -28,6 +28,17 @@ export interface DriverDeps {
   notes?: NoteReleaser;
   now?: () => Date;
   log?: (msg: string) => void;
+  /**
+   * Demo mode: stop driving a will this long after the agent started watching it, unless it is mid-
+   * execution. Abandoned demo wills would otherwise cycle (a failed vote returns them to Active) forever,
+   * costing gas and RPC calls. Unset in real mode.
+   */
+  demoWatchMs?: number;
+}
+
+/** True for errors that mean the RPC is throttling us; the rest of the tick waits for the next one. */
+export function isRateLimited(e: unknown): boolean {
+  return /\b429\b|rate limit/i.test(e instanceof Error ? e.message : String(e));
 }
 
 /** Whether advance() would change the state at `nowS` (mirrors the contract's internal_advance). */
@@ -107,11 +118,30 @@ export class Driver {
   async tick(): Promise<void> {
     for (const cfg of Object.values(this.deps.store.get().owners)) {
       try {
+        if (await this.expireDemoWill(cfg)) continue;
         await this.tickOwner(cfg);
       } catch (e) {
         this.log(`[driver] ${cfg.owner}: ${e instanceof Error ? e.message : String(e)}`);
+        if (isRateLimited(e)) {
+          this.log("[driver] NEAR RPC is rate-limiting; skipping the rest of this tick");
+          return;
+        }
       }
     }
+  }
+
+  /** Demo mode: drops a will from the watch list once its time is up (never mid-execution). */
+  private async expireDemoWill(cfg: OwnerSignalConfig): Promise<boolean> {
+    const ttl = this.deps.demoWatchMs;
+    if (!ttl || !cfg.watchedSince) return false;
+    if (this.now().getTime() - Date.parse(cfg.watchedSince) < ttl) return false;
+    const will = await this.deps.contract.getWill(cfg.owner);
+    if (will && stateName(will.state) === "Executing") return false;
+    this.deps.store.update((s) => {
+      delete s.owners[cfg.owner];
+    });
+    this.log(`[driver] ${cfg.owner}: demo will no longer watched (older than ${Math.round(ttl / 3_600_000)} h)`);
+    return true;
   }
 
   async tickOwner(cfg: OwnerSignalConfig): Promise<void> {

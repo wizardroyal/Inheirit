@@ -83,7 +83,7 @@ describe("owner-signed routes", () => {
     const t = setup(false);
     const res = await t.post("/api/owners", { signed: { owner: "alice.testnet", action: "register_owner", data: { github: "alice" } } });
     expect(await res.json()).toMatchObject({ ok: true, signed: true });
-    expect(t.store.get().owners["alice.testnet"]).toEqual({ owner: "alice.testnet", github: "alice" });
+    expect(t.store.get().owners["alice.testnet"]).toMatchObject({ owner: "alice.testnet", github: "alice", watchedSince: expect.any(String) });
   });
   it("refuses a bad signature", async () => {
     const res = await setup(true).post("/api/owners", { signed: { owner: "alice.testnet", action: "register_owner", bad: true } });
@@ -94,7 +94,7 @@ describe("owner-signed routes", () => {
     const res = await t.post("/api/heartbeat", { signed: { owner: "alice.testnet", action: "heartbeat" } });
     expect(res.status).toBe(200);
     expect(t.store.get().heartbeats["alice.testnet"]).toBeDefined();
-    expect(t.store.get().owners["alice.testnet"]).toEqual({ owner: "alice.testnet" });
+    expect(t.store.get().owners["alice.testnet"]).toMatchObject({ owner: "alice.testnet", watchedSince: expect.any(String) });
   });
   it("never accepts an unsigned heartbeat, even in demo mode", async () => {
     expect((await setup(true).post("/api/heartbeat", { owner: "alice.testnet" })).status).toBe(401);

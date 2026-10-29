@@ -70,6 +70,18 @@ export function api(deps: ApiDeps): Hono {
     guide: new RateLimiter(AI_GUIDE_LIMIT),
     faucet: new RateLimiter(FAUCET_LIMIT),
   };
+  // Many open pages poll these routes; each call costs the agent RPC/Sepolia/mempool requests from one
+  // IP, so answers are shared for a few seconds.
+  const cache = new Map<string, { at: number; value: Promise<unknown> }>();
+  function cached<T>(key: string, ttlMs: number, fn: () => Promise<T>): Promise<T> {
+    const hit = cache.get(key);
+    if (hit && Date.now() - hit.at < ttlMs) return hit.value as Promise<T>;
+    const value = fn();
+    cache.set(key, { at: Date.now(), value });
+    value.catch(() => cache.delete(key));
+    if (cache.size > 2000) cache.clear();
+    return value;
+  }
   const tooMany = (waitMs: number) => ({ error: "Too many requests; try again later", retry_after_s: Math.ceil(waitMs / 1000) });
 
   app.get("/", (c) => c.json({ message: "Inheirit will agent is running", demoMode: deps.demoMode }));
@@ -105,7 +117,8 @@ export function api(deps: ApiDeps): Hono {
     if (r.error) return c.json(r.error.body, r.error.status);
     const { evm_address, github, email } = r.data;
     if (!(await contract.getWill(r.owner))) return c.json({ error: `No will for ${r.owner}` }, 404);
-    store.update((s) => (s.owners[r.owner] = { owner: r.owner, evmAddress: evm_address, github, email }));
+    const watchedSince = new Date().toISOString();
+    store.update((s) => (s.owners[r.owner] = { owner: r.owner, evmAddress: evm_address, github, email, watchedSince }));
     return c.json({ ok: true, signed: r.signed, watching: store.get().owners[r.owner] });
   });
 
@@ -120,7 +133,7 @@ export function api(deps: ApiDeps): Hono {
     const at = new Date().toISOString();
     store.update((s) => {
       s.heartbeats[r.owner] = at;
-      s.owners[r.owner] ??= { owner: r.owner };
+      s.owners[r.owner] ??= { owner: r.owner, watchedSince: at };
     });
     return c.json({ ok: true, owner: r.owner, at });
   });
@@ -189,20 +202,23 @@ export function api(deps: ApiDeps): Hono {
 
   app.get("/api/vaults/:owner", async (c) => {
     const owner = c.req.param("owner");
-    const out: Record<string, unknown> = {};
-    for (const v of deps.vaults) {
-      try {
-        out[v.chain] = { address: await v.address(owner), balance: (await v.balance(owner)).toString() };
-      } catch (e) {
-        out[v.chain] = { error: e instanceof Error ? e.message : String(e) };
+    const out = await cached(`vaults:${owner}`, 15_000, async () => {
+      const r: Record<string, unknown> = {};
+      for (const v of deps.vaults) {
+        try {
+          r[v.chain] = { address: await v.address(owner), balance: (await v.balance(owner)).toString() };
+        } catch (e) {
+          r[v.chain] = { error: e instanceof Error ? e.message : String(e) };
+        }
       }
-    }
+      return r;
+    });
     return c.json(out);
   });
 
   app.get("/api/status/:owner", async (c) => {
     const owner = c.req.param("owner");
-    const will = await contract.getWill(owner);
+    const will = await cached(`will:${owner}`, 5_000, () => contract.getWill(owner));
     if (!will) return c.json({ error: `No will for ${owner}` }, 404);
     const s = store.get();
     return c.json({

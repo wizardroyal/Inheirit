@@ -13,6 +13,8 @@ export interface OwnerSignalConfig {
   github?: string;
   /** Where to email the owner (optional; without Resend configured, notices go to the UI log). */
   email?: string;
+  /** When the agent started watching (ISO). In demo mode, wills stop being driven after a while. */
+  watchedSince?: string;
 }
 
 export interface Notification {

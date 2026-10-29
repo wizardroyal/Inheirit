@@ -108,7 +108,7 @@ npm run dev                             # agent on :3000
 cd web && npm ci && cp .env.example .env.local && npm run dev -- -p 3100   # web on :3100
 ```
 
-Contract: `cd agent-contract && cargo +1.86.0 test --lib`. Headless scenario scripts: `scripts/demo-execute.ts` (Scenario B), `scripts/demo-sealed-note.ts` (English will → sealed note → heir decrypts), `scripts/fund-vaults.ts`. Project brief and every decision with its evidence: [`CLAUDE.md`](CLAUDE.md).
+Contract: `cd agent-contract && cargo +1.86.0 test --lib`. Headless scenario scripts: `scripts/demo-cancel.ts` (Scenario A), `scripts/demo-execute.ts` (Scenario B), `scripts/demo-sealed-note.ts` (English will → sealed note → heir decrypts); helpers `scripts/fund-vaults.ts`, `scripts/new-funder.ts`. Deploying: [`docs/DEPLOY.md`](docs/DEPLOY.md). Project brief and every decision with its evidence: [`CLAUDE.md`](CLAUDE.md).
 
 ## Credits
 

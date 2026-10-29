@@ -9,7 +9,7 @@ import { loadKeys, saveKey } from "../demo-keys";
 export const CONTRACT = process.env.AGENT_CONTRACT_ID || "inheirit.testnet";
 export const FUNDER = process.env.DEMO_FUNDER_ACCOUNT || "inheirit-demo.testnet";
 // rpc.testnet.near.org is deprecated and rate-limits (429)
-export const provider = new JsonRpcProvider({ url: process.env.NEAR_RPC_URL || "https://test.rpc.fastnear.com" });
+export const provider = new JsonRpcProvider({ url: (process.env.NEAR_RPC_URL || "https://test.rpc.fastnear.com").split(",")[0].trim() });
 export const NEAR = 10n ** 24n;
 export const sleep = (s: number) => new Promise((r) => setTimeout(r, s * 1000));
 export const nearblocks = (hash: string) => `https://testnet.nearblocks.io/txns/${hash}`;

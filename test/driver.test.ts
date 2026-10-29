@@ -165,3 +165,45 @@ describe("Driver", () => {
     expect(challenge.noted).toEqual([]);
   });
 });
+
+describe("demo watch expiry and rate limits", () => {
+  const HOUR = 3_600_000;
+  function setup(state: WillState, watchedSince: string, nowMs: number) {
+    const store = new Store(null);
+    store.update((s) => (s.owners["alice.testnet"] = { owner: "alice.testnet", watchedSince }));
+    const contract = new FakeContract(will(state), () => Math.floor(nowMs / 1000));
+    const driver = new Driver({ contract, adapters: [], store, now: () => new Date(nowMs), log: () => {}, demoWatchMs: 3 * HOUR });
+    return { store, contract, driver };
+  }
+  const since = new Date(T0 * 1000).toISOString();
+
+  it("stops driving a demo will after the watch period", async () => {
+    const t = setup("Active", since, T0 * 1000 + 4 * HOUR);
+    await t.driver.tick();
+    expect(t.store.get().owners["alice.testnet"]).toBeUndefined();
+    expect(t.contract.calls).toEqual([]);
+  });
+  it("keeps driving a demo will that is mid-execution", async () => {
+    const t = setup({ Executing: { stage: 0, since: T0, stage_started: T0 } }, since, T0 * 1000 + 4 * HOUR);
+    await t.driver.tick();
+    expect(t.store.get().owners["alice.testnet"]).toBeDefined();
+  });
+  it("keeps driving within the watch period", async () => {
+    const t = setup("Active", since, T0 * 1000 + HOUR);
+    await t.driver.tick();
+    expect(t.store.get().owners["alice.testnet"]).toBeDefined();
+  });
+  it("skips the rest of a tick when the RPC rate-limits", async () => {
+    const store = new Store(null);
+    for (const o of ["a.testnet", "b.testnet"]) store.update((s) => (s.owners[o] = { owner: o }));
+    let calls = 0;
+    const contract = {
+      getWill: async () => {
+        calls++;
+        throw new Error('{"code": -429, "message": "Rate limits exceeded"}');
+      },
+    } as unknown as WillContract;
+    await new Driver({ contract, adapters: [], store, log: () => {} }).tick();
+    expect(calls).toBe(1);
+  });
+});

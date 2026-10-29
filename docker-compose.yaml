@@ -7,6 +7,9 @@ services:
       DEMO_MODE: ${DEMO_MODE}
       NEARAI_API_KEY: ${NEARAI_API_KEY}
       NEARAI_MODEL: ${NEARAI_MODEL}
+      DEMO_FAUCET_ETH_KEY: ${DEMO_FAUCET_ETH_KEY}
+      DEMO_FAUCET_BTC_KEY: ${DEMO_FAUCET_BTC_KEY}
+      NEAR_RPC_URL: ${NEAR_RPC_URL}
     platform: linux/amd64
     # Pinned by digest: the compose hash (and so the approved measurements) covers this line
     image: unwizarding/inheirit-agent@sha256:4d8a09010979b6d3667dc0fb109532a895575f9cf30b448b022f1fe274db9381
