@@ -1,0 +1,32 @@
+# Threat model
+
+Inheirit holds money (vaults) and secrets (sealed notes) on behalf of someone who, by design, may not be around to defend them. This document lists who might attack it, what they want, and what stops them, including where the defenses are weaker than we'd like.
+
+## Assets
+
+- **Vault funds:** NEAR held by the contract `inheirit.testnet`; Sepolia ETH and BTC testnet4 at addresses derived by NEAR Chain Signatures from the contract account and `heirloom/<owner>/<chain>`.
+- **Sealed notes:** instructions encrypted to the agent's X25519 key and stored on-chain as ciphertext.
+- **Liveness data:** when the owner was last active on each source (timestamps only).
+
+## Attackers and defenses
+
+| Attacker | Goal | Defenses | Residual risk |
+|---|---|---|---|
+| **Greedy heir**, possibly with a colluding guardian | Get funds while the owner is alive | Execution needs a guardian quorum (threshold set by the owner; guardians can't be heirs, the owner or duplicates) **and** a challenge period during which the owner is notified on every channel. Any strong sign of life (signed NEAR or Sepolia tx, signed heartbeat) or a single guardian saying "alive" cancels. Release is staged (smallest first), and a sign of life mid-execution halts the rest. | A quorum of colluding guardians plus an owner who is truly unreachable for the whole challenge period (e.g. in hospital with no phone). Long real-world periods (30 days) and staging limit the damage. |
+| **Outsider** | Steal vault funds | Only the contract can request signatures for the vault paths, because the path is derived under the contract account and built by the contract itself. The contract forwards a signature request only from a registered agent with approved TDX measurements, only while that will is Executing (or for an owner-requested withdrawal), and at most 16 signatures per (stage, chain). Owner withdrawals must be signed by the owner. | Bugs in the contract or the template's attestation verification (unaudited). |
+| **Compromised or buggy agent** | Sign arbitrary transactions from a vault | Registration requires a TDX attestation matching approved measurements. | **The gate is payload-blind:** the contract can't see what a 32-byte payload hash signs. While a will is Executing, a compromised agent could get up to 16 signatures per (stage, chain) for any transaction from that vault. The defense is the attested code itself plus the cap. |
+| **Platform / developer (us)** | Read sealed notes or wills | Notes are encrypted in the owner's browser to a key derived inside the TEE and kept only in memory; plain-English wills go only to attested NEAR AI models. The agent's code is pinned by compose hash, and every new hash must be approved on the contract before an agent can register; all hashes are published in `deploy/tee-agent.json` and shown in the UI's Trust card. | **Centralized KMS:** with Phala's KMS, the Phala account holder can push a new compose in place, and that code would derive the **same** sealed-notes key; the contract's measurement approval gates registration, not key release. So "the developer can't read notes" rests on operational discipline plus Phala, not on cryptography alone. Planned fix: dstack's on-chain KMS with a timelocked compose allowlist. |
+| **Account hijacker after death** | Keep the will alive forever (block heirs) by posting from the owner's accounts | Weak social signals alone never count; it takes a strong signal (signed transaction or heartbeat). | Someone holding the owner's NEAR keys can keep signing. A guardian supermajority override with evidence is on the roadmap. |
+| **Spammer** | Drain the operator's NEAR AI credit, gas or demo faucet | AI routes and the demo faucet require NEP-413 signatures checked against on-chain keys, plus per-account and global hourly/daily limits. The faucet funds each will once, only Active wills with empty vaults, in demo mode only. | Free testnet accounts make Sybil accounts cheap; the global limits bound the total cost. |
+| **Owner's own mistakes** | Forgetting, losing keys | No check-ins. The owner can cancel at any stage and withdraw while Active. Heirs download a backup of their note key. | A lost heir key after notes are released cannot be recovered (the key is fixed once a note is released to it). |
+
+## Operational risks
+
+- **Contract account loss = vault loss.** Vault addresses derive from `inheirit.testnet`. If that account were deleted and re-registered by someone else, they would control every vault. Never delete it. (We learned this on a spike account that stranded 0.06 Sepolia ETH.)
+- **Agent app loss = sealed-notes key loss.** The key is bound to one Phala app_id. The agent is upgraded in place and never re-created; if the app is lost, owners must re-seal their notes to a new key (rotation needs the contract owner).
+- **MPC latency.** A signature takes up to ~1 minute; BTC needs one per input. The executor saves signed transactions before broadcasting and relies on nonces/UTXOs so a retry can't double-send.
+- **Demo keys in the browser.** The demo creates testnet accounts whose secret keys are stored in the browser's localStorage. Fine for throwaway testnet accounts; a real deployment would use a wallet.
+
+## Out of scope
+
+Mainnet funds, legal validity of the will, and attacks on NEAR, Phala, Intel TDX, NVIDIA attestation or the MPC network themselves.

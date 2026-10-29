@@ -52,6 +52,9 @@ export const agent = {
   draftPolicy: (signed: SignedRequest) => req<DraftResult>("/api/policy/draft", { signed }),
   heirGuide: (signed: SignedRequest) => req<GuideAnswer>("/api/heir/guide", { signed }),
   submitPolicy: (owner: string, policy: Policy) => req<{ ok: true; policy_hash: string }>("/api/policy", { owner, policy }),
+  faucetInfo: () => req<{ enabled: false } | { enabled: true; eth: string; btc: string; eth_wei: string; btc_sats: number }>("/demo/faucet"),
+  /** Demo vault faucet (demo mode only): funds the will's empty Sepolia/BTC vaults once. */
+  faucet: (signed: SignedRequest) => req<{ ok: boolean; sends: { chain: string; to: string; amount: string; txHash: string }[]; errors: string[] }>("/demo/faucet", { signed }),
   /** SIMULATED signal (demo mode only). */
   simulate: (owner: string, source: SignalSource) => req<{ ok: true }>("/demo/signal", { owner, source }),
 };

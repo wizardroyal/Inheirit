@@ -8,7 +8,7 @@ import { ActionButton, Card, Details, ExtLink, Pill, short, SimulatedTag } from 
 import { NotificationLog, Releases, SignalList, WatchStatus } from "@/components/WillParts";
 import { agent, type SignalSource } from "@/lib/agent";
 import { CONTRACT_ID, DEMO_TIMINGS, explorer } from "@/lib/config";
-import { addSealedNote, createCast, createWill, DEMO_NOTE, demoPolicy } from "@/lib/demo";
+import { addSealedNote, createCast, createWill, DEMO_NOTE, demoHeirReceive, demoPolicy, fundFromFaucet } from "@/lib/demo";
 import { useKeys, usePoll, useWill } from "@/lib/hooks";
 import type { Cast } from "@/lib/keys";
 import { call, formatNear, signRequest } from "@/lib/near";
@@ -159,7 +159,7 @@ function WillPanel({ cast }: { cast: Cast }) {
                 await createWill(
                 cast.owner,
                 {
-                  policy: demoPolicy(cast),
+                  policy: demoPolicy(cast, await demoHeirReceive()),
                   contacts: [cast.contact],
                   timings: DEMO_TIMINGS,
                   foreignChains: (["Eth", "Btc"] as const).filter((c) => chains[c]),
@@ -167,6 +167,11 @@ function WillPanel({ cast }: { cast: Cast }) {
                 },
                 progress,
               );
+                const foreign = (["Eth", "Btc"] as const).filter((c) => chains[c]);
+                if (foreign.length && (await agent.faucetInfo()).enabled) {
+                  progress("Asking the demo faucet to fund the Sepolia and BTC vaults (about 30 s)…");
+                  await fundFromFaucet(cast.owner, progress);
+                }
                 if (withNote) {
                   progress(`Sealing "${DEMO_NOTE.label}" in this browser to the agent's TEE key…`);
                   await addSealedNote(cast.owner, cast.heir, DEMO_NOTE.label, DEMO_NOTE.text);
@@ -321,12 +326,28 @@ function Vaults({ owner, will }: { owner: string; will: Will }) {
         <div className="font-sans">
           These addresses are derived by NEAR Chain Signatures from the contract account and the path heirloom/&lt;owner&gt;/&lt;chain&gt;. Only the
           contract can have them signed, and only while the will is executing (or for an owner withdrawal). Send a little Sepolia ETH or testnet4 BTC
-          from any faucet before execution starts; an empty vault is simply skipped. BTC balance counts confirmed coins only.
+          before execution starts: the demo panel asks the agent&apos;s demo faucet to do this when the will is created, or use any public faucet. An
+          empty vault is simply skipped.
         </div>
       </Details>
+      <FaucetButton owner={owner} will={will} />
       {error && <p className="text-xs text-danger">{error}</p>}
       {will.foreign_chains.length === 0 && <p className="mt-2 text-xs text-muted">This will has no foreign vaults.</p>}
     </Card>
+  );
+}
+
+function FaucetButton({ owner, will }: { owner: string; will: Will }) {
+  const { data: info } = usePoll(() => agent.faucetInfo(), 60_000);
+  const [log, setLog] = useState<string[]>([]);
+  if (!info?.enabled || will.foreign_chains.length === 0 || stateName(will.state) !== "Active") return null;
+  return (
+    <div className="mt-3">
+      <ActionButton tone="quiet" onClick={() => fundFromFaucet(owner, (m) => setLog((l) => [...l, m]))}>
+        Fund empty vaults from the demo faucet
+      </ActionButton>
+      <ProgressLog lines={log} />
+    </div>
   );
 }
 

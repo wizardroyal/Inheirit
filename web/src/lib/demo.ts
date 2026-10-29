@@ -10,8 +10,9 @@ import { sealToBase64 } from "./sealed";
 import type { AgentKey } from "./will";
 
 /**
- * Where the demo heir receives ETH and BTC. Testnet addresses whose keys the project keeps
- * (scripts/demo-keys.ts), so test coins released in demos can be recycled.
+ * Where the demo heir receives ETH and BTC when the agent has no demo faucet: testnet addresses whose
+ * keys the project keeps (scripts/demo-keys.ts), so released test coins can be recycled. With a faucet,
+ * the heir receives at the faucet pool's addresses instead, so coins flow back to the pool.
  */
 export const DEMO_HEIR_RECEIVE = {
   eth: "0x5d1667ff79aB791eeE854D0D03c5598aF542A567",
@@ -47,11 +48,16 @@ export async function createCast(progress: Progress): Promise<Cast> {
   return cast;
 }
 
-export function demoPolicy(cast: Cast): Policy {
+export async function demoHeirReceive(): Promise<{ eth: string; btc: string }> {
+  const f = await agent.faucetInfo().catch(() => ({ enabled: false as const }));
+  return f.enabled ? { eth: f.eth, btc: f.btc } : DEMO_HEIR_RECEIVE;
+}
+
+export function demoPolicy(cast: Cast, receive: { eth: string; btc: string }): Policy {
   const check = checkPolicy({
     version: 1,
     owner: cast.owner,
-    heirs: [{ id: "bola", name: "Bola", near_account: cast.heir, receive: DEMO_HEIR_RECEIVE }],
+    heirs: [{ id: "bola", name: "Bola", near_account: cast.heir, receive }],
     allocations: [
       { asset: "NEAR", shares: { bola: 100 } },
       { asset: "ETH", shares: { bola: 100 } },
@@ -110,4 +116,11 @@ export async function addSealedNote(owner: string, heir: string, label: string, 
   if (!key) throw new Error("The agent hasn't published its sealed-notes key on this contract yet");
   const ciphertext = await sealToBase64(text, key.x25519_pubkey);
   await call(owner, "add_sealed_note", { heir, label, ciphertext }, nearToYocto("0.05"));
+}
+
+/** Asks the agent's demo faucet to fund the will's empty Sepolia/BTC vaults (signed by the owner). */
+export async function fundFromFaucet(owner: string, progress: Progress): Promise<void> {
+  const r = await agent.faucet(await signRequest(owner, "demo_faucet", {}));
+  for (const s of r.sends) progress(`Faucet sent ${s.chain === "Eth" ? `${Number(s.amount) / 1e18} Sepolia ETH` : `${s.amount} testnet sats`} to the ${s.chain} vault (tx ${s.txHash.slice(0, 12)}…)`);
+  for (const e of r.errors) progress(`Faucet error: ${e}`);
 }

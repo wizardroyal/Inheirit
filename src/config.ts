@@ -20,4 +20,9 @@ export const config = {
   nearaiApiKey: () => process.env.NEARAI_API_KEY || undefined,
   // Attested (TEE) model; see Decision log 2026-10-27. Proxied models fail the attestation gate.
   nearaiModel: () => env("NEARAI_MODEL", "z-ai/glm-5.3-flash"),
+  // Demo vault faucet pool (testnet keys; demo mode only). Both keys must be set to enable it.
+  faucetEthKey: () => process.env.DEMO_FAUCET_ETH_KEY || undefined,
+  faucetBtcKey: () => process.env.DEMO_FAUCET_BTC_KEY || undefined,
+  faucetEth: () => env("DEMO_FAUCET_ETH", "0.002"),
+  faucetSats: () => Number(env("DEMO_FAUCET_SATS", "20000")),
 };

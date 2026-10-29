@@ -3,13 +3,11 @@
 // to those same heir addresses, so demo coins circulate instead of being lost. Testnet only.
 //
 // Usage: npx tsx scripts/fund-vaults.ts <owner> [--eth 0.003] [--sats 30000]
-import { secp256k1 } from "@noble/curves/secp256k1";
-import * as bitcoin from "bitcoinjs-lib";
 import { chainAdapters, contracts } from "chainsig.js";
-import { createPublicClient, createWalletClient, http, parseEther } from "viem";
-import { privateKeyToAccount } from "viem/accounts";
+import { createPublicClient, http, parseEther } from "viem";
 import { sepolia } from "viem/chains";
 import { MPC_CONTRACT_ID, vaultPath } from "../src/chains/vault-path";
+import { DemoFaucet } from "../src/demo/faucet";
 import { loadKeys } from "./demo-keys";
 
 const args = process.argv.slice(2);
@@ -36,47 +34,20 @@ const vaultEth = (await evm.deriveAddressAndPublicKey(contractId, vaultPath(owne
 const vaultBtc = (await btc.deriveAddressAndPublicKey(contractId, vaultPath(owner, "Btc"))).address;
 console.log(`contract ${contractId}, owner ${owner}\n  ETH vault ${vaultEth}\n  BTC vault ${vaultBtc}`);
 
-// Sepolia: a plain value transfer from the heir's key
+// Same send code as the agent's demo faucet, with the demo heir's keys as the pool
+const pool = new DemoFaucet({
+  ethPrivateKey: keys["heir-eth"] as `0x${string}`,
+  btcPrivateKeyHex: keys["heir-btc"],
+  sepoliaRpc: SEPOLIA_RPC,
+  btcApi: BTC_API,
+  ethWei: parseEther(eth),
+  btcSats: sats,
+});
 if (Number(eth) > 0) {
-  const account = privateKeyToAccount(keys["heir-eth"] as `0x${string}`);
-  const wallet = createWalletClient({ account, chain: sepolia, transport: http(SEPOLIA_RPC) });
-  const hash = await wallet.sendTransaction({ to: vaultEth, value: parseEther(eth) });
-  const receipt = await publicClient.waitForTransactionReceipt({ hash });
-  console.log(`sent ${eth} ETH: https://sepolia.etherscan.io/tx/${hash} (status ${receipt.status})`);
+  const r = await pool.send("Eth", vaultEth);
+  console.log(`sent ${eth} ETH: https://sepolia.etherscan.io/tx/${r.txHash}`);
 }
-
-// BTC testnet4: P2WPKH from the heir's key, change back to the heir
 if (sats > 0) {
-  const priv = Buffer.from(keys["heir-btc"], "hex");
-  const pubkey = Buffer.from(secp256k1.getPublicKey(priv, true));
-  const network = bitcoin.networks.testnet;
-  const pay = bitcoin.payments.p2wpkh({ pubkey, network });
-  const from = pay.address!;
-  const utxoRes = await fetch(`${BTC_API}/address/${from}/utxo`);
-  if (!utxoRes.ok) throw new Error(`UTXO fetch ${utxoRes.status}`);
-  const utxos = ((await utxoRes.json()) as { txid: string; vout: number; value: number }[]).sort((a, b) => b.value - a.value);
-  const feeRes = await fetch(`${BTC_API}/v1/fees/recommended`);
-  const rate = Math.max(1, Math.ceil(((await feeRes.json()) as { halfHourFee: number }).halfHourFee));
-  const psbt = new bitcoin.Psbt({ network });
-  let total = 0;
-  for (const u of utxos) {
-    psbt.addInput({ hash: u.txid, index: u.vout, witnessUtxo: { script: pay.output!, value: u.value } });
-    total += u.value;
-    if (total >= sats + 1000) break;
-  }
-  const fee = Math.ceil((11 + 68 * psbt.inputCount + 31 * 2) * rate);
-  const change = total - sats - fee;
-  if (change < 0) throw new Error(`heir has ${total} sats, needs ${sats + fee}`);
-  psbt.addOutput({ address: vaultBtc, value: sats });
-  if (change >= 546) psbt.addOutput({ address: from, value: change });
-  const signer = {
-    publicKey: pubkey,
-    sign: (hash: Buffer) => Buffer.from(secp256k1.sign(hash, priv, { lowS: true }).toCompactRawBytes()),
-  };
-  psbt.signAllInputs(signer);
-  psbt.finalizeAllInputs();
-  const tx = psbt.extractTransaction();
-  const res = await fetch(`${BTC_API}/tx`, { method: "POST", body: tx.toHex() });
-  if (!res.ok) throw new Error(`BTC broadcast ${res.status}: ${await res.text()}`);
-  console.log(`sent ${sats} sats (fee ${fee}): https://mempool.space/testnet4/tx/${tx.getId()}`);
+  const r = await pool.send("Btc", vaultBtc);
+  console.log(`sent ${sats} sats: https://mempool.space/testnet4/tx/${r.txHash}`);
 }

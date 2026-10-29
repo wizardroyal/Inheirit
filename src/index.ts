@@ -11,6 +11,7 @@ import { Nep413Verifier, rpcAccessKey } from "./auth/nep413";
 import { BtcVault } from "./chains/btc";
 import { EvmVault } from "./chains/evm";
 import { config, env } from "./config";
+import { DemoFaucet } from "./demo/faucet";
 import { Driver } from "./escalation/driver";
 import { StagedExecutor } from "./executor/executor";
 import { ShadeWillContract, type WillView } from "./near/will-contract";
@@ -20,6 +21,7 @@ import { ensureAgentKey, NoteReleaser } from "./sealed/releaser";
 import { EvmNonceAdapter, GithubAdapter, HeartbeatAdapter, NearOnchainAdapter, SIMULATED_SOURCES, SimulatedAdapter } from "./signals/adapters";
 import type { Policy } from "./policy/policy";
 import { Store } from "./state/store";
+import { parseEther } from "viem";
 
 const agentContractId = config.contractId();
 const sponsorAccountId = env("SPONSOR_ACCOUNT_ID");
@@ -140,7 +142,34 @@ const ai = nearaiKey
   : undefined;
 if (!ai) console.warn("[ai] NEARAI_API_KEY not set: policy drafting and the AI attestation badge are off");
 
+// Demo vault faucet: only in demo mode, only when both pool keys are configured
+const faucetEthKey = config.faucetEthKey();
+const faucetBtcKey = config.faucetBtcKey();
+const faucet =
+  config.demoMode() && faucetEthKey && faucetBtcKey
+    ? (() => {
+        const ethWei = parseEther(config.faucetEth());
+        const btcSats = config.faucetSats();
+        const f = new DemoFaucet({
+          ethPrivateKey: faucetEthKey as `0x${string}`,
+          btcPrivateKeyHex: faucetBtcKey,
+          sepoliaRpc: config.sepoliaRpc(),
+          btcApi: config.btcApi(),
+          ethWei,
+          btcSats,
+        });
+        console.log(`[faucet] demo vault faucet on: ETH ${f.ethAddress}, BTC ${f.btcAddress}`);
+        return {
+          ethAddress: f.ethAddress,
+          btcAddress: f.btcAddress,
+          amounts: { eth_wei: ethWei.toString(), btc_sats: btcSats },
+          send: (chain: "Eth" | "Btc", to: string) => f.send(chain, to),
+        };
+      })()
+    : undefined;
+
 const app = api({
+  faucet,
   ai,
   auth: new Nep413Verifier({ recipient: agentContractId, accessKey: rpcAccessKey(config.nearRpc()) }),
   contract,

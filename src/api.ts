@@ -5,6 +5,8 @@ import { z } from "zod";
 import type { AttestationResult } from "./ai/attestation";
 import type { GuideAnswer, GuideTurn } from "./ai/heir-guide";
 import { AuthError, type Nep413Verifier, type SignedAction, type Verified } from "./auth/nep413";
+import { AI_DRAFT_LIMIT, AI_GUIDE_LIMIT, FAUCET_LIMIT, RateLimiter } from "./auth/rate-limit";
+import type { FaucetSend } from "./demo/faucet";
 import type { PolicyDraft } from "./ai/policy-parser";
 import type { ChainVault } from "./executor/executor";
 import { stateName, type WillContract, type WillView } from "./near/will-contract";
@@ -20,6 +22,15 @@ export interface ApiDeps {
   agentInfo: () => Promise<Record<string, unknown>>;
   /** Checks owner-signed (NEP-413) requests. */
   auth: Pick<Nep413Verifier, "verify">;
+  /** Demo vault faucet; absent unless demo mode has pool keys configured. */
+  faucet?: {
+    ethAddress: string;
+    btcAddress: string;
+    amounts: { eth_wei: string; btc_sats: number };
+    send(chain: "Eth" | "Btc", to: string): Promise<FaucetSend>;
+  };
+  /** Override the default rate limits (tests). */
+  limiters?: { draft: RateLimiter; guide: RateLimiter; faucet: RateLimiter };
   /** Absent when NEARAI_API_KEY isn't configured. */
   ai?: {
     attestation(): Promise<AttestationResult>;
@@ -54,6 +65,12 @@ export function api(deps: ApiDeps): Hono {
   const app = new Hono();
   app.use(cors());
   const { contract, store } = deps;
+  const limiters = deps.limiters ?? {
+    draft: new RateLimiter(AI_DRAFT_LIMIT),
+    guide: new RateLimiter(AI_GUIDE_LIMIT),
+    faucet: new RateLimiter(FAUCET_LIMIT),
+  };
+  const tooMany = (waitMs: number) => ({ error: "Too many requests; try again later", retry_after_s: Math.ceil(waitMs / 1000) });
 
   app.get("/", (c) => c.json({ message: "Inheirit will agent is running", demoMode: deps.demoMode }));
   app.get("/api/agent-info", async (c) => c.json(await deps.agentInfo()));
@@ -126,6 +143,8 @@ export function api(deps: ApiDeps): Hono {
     if (!deps.ai) return c.json({ error: "NEAR AI is not configured (NEARAI_API_KEY)" }, 503);
     const r = await ownerRequest(await c.req.json(), "draft_policy", DraftText, DraftRequest);
     if (r.error) return c.json(r.error.body, r.error.status);
+    const wait = limiters.draft.take(r.owner);
+    if (wait) return c.json(tooMany(wait), 429);
     try {
       return c.json(await deps.ai.draftPolicy(r.owner, r.data.text));
     } catch (e) {
@@ -145,6 +164,8 @@ export function api(deps: ApiDeps): Hono {
     const will = await contract.getWill(r.data.owner);
     if (!will) return c.json({ error: `No will for ${r.data.owner}` }, 404);
     if (!will.heirs.some((h) => h.account_id === heir)) return c.json({ error: `${heir} is not an heir of this will` }, 403);
+    const wait = limiters.guide.take(heir);
+    if (wait) return c.json(tooMany(wait), 429);
     try {
       return c.json(await deps.ai.heirGuide(will, heir, store.get().policies[will.owner], r.data.question, r.data.history));
     } catch (e) {
@@ -198,6 +219,43 @@ export function api(deps: ApiDeps): Hono {
     const owner = c.req.query("owner");
     const all = store.get().notifications;
     return c.json(owner ? all.filter((n) => n.owner === owner) : all);
+  });
+
+  // Demo vault faucet: pool addresses (the demo heir receives at the same addresses, so coins cycle).
+  app.get("/demo/faucet", (c) => {
+    if (!deps.demoMode || !deps.faucet) return c.json({ enabled: false });
+    const f = deps.faucet;
+    return c.json({ enabled: true, eth: f.ethAddress, btc: f.btcAddress, ...f.amounts });
+  });
+
+  // Tops up an Active demo will's empty Sepolia/BTC vaults once. Owner-signed and capped per day.
+  app.post("/demo/faucet", async (c) => {
+    if (!deps.demoMode || !deps.faucet) return c.json({ error: "The demo faucet is not enabled" }, 403);
+    const body = (await c.req.json()) as { signed?: unknown };
+    if (!body?.signed) return c.json({ error: "The faucet needs a request signed by the will's owner" }, 401);
+    const r = await ownerRequest(body, "demo_faucet", z.object({}).passthrough(), z.never());
+    if (r.error) return c.json(r.error.body, r.error.status);
+    const owner = r.owner;
+    if (store.get().faucetSends[owner]) return c.json({ error: "This will's vaults were already funded by the faucet", sends: store.get().faucetSends[owner] }, 409);
+    const will = await contract.getWill(owner);
+    if (!will) return c.json({ error: `No will for ${owner}` }, 404);
+    if (stateName(will.state) !== "Active") return c.json({ error: "The faucet only funds Active wills" }, 409);
+    const chains = deps.vaults.filter((v) => will.foreign_chains.includes(v.chain));
+    if (!chains.length) return c.json({ error: "This will has no Sepolia or BTC vault" }, 409);
+    const wait = limiters.faucet.take(owner);
+    if (wait) return c.json(tooMany(wait), 429);
+    const sends: FaucetSend[] = [];
+    const errors: string[] = [];
+    for (const v of chains) {
+      try {
+        if ((await v.balance(owner)) > 0n) continue; // already funded some other way
+        sends.push(await deps.faucet.send(v.chain, await v.address(owner)));
+      } catch (e) {
+        errors.push(`${v.chain}: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    }
+    if (sends.length) store.update((s) => (s.faucetSends[owner] = sends));
+    return c.json({ ok: errors.length === 0, sends, errors }, sends.length || !errors.length ? 200 : 503);
   });
 
   // SIMULATED signals for the demo panel (CLAUDE.md §7.1). Never available outside demo mode.

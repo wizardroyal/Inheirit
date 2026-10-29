@@ -53,6 +53,8 @@ export interface AgentState {
   /** Last will state the driver notified about: owner -> state name. */
   notifiedState: Record<string, string>;
   notifications: Notification[];
+  /** Demo faucet top-ups already sent: owner -> sends (one funding per will). */
+  faucetSends: Record<string, { chain: "Eth" | "Btc"; to: string; amount: string; txHash: string }[]>;
 }
 
 const EMPTY: AgentState = {
@@ -66,6 +68,7 @@ const EMPTY: AgentState = {
   pendingTxs: {},
   notifiedState: {},
   notifications: [],
+  faucetSends: {},
 };
 
 export class Store {

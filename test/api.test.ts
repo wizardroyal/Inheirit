@@ -27,15 +27,15 @@ const verifier = {
   },
 };
 
-function setup(demoMode: boolean, onChainHash = HASH, ai?: ApiDeps["ai"]) {
+function setup(demoMode: boolean, onChainHash = HASH, ai?: ApiDeps["ai"], extra: Partial<ApiDeps> = {}) {
   const store = new Store(null);
   const contract = {
-    getWill: async (owner: string) => (owner === "alice.testnet" ? ({ owner, policy_hash: onChainHash, state: "Active", heirs: [{ account_id: "bola.testnet" }] } as WillView) : null),
+    getWill: async (owner: string) => (owner === "alice.testnet" ? ({ owner, policy_hash: onChainHash, state: "Active", heirs: [{ account_id: "bola.testnet" }], foreign_chains: ["Eth", "Btc"] } as WillView) : null),
   } as unknown as WillContract;
-  const app = api({ contract, store, vaults: [], demoMode, agentInfo: async () => ({}), auth: verifier, ai });
+  const app = api({ contract, store, vaults: [], demoMode, agentInfo: async () => ({}), auth: verifier, ai, ...extra });
   const post = (path: string, body: unknown) =>
     app.request(path, { method: "POST", body: JSON.stringify(body), headers: { "Content-Type": "application/json" } });
-  return { store, post };
+  return { store, post, app };
 }
 
 describe("POST /api/policy", () => {
@@ -109,5 +109,46 @@ describe("owner-signed routes", () => {
   });
   it("refuses a heartbeat for an owner with no will", async () => {
     expect((await setup(false).post("/api/heartbeat", { signed: { owner: "bob.testnet", action: "heartbeat" } })).status).toBe(404);
+  });
+});
+
+describe("demo vault faucet", () => {
+  function faucetSetup(balances: Record<string, bigint> = { Eth: 0n, Btc: 0n }, demoMode = true) {
+    const sent: string[] = [];
+    const faucet = {
+      ethAddress: "0xpool",
+      btcAddress: "tb1pool",
+      amounts: { eth_wei: "1", btc_sats: 2 },
+      send: async (chain: "Eth" | "Btc", to: string) => {
+        sent.push(`${chain}:${to}`);
+        return { chain, to, amount: "1", txHash: `h-${chain}` };
+      },
+    };
+    const vaults = (["Eth", "Btc"] as const).map((chain) => ({
+      chain,
+      asset: chain === "Eth" ? "ETH" : "BTC",
+      address: async (o: string) => `${chain}-vault-${o}`,
+      balance: async () => balances[chain],
+    })) as unknown as ApiDeps["vaults"];
+    return { ...setup(demoMode, HASH, undefined, { faucet, vaults }), sent };
+  }
+  const signed = (owner = "alice.testnet") => ({ signed: { owner, action: "demo_faucet", data: {} } });
+
+  it("funds each empty vault once, signed by the owner", async () => {
+    const t = faucetSetup();
+    const res = await t.post("/demo/faucet", signed());
+    expect(await res.json()).toMatchObject({ ok: true, sends: [{ chain: "Eth" }, { chain: "Btc" }] });
+    expect(t.sent).toEqual(["Eth:Eth-vault-alice.testnet", "Btc:Btc-vault-alice.testnet"]);
+    expect((await t.post("/demo/faucet", signed())).status).toBe(409);
+  });
+  it("skips a vault that already holds coins", async () => {
+    const t = faucetSetup({ Eth: 5n, Btc: 0n });
+    await t.post("/demo/faucet", signed());
+    expect(t.sent).toEqual(["Btc:Btc-vault-alice.testnet"]);
+  });
+  it("is off outside demo mode and needs a signature", async () => {
+    expect((await faucetSetup(undefined, false).post("/demo/faucet", signed())).status).toBe(403);
+    expect((await faucetSetup().post("/demo/faucet", { owner: "alice.testnet" })).status).toBe(401);
+    expect(await (await faucetSetup(undefined, false).app.request("/demo/faucet")).json()).toEqual({ enabled: false });
   });
 });
