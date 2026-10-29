@@ -3,11 +3,12 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { z } from "zod";
 import type { AttestationResult } from "./ai/attestation";
+import type { GuideAnswer, GuideTurn } from "./ai/heir-guide";
 import { AuthError, type Nep413Verifier, type SignedAction, type Verified } from "./auth/nep413";
 import type { PolicyDraft } from "./ai/policy-parser";
 import type { ChainVault } from "./executor/executor";
-import { stateName, type WillContract } from "./near/will-contract";
-import { checkPolicy, policyHash } from "./policy/policy";
+import { stateName, type WillContract, type WillView } from "./near/will-contract";
+import { checkPolicy, policyHash, type Policy } from "./policy/policy";
 import { SIMULATED_SOURCES } from "./signals/adapters";
 import type { Store } from "./state/store";
 
@@ -23,11 +24,18 @@ export interface ApiDeps {
   ai?: {
     attestation(): Promise<AttestationResult>;
     draftPolicy(owner: string, text: string): Promise<PolicyDraft>;
+    heirGuide(will: WillView, heir: string, policy: Policy | undefined, question: string, history: GuideTurn[]): Promise<GuideAnswer>;
   };
 }
 
 const DraftText = z.object({ text: z.string().min(10).max(4000) });
 const DraftRequest = DraftText.extend({ owner: z.string().min(2) });
+
+const GuideRequest = z.object({
+  owner: z.string().min(2),
+  question: z.string().min(1).max(1000),
+  history: z.array(z.object({ role: z.enum(["user", "assistant"]), content: z.string().max(2000) })).max(8).default([]),
+});
 
 const OwnerFields = z.object({
   evm_address: z.string().regex(/^0x[0-9a-fA-F]{40}$/).optional(),
@@ -120,6 +128,25 @@ export function api(deps: ApiDeps): Hono {
     if (r.error) return c.json(r.error.body, r.error.status);
     try {
       return c.json(await deps.ai.draftPolicy(r.owner, r.data.text));
+    } catch (e) {
+      return c.json({ error: e instanceof Error ? e.message : String(e) }, 503);
+    }
+  });
+
+  // Heir claim guide. Signed by the heir (never unsigned: it spends NEAR AI credit); the model sees
+  // only that heir's own claim facts.
+  app.post("/api/heir/guide", async (c) => {
+    if (!deps.ai) return c.json({ error: "NEAR AI is not configured (NEARAI_API_KEY)" }, 503);
+    const body = (await c.req.json()) as { signed?: unknown };
+    if (!body?.signed) return c.json({ error: "The guide needs a request signed by the heir" }, 401);
+    const r = await ownerRequest(body, "heir_guide", GuideRequest, z.never());
+    if (r.error) return c.json(r.error.body, r.error.status);
+    const heir = r.owner;
+    const will = await contract.getWill(r.data.owner);
+    if (!will) return c.json({ error: `No will for ${r.data.owner}` }, 404);
+    if (!will.heirs.some((h) => h.account_id === heir)) return c.json({ error: `${heir} is not an heir of this will` }, 403);
+    try {
+      return c.json(await deps.ai.heirGuide(will, heir, store.get().policies[will.owner], r.data.question, r.data.history));
     } catch (e) {
       return c.json({ error: e instanceof Error ? e.message : String(e) }, 503);
     }

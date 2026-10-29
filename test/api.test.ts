@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { api } from "../src/api";
+import { api, type ApiDeps } from "../src/api";
 import { AuthError, type SignedAction } from "../src/auth/nep413";
 import type { WillContract, WillView } from "../src/near/will-contract";
 import { checkPolicy, policyHash } from "../src/policy/policy";
@@ -27,12 +27,12 @@ const verifier = {
   },
 };
 
-function setup(demoMode: boolean, onChainHash = HASH) {
+function setup(demoMode: boolean, onChainHash = HASH, ai?: ApiDeps["ai"]) {
   const store = new Store(null);
   const contract = {
-    getWill: async (owner: string) => (owner === "alice.testnet" ? ({ owner, policy_hash: onChainHash, state: "Active" } as WillView) : null),
+    getWill: async (owner: string) => (owner === "alice.testnet" ? ({ owner, policy_hash: onChainHash, state: "Active", heirs: [{ account_id: "bola.testnet" }] } as WillView) : null),
   } as unknown as WillContract;
-  const app = api({ contract, store, vaults: [], demoMode, agentInfo: async () => ({}), auth: verifier });
+  const app = api({ contract, store, vaults: [], demoMode, agentInfo: async () => ({}), auth: verifier, ai });
   const post = (path: string, body: unknown) =>
     app.request(path, { method: "POST", body: JSON.stringify(body), headers: { "Content-Type": "application/json" } });
   return { store, post };
@@ -98,6 +98,14 @@ describe("owner-signed routes", () => {
   });
   it("never accepts an unsigned heartbeat, even in demo mode", async () => {
     expect((await setup(true).post("/api/heartbeat", { owner: "alice.testnet" })).status).toBe(401);
+  });
+  it("the heir guide answers only a signed request from an heir of the will", async () => {
+    const ai = { heirGuide: async () => ({ ok: true, answer: "hello", ai: { model: "m" } }) } as unknown as ApiDeps["ai"];
+    const t = setup(true, HASH, ai);
+    const ask = (signer: string) => ({ signed: { owner: signer, action: "heir_guide", data: { owner: "alice.testnet", question: "hi" } } });
+    expect((await t.post("/api/heir/guide", { owner: "alice.testnet", question: "hi" })).status).toBe(401);
+    expect((await t.post("/api/heir/guide", ask("mallory.testnet"))).status).toBe(403);
+    expect(await (await t.post("/api/heir/guide", ask("bola.testnet"))).json()).toMatchObject({ ok: true, answer: "hello" });
   });
   it("refuses a heartbeat for an owner with no will", async () => {
     expect((await setup(false).post("/api/heartbeat", { signed: { owner: "bob.testnet", action: "heartbeat" } })).status).toBe(404);

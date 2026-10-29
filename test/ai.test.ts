@@ -11,7 +11,10 @@ import {
   type AttestationResult,
 } from "../src/ai/attestation";
 import { verifyChatSignature, type ChatResult } from "../src/ai/nearai";
+import { heirFacts, heirGuide } from "../src/ai/heir-guide";
 import { draftPolicy, type PolicyAi } from "../src/ai/policy-parser";
+import type { WillView } from "../src/near/will-contract";
+import { checkPolicy } from "../src/policy/policy";
 
 const sha = (s: string) => createHash("sha256").update(s).digest("hex");
 const NONCE = "ab".repeat(32);
@@ -226,5 +229,61 @@ describe("draftPolicy", () => {
     const d = await draftPolicy("alice.testnet", "…", fakeAi(JSON.stringify(GOOD), { badSig: true }), { require: async () => ATTESTED });
     expect(d.ok).toBe(false);
     expect(d.errors[0]).toMatch(/signature not verified/);
+  });
+});
+
+const WILL = {
+  owner: "alice.testnet",
+  heirs: [
+    { account_id: "bola.testnet", name: "Bola", near_share_bps: 8000, x25519_pubkey: "ab".repeat(32) },
+    { account_id: "charity.testnet", name: "Charity", near_share_bps: 2000, x25519_pubkey: null },
+  ],
+  guardians: ["g1.testnet"],
+  guardian_threshold: 1,
+  contacts: [],
+  stages_pct: [10, 90],
+  timings: {},
+  policy_hash: "",
+  foreign_chains: ["Eth"],
+  state: { Executing: { stage: 0, since: 1, stage_started: 1 } },
+  last_alive_at: 0,
+  execution_round: 1,
+  near_balance: "0",
+  pending_withdrawals: [],
+  executions: [
+    { round: 1, stage: 0, chain: "Near", to: "bola.testnet", amount: "800", tx_hash: "" },
+    { round: 1, stage: 0, chain: "Near", to: "charity.testnet", amount: "200", tx_hash: "" },
+    { round: 1, stage: 0, chain: "Eth", to: "0x" + "1".repeat(40), amount: "5", tx_hash: "0xabc" },
+  ],
+  stage_done: [],
+  sealed_notes: [{ id: 0, heir: "bola.testnet", label: "Ledger", ciphertext: "SECRETCIPHERTEXT" }],
+  released_notes: [],
+} as unknown as WillView;
+
+describe("heir guide", () => {
+  const policy = (() => {
+    const c = checkPolicy(GOOD);
+    if (!c.ok) throw new Error("bad fixture");
+    return c.policy;
+  })();
+  it("gives the model only this heir's facts", () => {
+    const f = heirFacts(WILL, "bola.testnet", policy);
+    expect(f).toContain("Bola");
+    expect(f).toContain("stage 1 Near amount 800");
+    expect(f).toContain("stage 1 Eth amount 5");
+    expect(f).not.toContain("charity");
+    expect(f).not.toContain("Charity");
+    expect(f).not.toContain("SECRETCIPHERTEXT");
+  });
+  it("refuses an account that isn't an heir", () => {
+    expect(() => heirFacts(WILL, "mallory.testnet", policy)).toThrow("not an heir");
+  });
+  it("returns an answer only when the signature verifies", async () => {
+    const gate = { require: async () => ATTESTED };
+    const ok = await heirGuide(WILL, "bola.testnet", policy, "What now?", [], fakeAi("<think>hmm</think>Register your key."), gate);
+    expect(ok).toMatchObject({ ok: true, answer: "Register your key." });
+    const bad = await heirGuide(WILL, "bola.testnet", policy, "What now?", [], fakeAi("Register your key.", { badSig: true }), gate);
+    expect(bad.ok).toBe(false);
+    expect(bad.answer).toBeUndefined();
   });
 });

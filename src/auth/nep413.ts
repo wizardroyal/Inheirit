@@ -7,7 +7,7 @@ import { serialize } from "borsh";
 import { createHash } from "node:crypto";
 import { z } from "zod";
 
-export type SignedAction = "heartbeat" | "register_owner" | "draft_policy";
+export type SignedAction = "heartbeat" | "register_owner" | "draft_policy" | "heir_guide";
 
 export const SignedRequest = z.object({
   account_id: z.string().min(2),
@@ -16,13 +16,13 @@ export const SignedRequest = z.object({
   signature: z.string().min(1),
   /** base64 of 32 bytes */
   nonce: z.string().min(1),
-  /** The signed JSON message: { action, owner, issued_at (ms), data }. */
+  /** The signed JSON message: { action, owner, issued_at (ms), data }. `owner` is the signing account. */
   message: z.string().max(8000),
 });
 export type SignedRequest = z.infer<typeof SignedRequest>;
 
 const Message = z.object({
-  action: z.enum(["heartbeat", "register_owner", "draft_policy"]),
+  action: z.enum(["heartbeat", "register_owner", "draft_policy", "heir_guide"]),
   owner: z.string().min(2),
   issued_at: z.number().int(),
   data: z.unknown().optional(),

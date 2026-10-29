@@ -1,7 +1,9 @@
 // The will policy (CLAUDE.md §7.6): the off-chain JSON whose sha256 is the will's policy_hash.
 // The contract enforces NEAR shares, stages and guardians itself; the policy adds what the
 // contract cannot see: foreign-chain shares and heirs' receive addresses.
-import { createHash } from "node:crypto";
+// @noble/hashes rather than node:crypto: the web app imports this file too, so both hash the same way
+import { sha256 } from "@noble/hashes/sha2";
+import { bytesToHex, utf8ToBytes } from "@noble/hashes/utils";
 import { z } from "zod";
 
 export const ASSETS = ["NEAR", "ETH", "BTC"] as const;
@@ -111,7 +113,7 @@ export function canonicalJson(value: unknown): string {
 
 /** Hex sha256 of the canonical policy JSON: the will's on-chain policy_hash. */
 export function policyHash(policy: Policy): string {
-  return createHash("sha256").update(canonicalJson(policy)).digest("hex");
+  return bytesToHex(sha256(utf8ToBytes(canonicalJson(policy))));
 }
 
 /** Shares (percent) of `asset` per heir id; empty if the policy does not allocate that asset. */

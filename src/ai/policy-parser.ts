@@ -67,7 +67,7 @@ function extractJson(text: string): unknown {
   return JSON.parse(body);
 }
 
-async function fetchSignature(ai: PolicyAi, chatId: string, attempts = 3, waitMs = 1000): Promise<ChatSignature> {
+export async function fetchSignature(ai: PolicyAi, chatId: string, attempts = 3, waitMs = 1000): Promise<ChatSignature> {
   let last: unknown;
   for (let i = 0; i < attempts; i++) {
     try {

@@ -4,6 +4,7 @@ import { serve } from "@hono/node-server";
 import { ShadeClient } from "@neardefi/shade-agent-js";
 import { AttestationGate, liveDeps } from "./ai/attestation";
 import { NearAiClient } from "./ai/nearai";
+import { heirGuide, type GuideTurn } from "./ai/heir-guide";
 import { draftPolicy } from "./ai/policy-parser";
 import { api } from "./api";
 import { Nep413Verifier, rpcAccessKey } from "./auth/nep413";
@@ -12,11 +13,12 @@ import { EvmVault } from "./chains/evm";
 import { config, env } from "./config";
 import { Driver } from "./escalation/driver";
 import { StagedExecutor } from "./executor/executor";
-import { ShadeWillContract } from "./near/will-contract";
+import { ShadeWillContract, type WillView } from "./near/will-contract";
 import { toHex } from "./sealed/crypto";
 import { loadSealedKey } from "./sealed/key-source";
 import { ensureAgentKey, NoteReleaser } from "./sealed/releaser";
 import { EvmNonceAdapter, GithubAdapter, HeartbeatAdapter, NearOnchainAdapter, SIMULATED_SOURCES, SimulatedAdapter } from "./signals/adapters";
+import type { Policy } from "./policy/policy";
 import { Store } from "./state/store";
 
 const agentContractId = config.contractId();
@@ -129,7 +131,11 @@ const ai = nearaiKey
   ? (() => {
       const client = new NearAiClient(config.nearaiBaseUrl(), nearaiKey, config.nearaiModel());
       const gate = new AttestationGate(client.model, liveDeps(client.baseUrl, nearaiKey));
-      return { attestation: () => gate.current(), draftPolicy: (owner: string, text: string) => draftPolicy(owner, text, client, gate) };
+      return {
+        attestation: () => gate.current(),
+        draftPolicy: (owner: string, text: string) => draftPolicy(owner, text, client, gate),
+        heirGuide: (...a: [WillView, string, Policy | undefined, string, GuideTurn[]]) => heirGuide(...a, client, gate),
+      };
     })()
   : undefined;
 if (!ai) console.warn("[ai] NEARAI_API_KEY not set: policy drafting and the AI attestation badge are off");
