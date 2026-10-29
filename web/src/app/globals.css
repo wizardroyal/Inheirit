@@ -1,0 +1,63 @@
+@import "tailwindcss";
+
+/* Calm, paper-like palette; one deep green accent. Dark mode follows the system. */
+:root {
+  --bg: #f7f5f0;
+  --card: #ffffff;
+  --ink: #1f2421;
+  --muted: #5f6661;
+  --line: #e2ded5;
+  --accent: #2f5d50;
+  --accent-ink: #ffffff;
+  --accent-soft: #e3ece8;
+  --warn: #9a5b13;
+  --warn-soft: #f6ead8;
+  --danger: #a3362a;
+  --danger-soft: #f6e1de;
+  --sim: #6b4fa0;
+  --sim-soft: #ece6f5;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #141715;
+    --card: #1c201e;
+    --ink: #e6e8e4;
+    --muted: #9aa29c;
+    --line: #2e3430;
+    --accent: #7fb8a6;
+    --accent-ink: #0f1311;
+    --accent-soft: #23302b;
+    --warn: #e0a95c;
+    --warn-soft: #33291b;
+    --danger: #e58a7f;
+    --danger-soft: #3a2320;
+    --sim: #b9a2e6;
+    --sim-soft: #2a2436;
+  }
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-card: var(--card);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-soft: var(--accent-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-sim: var(--sim);
+  --color-sim-soft: var(--sim-soft);
+  --font-sans: var(--font-body);
+  --font-serif: var(--font-display);
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+}
