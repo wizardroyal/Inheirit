@@ -66,6 +66,34 @@ impl Contract {
         self.settle_storage(&owner, initial, env::attached_deposit());
     }
 
+    /// Removes a guardian (invited or accepted). Only while Active, and never below the threshold.
+    pub fn remove_guardian(&mut self, account: AccountId) {
+        let owner = env::predecessor_account_id();
+        let mut will = self.will(&owner);
+        require!(
+            will.state == WillState::Active,
+            "Guardians can be removed only while Active"
+        );
+        require!(
+            will.guardian(&account).is_some(),
+            "Not a guardian of this will"
+        );
+        require!(
+            will.guardians.len() > will.guardian_threshold as usize,
+            "That would leave fewer guardians than the threshold"
+        );
+        let initial = env::storage_usage();
+        will.guardians.retain(|g| g.account_id != account);
+        will.last_alive_at = now_s();
+        emit(
+            "guardian_removed",
+            serde_json::json!({ "owner": owner, "guardian": account }),
+        );
+        self.save(will);
+        self.wills.flush();
+        self.settle_storage(&owner, initial, NearToken::from_yoctonear(0));
+    }
+
     /// Adds the attached NEAR to the will's NEAR vault. Closed once execution starts.
     #[payable]
     pub fn deposit_near(&mut self) {

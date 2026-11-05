@@ -627,17 +627,6 @@ impl Will {
         )
     }
 
-    /// A liveness time newer than this returns the will to Active. From execution onward it is
-    /// the start of execution, so a signal seen during any stage still halts the secrets.
-    pub fn liveness_cutoff(&self) -> Option<u64> {
-        match self.state {
-            WillState::SecretsBuffer { .. } | WillState::SecretsReleased { .. } => {
-                Some(self.round_started_at)
-            }
-            _ => self.state.since(),
-        }
-    }
-
     /// Switches the will to the accelerated schedule. Before execution the whole schedule is
     /// replaced when execution starts; during execution the remaining stages keep their
     /// percentages and each wait is capped at the accelerated wait, so no stage is skipped.
@@ -875,7 +864,11 @@ impl Contract {
             WillState::GuardianVote { since } if elapsed(since) >= t.vote_period => {
                 // Quorum not reached in time (reaching it moves to Challenge immediately).
                 emit("vote_failed", serde_json::json!({ "owner": will.owner }));
+                // Same clean-up as any return to Active, but last_alive_at stays: the owner is
+                // still silent, so the ladder restarts (Decision log 2026-10-27 (8)).
                 will.attestations.clear();
+                will.death_proofs.clear();
+                will.accelerated = false;
                 will.set_state(WillState::Active, "vote_failed");
             }
             WillState::Challenge { since } if elapsed(since) >= t.challenge_period => {

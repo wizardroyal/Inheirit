@@ -25,9 +25,11 @@ impl Contract {
 
 #[near]
 impl Contract {
-    /// The agent's scored "alive" time for `owner` (CLAUDE.md §7.2). Moves last_alive_at forward;
-    /// if `at` is newer than when the current escalation state began, the will returns to Active
-    /// (halting execution if it was running). Returns whether anything changed.
+    /// The agent's scored "alive" time for `owner` (CLAUDE.md §7.2). Moves last_alive_at forward.
+    /// In any state but Active and Completed, a time newer than last_alive_at returns the will to
+    /// Active (halting execution or secrets if they were running): the silence that started the
+    /// ladder was wrong, even if the agent saw the sign of life only after a later state began
+    /// (audit 2026-11-05). Returns whether anything changed.
     pub fn record_liveness(&mut self, owner: AccountId, at: u64) -> bool {
         self.require_agent();
         require!(at <= now_s(), "Liveness time is in the future");
@@ -39,9 +41,10 @@ impl Contract {
             "liveness_recorded",
             serde_json::json!({ "owner": owner, "at": at, "source": "agent" }),
         );
-        match will.liveness_cutoff() {
-            Some(cutoff) if at > cutoff => will.reset_to_active("signal_alive", at),
-            _ => will.last_alive_at = at,
+        if will.state == WillState::Active {
+            will.last_alive_at = at;
+        } else {
+            will.reset_to_active("signal_alive", at);
         }
         self.save(will);
         true

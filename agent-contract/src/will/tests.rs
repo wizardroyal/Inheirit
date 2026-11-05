@@ -561,12 +561,14 @@ fn record_liveness_newer_than_state_cancels_at_every_stage() {
 }
 
 #[test]
-fn record_liveness_older_than_state_updates_time_but_does_not_cancel() {
+fn record_liveness_seen_before_the_escalation_still_cancels_it() {
+    // The agent can see a sign of life late (it polls every 15 s, MPC and RPC lag). Any sign of life
+    // newer than last_alive_at means the silence that started the ladder was wrong: back to Active.
     let mut t = T::with_will();
     t.to_quiet(); // Quiet since T0+120
     t.wait(10);
     assert!(t.as_(AGENT).record_liveness(acc(OWNER), T0 + 100));
-    assert!(matches!(t.state(), WillState::Quiet { .. }));
+    assert_eq!(t.state(), WillState::Active);
     assert_eq!(t.will().last_alive_at, T0 + 100);
     assert!(
         !t.as_(AGENT).record_liveness(acc(OWNER), T0 + 50),
@@ -1416,4 +1418,66 @@ impl T {
         assert!(self.advance());
         assert!(matches!(self.state(), WillState::SecretsBuffer { .. }));
     }
+}
+
+// ---------------------------------------------------------------- audit fixes (2026-11-05)
+
+#[test]
+fn sign_of_life_during_challenge_recorded_after_execution_started_still_halts() {
+    let mut t = T::with_will();
+    t.to_challenge();
+    let alive_in_challenge = t.now + 100; // heartbeat while still in the challenge period
+    t.wait(120);
+    assert!(
+        t.advance(),
+        "someone starts execution before the agent records the heartbeat"
+    );
+    assert!(matches!(t.state(), WillState::Executing { stage: 0, .. }));
+    t.wait(5);
+    assert!(t.as_(AGENT).record_liveness(acc(OWNER), alive_in_challenge));
+    assert_eq!(t.state(), WillState::Active);
+    assert_eq!(t.will().halted.len(), 1);
+}
+
+#[test]
+fn expired_vote_clears_acceleration() {
+    let mut t = T::with_will();
+    t.to_vote();
+    t.as_(LAWYER)
+        .attest_death_proof(acc(OWNER), EVIDENCE.into());
+    assert!(t.will().accelerated);
+    t.wait(300);
+    assert!(t.advance(), "vote expires without quorum");
+    let w = t.will();
+    assert_eq!(w.state, WillState::Active);
+    assert!(
+        !w.accelerated,
+        "a proof from a failed round must not carry over"
+    );
+    assert!(w.death_proofs.is_empty());
+}
+
+#[test]
+fn remove_guardian_while_active() {
+    let mut t = T::with_will();
+    t.as_(OWNER).remove_guardian(acc(G3));
+    let w = t.will();
+    assert_eq!(w.guardians.len(), 2);
+    assert!(w.guardian(&acc(G3)).is_none());
+}
+
+#[test]
+#[should_panic(expected = "fewer guardians than the threshold")]
+fn remove_guardian_below_threshold_rejected() {
+    let mut t = T::with_will();
+    t.as_(OWNER).remove_guardian(acc(G3));
+    t.as_(OWNER).remove_guardian(acc(G2));
+}
+
+#[test]
+#[should_panic(expected = "only while Active")]
+fn remove_guardian_while_escalating_rejected() {
+    let mut t = T::with_will();
+    t.to_quiet();
+    t.as_(OWNER).remove_guardian(acc(G3));
 }
