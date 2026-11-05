@@ -10,6 +10,17 @@
       "compose_hash": "7cfcdfb1a43435ccceb2752665a1ee9039df743f4476de7b0d03819fe780448f",
       "image": "unwizarding/inheirit-agent@sha256:4d8a09010979b6d3667dc0fb109532a895575f9cf30b448b022f1fe274db9381",
       "at": "2026-10-28T16:38:44.106Z"
+    },
+    {
+      "compose_hash": "f1094d100fded7db908f2748dfe4fe2999fbc3db0b5e902d8ea5762d4b878043",
+      "image": "unwizarding/inheirit-agent@sha256:489433b7b890b7789098adc622ab078f873bf80eb609300894ad164e69ece74a",
+      "at": "2026-11-05T08:01:08.708Z"
+    },
+    {
+      "compose_hash": "3e2c026e634e40f5dc59f1f8a903eb075dded79f3a311c72189a303e1fe7ad69",
+      "image": "unwizarding/inheirit-agent@sha256:489433b7b890b7789098adc622ab078f873bf80eb609300894ad164e69ece74a",
+      "at": "2026-11-05T08:04:00.000Z",
+      "note": "env update (allowed_envs + DEMO_FAUCET_*); live, only approved hash"
     }
   ]
 }

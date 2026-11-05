@@ -12,7 +12,7 @@ services:
       NEAR_RPC_URL: ${NEAR_RPC_URL}
     platform: linux/amd64
     # Pinned by digest: the compose hash (and so the approved measurements) covers this line
-    image: unwizarding/inheirit-agent@sha256:4d8a09010979b6d3667dc0fb109532a895575f9cf30b448b022f1fe274db9381
+    image: unwizarding/inheirit-agent@sha256:489433b7b890b7789098adc622ab078f873bf80eb609300894ad164e69ece74a
     container_name: shade-agent-app
     ports:
       - 3000:3000
