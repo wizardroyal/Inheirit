@@ -54,7 +54,18 @@
       "compose_hash": "68ab3ff84784d16aebe67c078cfe6a9f5fb0378daff3d31d245329c3a0c276c3",
       "image": "unwizarding/inheirit-agent@sha256:fc7e49e9f539959d3f78ac13a3ab9192375efe93013bf7ea28c91aa6f9918f43",
       "at": "2026-11-05T14:06:00.000Z",
-      "note": "v2b image (/api/overview, calmer polling); live, only approved hash"
+      "note": "v2b image (/api/overview, calmer polling); retired 2026-11-05"
+    },
+    {
+      "compose_hash": "88deb635cd6d35520dd42d9e646e6f87373723cc4ce2484e8902c636857bb03e",
+      "image": "unwizarding/inheirit-agent@sha256:6d412c1a189b230fb721e0354cc6455c95baf28fa349ea78d2e01c81ad8a063e",
+      "at": "2026-11-05T14:24:33.601Z"
+    },
+    {
+      "compose_hash": "88deb635cd6d35520dd42d9e646e6f87373723cc4ce2484e8902c636857bb03e",
+      "image": "unwizarding/inheirit-agent@sha256:6d412c1a189b230fb721e0354cc6455c95baf28fa349ea78d2e01c81ad8a063e",
+      "at": "2026-11-05T14:25:00.000Z",
+      "note": "v2c image (audit fixes: private Telegram chats, flags-only watching, verdict); live, only approved hash"
     }
   ]
 }
