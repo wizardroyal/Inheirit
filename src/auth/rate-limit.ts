@@ -38,4 +38,5 @@ export class RateLimiter {
 const HOUR = 60 * 60_000;
 export const AI_DRAFT_LIMIT: Limit = { perKey: 6, global: 120, windowMs: HOUR };
 export const AI_GUIDE_LIMIT: Limit = { perKey: 20, global: 300, windowMs: HOUR };
-export const FAUCET_LIMIT: Limit = { perKey: 1, global: 20, windowMs: 24 * HOUR };
+// Per owner: a few attempts so a chain whose send failed can be retried; each chain is still funded once.
+export const FAUCET_LIMIT: Limit = { perKey: 3, global: 30, windowMs: 24 * HOUR };

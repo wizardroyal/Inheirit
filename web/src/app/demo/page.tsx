@@ -365,6 +365,9 @@ function useEventLog(will: Will | null) {
     const b = stateName(will.state);
     if (a !== b || JSON.stringify(p.state) !== JSON.stringify(will.state)) {
       if (a === b && b === "Executing") out.push(`Stage ${(will.state as { Executing: { stage: number } }).Executing.stage + 1} started`);
+      // No new sign of life: the vote period ran out short of the threshold (§5.3 vote_failed)
+      else if (a === "GuardianVote" && b === "Active" && will.last_alive_at === p.last_alive_at)
+        out.push("Guardian vote expired without enough confirmations → Active. The owner is still silent, so the ladder starts again");
       else out.push(`${a} → ${b}`);
     }
     if (will.last_alive_at > p.last_alive_at) out.push("Sign of life recorded on-chain");

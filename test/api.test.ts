@@ -113,13 +113,14 @@ describe("owner-signed routes", () => {
 });
 
 describe("demo vault faucet", () => {
-  function faucetSetup(balances: Record<string, bigint> = { Eth: 0n, Btc: 0n }, demoMode = true) {
+  function faucetSetup(balances: Record<string, bigint> = { Eth: 0n, Btc: 0n }, demoMode = true, failing = new Set<string>()) {
     const sent: string[] = [];
     const faucet = {
       ethAddress: "0xpool",
       btcAddress: "tb1pool",
       amounts: { eth_wei: "1", btc_sats: 2 },
       send: async (chain: "Eth" | "Btc", to: string) => {
+        if (failing.has(chain)) throw new Error("mempool UTXO fetch 503");
         sent.push(`${chain}:${to}`);
         return { chain, to, amount: "1", txHash: `h-${chain}` };
       },
@@ -145,6 +146,17 @@ describe("demo vault faucet", () => {
     const t = faucetSetup({ Eth: 5n, Btc: 0n });
     await t.post("/demo/faucet", signed());
     expect(t.sent).toEqual(["Btc:Btc-vault-alice.testnet"]);
+  });
+  it("lets a chain whose send failed be retried, without re-funding the others", async () => {
+    const failing = new Set(["Btc"]);
+    const t = faucetSetup(undefined, true, failing);
+    const first = await t.post("/demo/faucet", signed());
+    expect(await first.json()).toMatchObject({ ok: false, sends: [{ chain: "Eth" }], errors: ["Btc: mempool UTXO fetch 503"] });
+    failing.clear();
+    const retry = await t.post("/demo/faucet", signed());
+    expect(await retry.json()).toMatchObject({ ok: true, sends: [{ chain: "Btc" }] });
+    expect(t.sent).toEqual(["Eth:Eth-vault-alice.testnet", "Btc:Btc-vault-alice.testnet"]);
+    expect((await t.post("/demo/faucet", signed())).status).toBe(409);
   });
   it("is off outside demo mode and needs a signature", async () => {
     expect((await faucetSetup(undefined, false).post("/demo/faucet", signed())).status).toBe(403);

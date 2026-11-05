@@ -252,12 +252,15 @@ export function api(deps: ApiDeps): Hono {
     const r = await ownerRequest(body, "demo_faucet", z.object({}).passthrough(), z.never());
     if (r.error) return c.json(r.error.body, r.error.status);
     const owner = r.owner;
-    if (store.get().faucetSends[owner]) return c.json({ error: "This will's vaults were already funded by the faucet", sends: store.get().faucetSends[owner] }, 409);
+    // Each chain is funded at most once per will; a chain whose send failed can be retried.
+    const earlier = store.get().faucetSends[owner] ?? [];
     const will = await contract.getWill(owner);
     if (!will) return c.json({ error: `No will for ${owner}` }, 404);
     if (stateName(will.state) !== "Active") return c.json({ error: "The faucet only funds Active wills" }, 409);
-    const chains = deps.vaults.filter((v) => will.foreign_chains.includes(v.chain));
-    if (!chains.length) return c.json({ error: "This will has no Sepolia or BTC vault" }, 409);
+    const vaults = deps.vaults.filter((v) => will.foreign_chains.includes(v.chain));
+    if (!vaults.length) return c.json({ error: "This will has no Sepolia or BTC vault" }, 409);
+    const chains = vaults.filter((v) => !earlier.some((s) => s.chain === v.chain));
+    if (!chains.length) return c.json({ error: "This will's vaults were already funded by the faucet", sends: earlier }, 409);
     const wait = limiters.faucet.take(owner);
     if (wait) return c.json(tooMany(wait), 429);
     const sends: FaucetSend[] = [];
@@ -267,10 +270,12 @@ export function api(deps: ApiDeps): Hono {
         if ((await v.balance(owner)) > 0n) continue; // already funded some other way
         sends.push(await deps.faucet.send(v.chain, await v.address(owner)));
       } catch (e) {
-        errors.push(`${v.chain}: ${e instanceof Error ? e.message : String(e)}`);
+        const msg = `${v.chain}: ${e instanceof Error ? e.message : String(e)}`;
+        console.error(`[faucet] ${owner} ${msg}`);
+        errors.push(msg);
       }
     }
-    if (sends.length) store.update((s) => (s.faucetSends[owner] = sends));
+    if (sends.length) store.update((s) => (s.faucetSends[owner] = [...earlier, ...sends]));
     return c.json({ ok: errors.length === 0, sends, errors }, sends.length || !errors.length ? 200 : 503);
   });
 
