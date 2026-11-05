@@ -859,3 +859,13 @@ DEMO_MODE=true
   - The ladder: Quiet 127 s → WelfareCheck 200 s → GuardianVote 273 s → 2 guardians → Challenge 289 s → Executing 404 s → SecretsBuffer 691 s → SecretsReleased 765 s.
   - The note was released only after that. The heir decrypted it, and another key could not.
   - Cosmetic: the driver's "advanced to X" log sometimes prints the previous state, because the re-read right after `advance` can lag the RPC. State handling is unaffected, since the next tick reads the new state.
+- 2026-11-05 — **Day B, first part** (commit `1ad60ca`):
+  - The deterministic verdict (`src/liveness/verdict.ts`) is in `GET /api/signals/:owner`.
+  - The agent checks the NEAR AI model's attestation at startup.
+  - The web app has the `SignsOfLife` hero panel on `/owner` and `/demo`, and the demo timeline uses plain words.
+  - Verified by screenshot against the local agent (no console errors), **except the snap-back animation, which has not been seen running yet**.
+  - **Not built:** the baseline ("usually active every N days"). The adapters keep only the latest time per source, so there is no history to compute it from. Roadmap.
+- 2026-11-05 — [VERIFIED] **Repeat Telegram checks from abandoned test wills.** After the Telegram test, the silent owner `tgalice2` re-escalated, and each new Quiet sent the human another Telegram check. This is the vote-expired cycle (§7.3, known noise), now reaching a real phone.
+  - Mitigated: the test wills were removed from the local agent's watch list and the test chat was unlinked (`data-v2`).
+  - In demo mode, the 3 h `DEMO_WATCH_HOURS` limit bounds it.
+  - Improvement to consider: after a failed vote, wait a full `quiet_after` before the next check round, or cap Telegram checks per day.
