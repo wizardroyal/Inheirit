@@ -24,7 +24,7 @@ function Step({ n, title, done, children }: { n: number; title: string; done?: b
 
 export default function HeirPage() {
   const owner = decodeURIComponent(useParams<{ owner: string }>().owner);
-  const { data: will, loaded, refresh } = useWill(owner, 5000);
+  const { data: will, loaded, refresh } = useWill(owner);
   const [me, setMe] = useState("");
   useKeys(); // re-render when the local key store changes
 
@@ -137,7 +137,7 @@ function RestoreKey({ owner, heir }: { owner: string; heir: string }) {
 }
 
 function NotesStep({ owner, will, heir }: { owner: string; will: Will; heir: string }) {
-  const { data: released } = usePoll(() => view<Released[]>("get_released_notes", { owner, heir }), 8000, [owner, heir]);
+  const { data: released } = usePoll(() => view<Released[]>("get_released_notes", { owner, heir }), 15_000, [owner, heir]);
   const [opened, setOpened] = useState<Record<number, string>>({});
   const waiting = will.sealed_notes.filter((n) => n.heir === heir && !(released ?? []).some((r) => r.note_id === n.id));
   return (

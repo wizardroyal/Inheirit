@@ -121,7 +121,7 @@ function ProgressLog({ lines }: { lines: string[] }) {
 }
 
 function WillPanel({ cast }: { cast: Cast }) {
-  const { data: will, loaded, refresh } = useWill(cast.owner, 4000);
+  const { data: will, loaded, refresh } = useWill(cast.owner);
   const [chains, setChains] = useState<{ Eth: boolean; Btc: boolean }>({ Eth: true, Btc: true });
   const [withNote, setWithNote] = useState(true);
   // Keep the setup view until every step has finished, even after the will shows up on-chain
@@ -313,7 +313,7 @@ function WillPanel({ cast }: { cast: Cast }) {
 }
 
 function Vaults({ owner, will }: { owner: string; will: Will }) {
-  const { data, error } = usePoll(() => agent.vaults(owner), 20_000, [owner]);
+  const { data, error } = usePoll(() => agent.vaults(owner), 30_000, [owner]);
   return (
     <Card title="Vaults">
       <ul className="space-y-2 text-sm">

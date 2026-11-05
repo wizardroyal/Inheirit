@@ -30,7 +30,7 @@ const verifier = {
 function setup(demoMode: boolean, onChainHash = HASH, ai?: ApiDeps["ai"], extra: Partial<ApiDeps> = {}) {
   const store = new Store(null);
   const contract = {
-    getWill: async (owner: string) => (owner === "alice.testnet" ? ({ owner, policy_hash: onChainHash, state: "Active", heirs: [{ account_id: "bola.testnet" }], foreign_chains: ["Eth", "Btc"] } as WillView) : null),
+    getWill: async (owner: string) => (owner === "alice.testnet" ? ({ owner, policy_hash: onChainHash, state: "Active", heirs: [{ account_id: "bola.testnet" }], guardians: [], guardian_threshold: 1, last_alive_at: 0, foreign_chains: ["Eth", "Btc"] } as unknown as WillView) : null),
   } as unknown as WillContract;
   const app = api({ contract, store, vaults: [], demoMode, agentInfo: async () => ({}), auth: verifier, ai, ...extra });
   const post = (path: string, body: unknown) =>
@@ -162,5 +162,27 @@ describe("demo vault faucet", () => {
     expect((await faucetSetup(undefined, false).post("/demo/faucet", signed())).status).toBe(403);
     expect((await faucetSetup().post("/demo/faucet", { owner: "alice.testnet" })).status).toBe(401);
     expect(await (await faucetSetup(undefined, false).app.request("/demo/faucet")).json()).toEqual({ enabled: false });
+  });
+});
+
+describe("GET /api/overview/:owner", () => {
+  it("returns status, signals with the verdict, this owner's notifications and Telegram status in one response", async () => {
+    const t = setup(true);
+    const note = { at: "2026-11-05T00:00:00Z", event: "Quiet", to: ["x"], channels: ["ui"], subject: "s", body: "b" };
+    t.store.update((s) => {
+      s.notifications.push({ ...note, owner: "alice.testnet" }, { ...note, owner: "carol.testnet" });
+      s.observations["alice.testnet"] = { near_onchain: { at: "2026-11-05T00:00:00Z", trustWeight: 0.9, simulated: false } };
+    });
+    const body = await (await t.app.request("/api/overview/alice.testnet")).json();
+    expect(body.status.state).toBe("Active");
+    expect(body.signals.observations.near_onchain).toBeDefined();
+    expect(body.signals.verdict.headline).toMatch(/^Alive\./);
+    expect(body.notifications.map((n: { owner: string }) => n.owner)).toEqual(["alice.testnet"]);
+    expect(body.telegram).toEqual({ enabled: false, linked: false });
+  });
+  it("still answers for an owner without a will", async () => {
+    const body = await (await setup(true).app.request("/api/overview/nobody.testnet")).json();
+    expect(body.status).toBeNull();
+    expect(body.signals.verdict).toBeNull();
   });
 });

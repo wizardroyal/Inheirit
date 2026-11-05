@@ -1,4 +1,5 @@
 "use client";
+import { boostPolling, shared } from "./boost";
 import { Account } from "@near-js/accounts";
 import { KeyPair, type KeyPairString } from "@near-js/crypto";
 import { JsonRpcProvider } from "@near-js/providers";
@@ -23,7 +24,8 @@ export function formatNear(yocto: string | bigint, digits = 4): string {
 }
 
 export async function view<T>(methodName: string, args: Record<string, unknown> = {}, contractId = CONTRACT_ID): Promise<T> {
-  return (await provider.callFunction(contractId, methodName, args)) as T;
+  // Components that show the same will share one RPC read.
+  return shared(`view:${contractId}:${methodName}:${JSON.stringify(args)}`, async () => (await provider.callFunction(contractId, methodName, args)) as T);
 }
 
 export async function accountExists(id: string): Promise<boolean> {
@@ -57,6 +59,7 @@ export async function call<T = unknown>(accountId: string, methodName: string, a
   const status = outcome.status as { SuccessValue?: string; Failure?: unknown };
   if (status.Failure) throw new Error(failureMessage(status.Failure));
   const raw = status.SuccessValue ? atob(status.SuccessValue) : "";
+  boostPolling(); // show the result of this transaction within seconds
   return { hash: outcome.transaction.hash as string, value: (raw ? JSON.parse(raw) : null) as T };
 }
 

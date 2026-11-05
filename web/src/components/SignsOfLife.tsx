@@ -3,8 +3,7 @@
 // the ladder as a horizontal progress bar with a countdown, a visible snap back to Active when a sign
 // of life cancels an escalation, the agent's plain-English verdict, and what the agent can see.
 import { useEffect, useRef, useState } from "react";
-import { agent } from "@/lib/agent";
-import { useNow, usePoll } from "@/lib/hooks";
+import { useNow, useOverview } from "@/lib/hooks";
 import { duration, isArmed, LADDER, nextStepIn, stateName, type StateName, type Will } from "@/lib/will";
 import { AgentBadge, AiBadge } from "./Attestation";
 import { Pill, SimulatedTag } from "./ui";
@@ -14,8 +13,12 @@ import { SOURCE_LABELS, ago } from "@/lib/will";
 export function SignsOfLife({ owner, will }: { owner: string; will: Will }) {
   const now = useNow();
   const state = stateName(will.state);
+  const { data: overview, refresh } = useOverview(owner);
+  const data = overview?.signals;
   // Refetch as soon as the state changes, so the verdict never describes the previous state for long.
-  const { data } = usePoll(() => agent.signals(owner), 4000, [owner, state]);
+  useEffect(() => {
+    refresh();
+  }, [state, refresh]);
   const snapped = useSnapBack(state, will.last_alive_at);
   const pulsing = usePulses(data?.observations);
   const idx = LADDER.findIndex((r) => r.state === state);

@@ -2,7 +2,7 @@
 // Pieces shared by the owner, guardian, heir and demo pages.
 import { agent, type SignalSource } from "@/lib/agent";
 import { explorer } from "@/lib/config";
-import { usePoll } from "@/lib/hooks";
+import { useOverview, usePoll } from "@/lib/hooks";
 import { formatNear, signRequest } from "@/lib/near";
 import { ago, schedule, SOURCE_LABELS, type Will } from "@/lib/will";
 import { ActionButton, ExtLink, Pill, short, SimulatedTag } from "./ui";
@@ -33,7 +33,8 @@ export function strength(weight: number): { label: "strong" | "medium" | "weak";
 
 /** Latest sign of life per source, as the agent last saw it. Timestamps only, never content. */
 export function SignalList({ owner, will }: { owner: string; will: Will | null }) {
-  const { data, error } = usePoll(() => agent.signals(owner), 5000, [owner]);
+  const { data: overview, error } = useOverview(owner);
+  const data = overview?.signals;
   return (
     <div className="space-y-2">
       <ul className="divide-y divide-line text-sm">
@@ -62,7 +63,8 @@ export function SignalList({ owner, will }: { owner: string; will: Will | null }
 }
 
 export function NotificationLog({ owner }: { owner: string }) {
-  const { data, error } = usePoll(() => agent.notifications(owner), 5000, [owner]);
+  const { data: overview, error } = useOverview(owner);
+  const data = overview?.notifications;
   const items = [...(data ?? [])].reverse().slice(0, 20);
   return (
     <div>
@@ -156,7 +158,8 @@ export function Releases({ will }: { will: Will }) {
 
 /** Warns when the agent isn't watching this will (e.g. a setup step failed) and lets the owner fix it. */
 export function WatchStatus({ owner, will, canSign }: { owner: string; will: Will; canSign: boolean }) {
-  const { data, refresh } = usePoll(() => agent.status(owner), 15_000, [owner]);
+  const { data: overview, refresh } = useOverview(owner);
+  const data = overview?.status;
   if (!data || (data.watching && data.has_policy)) return null;
   return (
     <div className="space-y-2 rounded-lg bg-warn-soft px-3 py-2 text-sm text-warn">

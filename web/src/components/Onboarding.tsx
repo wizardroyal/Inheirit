@@ -8,7 +8,7 @@ import { STANDARD_PCT } from "@agent/policy/schedule";
 import { agent } from "@/lib/agent";
 import { DEMO_SCHEDULE, REAL_SCHEDULE } from "@/lib/config";
 import { createWill } from "@/lib/demo";
-import { usePoll } from "@/lib/hooks";
+import { useOverview } from "@/lib/hooks";
 import { signRequest } from "@/lib/near";
 import { acceptedGuardians, isArmed, type Will } from "@/lib/will";
 import { TelegramLink } from "./TelegramLink";
@@ -275,9 +275,10 @@ export function QuickSetup({
 /** Will strength (CLAUDE.md §8): what makes the will armed, and what makes it more robust. */
 export function StrengthChecklist({ will }: { will: Will }) {
   const owner = will.owner;
-  const { data: signals } = usePoll(() => agent.signals(owner), 10_000, [owner]);
-  const { data: status } = usePoll(() => agent.status(owner), 10_000, [owner]);
-  const { data: tg } = usePoll(() => agent.telegramStatus(owner), 10_000, [owner]);
+  const { data: overview } = useOverview(owner);
+  const signals = overview?.signals;
+  const status = overview?.status;
+  const tg = overview?.telegram;
   const watching = (status?.watching ?? {}) as { evmAddress?: string; github?: string; email?: string };
   const accepted = acceptedGuardians(will).length;
   const items: { label: string; done: boolean; required?: boolean; hint?: string }[] = [

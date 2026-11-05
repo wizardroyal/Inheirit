@@ -144,14 +144,41 @@ export function api(deps: ApiDeps): Hono {
   });
 
   // Latest activity per source (timestamps only, never content) for the liveness timeline.
-  // Includes the plain-English verdict (§7.8): what counts as a sign of life, what was ignored and why.
-  app.get("/api/signals/:owner", async (c) => {
-    const owner = c.req.param("owner");
+  // Latest signal per source, plus the plain-English verdict (§7.8): what counts as a sign of life,
+  // what was ignored and why. Timestamps only.
+  async function signalsFor(owner: string) {
     const seen = store.get().observations[owner] ?? {};
     const will = await cached(`will:${owner}`, 5000, () => contract.getWill(owner)).catch(() => null);
     const observations = Object.entries(seen).map(([source, o]) => ({ source: source as SignalSource, at: new Date(o!.at), trustWeight: o!.trustWeight, simulated: o!.simulated }));
     const verdict = will ? explainLiveness(will, observations, new Date()) : null;
-    return c.json({ observations: seen, heartbeat: store.get().heartbeats[owner] ?? null, verdict });
+    return { will, signals: { observations: seen, heartbeat: store.get().heartbeats[owner] ?? null, verdict } };
+  }
+
+  app.get("/api/signals/:owner", async (c) => c.json((await signalsFor(c.req.param("owner"))).signals));
+
+  // Everything an owner/demo page shows from the agent, in one request (instead of signals + status +
+  // notifications + telegram polled separately). Shared for a few seconds across open pages.
+  app.get("/api/overview/:owner", async (c) => {
+    const owner = c.req.param("owner");
+    const body = await cached(`overview:${owner}`, 3000, async () => {
+      const { will, signals } = await signalsFor(owner);
+      const s = store.get();
+      return {
+        status: will
+          ? {
+              state: stateName(will.state),
+              last_alive_at: will.last_alive_at,
+              watching: s.owners[owner] ?? null,
+              has_policy: !!s.policies[owner],
+              simulated_signals: s.simulated[owner] ?? {},
+            }
+          : null,
+        signals,
+        notifications: s.notifications.filter((n) => n.owner === owner).slice(-30),
+        telegram: deps.telegram ? { enabled: true, bot: deps.telegram.username, linked: deps.telegram.isLinked(owner) } : { enabled: false, linked: false },
+      };
+    });
+    return c.json(body);
   });
 
   // NEAR AI Cloud attestation for the configured model: public, contains no will content.

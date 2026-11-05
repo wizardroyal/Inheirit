@@ -1,5 +1,6 @@
 "use client";
 // Client for the will agent's HTTP API (src/api.ts in the repo root).
+import { boostPolling, shared } from "./boost";
 import type { AttestationResult } from "@agent/ai/attestation";
 import type { GuideAnswer } from "@agent/ai/heir-guide";
 import type { PolicyDraft } from "@agent/ai/policy-parser";
@@ -8,6 +9,14 @@ import { AGENT_URL } from "./config";
 import type { SignedRequest } from "./near";
 
 async function req<T>(path: string, body?: unknown): Promise<T> {
+  // Reads are shared between components for a moment; a successful write speeds polling up briefly.
+  if (body === undefined) return shared(`agent:${path}`, () => send<T>(path));
+  const out = await send<T>(path, body);
+  boostPolling();
+  return out;
+}
+
+async function send<T>(path: string, body?: unknown): Promise<T> {
   const res = await fetch(`${AGENT_URL}${path}`, body === undefined ? {} : { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
   const json = await res.json().catch(() => ({}));
   if (!res.ok) {
@@ -62,7 +71,33 @@ export interface Verdict {
   ignored: { source: SignalSource; reason: string }[];
 }
 
+export type Signals = { observations: Observations; heartbeat: string | null; verdict: Verdict | null };
+export type Status = { state: string; watching: unknown; has_policy: boolean; simulated_signals: Record<string, string> };
+export type TelegramStatus = { enabled: boolean; bot?: string; linked: boolean };
+export interface Overview {
+  status: Status | null;
+  signals: Signals;
+  notifications: Notification[];
+  telegram: TelegramStatus;
+}
+
 export const agent = {
+  /** One request for everything the owner/demo panels show. Falls back to the separate routes for agents without it. */
+  overview: async (owner: string): Promise<Overview> => {
+    const o = encodeURIComponent(owner);
+    try {
+      return await req<Overview>(`/api/overview/${o}`);
+    } catch (e) {
+      if (!/: 404\b/.test(String(e))) throw e;
+      const [signals, status, notifications, telegram] = await Promise.all([
+        req<Signals>(`/api/signals/${o}`),
+        req<Status>(`/api/status/${o}`).catch(() => null),
+        req<Notification[]>(`/api/notifications?owner=${o}`),
+        req<TelegramStatus>(`/api/telegram/${o}`).catch(() => ({ enabled: false, linked: false })),
+      ]);
+      return { signals, status, notifications: notifications.slice(-30), telegram };
+    }
+  },
   root: () => req<{ message: string; demoMode: boolean }>("/"),
   info: () => req<AgentInfo>("/api/agent-info"),
   aiAttestation: () => req<AttestationResult>("/api/attestation/ai"),

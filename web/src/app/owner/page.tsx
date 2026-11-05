@@ -29,7 +29,7 @@ function Owner() {
   const params = useSearchParams();
   const { casts } = useKeys();
   const [owner, setOwner] = useState(params.get("as") ?? "");
-  const { data: will, loaded, refresh } = useWill(owner || null, 4000);
+  const { data: will, loaded, refresh } = useWill(owner || null);
   // Keep the writing view until every creation step has finished, even after the will shows up on-chain
   const [creating, setCreating] = useState(false);
 

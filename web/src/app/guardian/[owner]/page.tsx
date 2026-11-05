@@ -17,7 +17,7 @@ async function sha256Hex(file: File): Promise<string> {
 
 export default function GuardianPage() {
   const owner = decodeURIComponent(useParams<{ owner: string }>().owner);
-  const { data: will, loaded, refresh } = useWill(owner, 4000);
+  const { data: will, loaded, refresh } = useWill(owner);
   const [me, setMe] = useState("");
   const [evidence, setEvidence] = useState<{ name: string; hash: string } | null>(null);
 

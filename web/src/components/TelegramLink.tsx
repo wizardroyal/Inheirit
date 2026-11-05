@@ -2,24 +2,16 @@
 // Link a Telegram chat to a NEAR account (agent §7.7). The request is signed with the account's key in
 // this browser; the agent returns a one-time t.me link. Some desktop clients don't pass the link's
 // token when the chat already exists, so the same token is shown as a message to paste.
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { agent } from "@/lib/agent";
+import { usePoll } from "@/lib/hooks";
 import { signRequest } from "@/lib/near";
 import { ActionButton, ExtLink, Pill } from "./ui";
 
 export function TelegramLink({ account, purpose }: { account: string; purpose: string }) {
-  const [status, setStatus] = useState<{ enabled: boolean; bot?: string; linked: boolean } | null>(null);
   const [link, setLink] = useState<string | null>(null);
-  useEffect(() => {
-    let live = true;
-    const load = () => agent.telegramStatus(account).then((s) => live && setStatus(s), () => live && setStatus(null));
-    load();
-    const id = setInterval(load, 5000);
-    return () => {
-      live = false;
-      clearInterval(id);
-    };
-  }, [account]);
+  // Checked once, then every 5 s only while a link is out and we wait for the person to press Start.
+  const { data: status } = usePoll(() => agent.telegramStatus(account), link ? 5000 : 10 * 60_000, [account, !!link]);
 
   if (!status?.enabled) return null;
   if (status.linked) return <Pill tone="accent">Telegram linked</Pill>;

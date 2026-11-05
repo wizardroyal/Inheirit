@@ -10,7 +10,7 @@ import { stateName } from "@/lib/will";
 
 export default function ContactPage() {
   const owner = decodeURIComponent(useParams<{ owner: string }>().owner);
-  const { data: will, loaded, refresh } = useWill(owner, 5000);
+  const { data: will, loaded, refresh } = useWill(owner);
   const [me, setMe] = useState("");
   if (!loaded) return <p>Loading…</p>;
   if (!will) return <ErrorNote>No will for {owner}.</ErrorNote>;
