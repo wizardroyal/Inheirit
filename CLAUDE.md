@@ -51,7 +51,21 @@ They will read the README and the code. So:
 ## 2. The product
 
 ### 2.1 One-liner
-**A crypto will that doesn't make you prove you're alive.** It watches for normal signs of life privately, only escalates when you go quiet, never triggers on silence alone, and releases assets in stages across NEAR, Ethereum and Bitcoin, plus sealed instructions for everything else, decrypted only for the right heir, only after execution.
+**"A will that doesn't make you prove you're alive."** Use exactly this wording everywhere: README line 1, landing page, X post, video title.
+
+It reads normal signs of life privately and only reaches out once you've gone quiet for longer than *your* normal. It never acts on silence alone, and it hands over assets across NEAR, Ethereum and Bitcoin in small reversible slices before it reveals any secret.
+
+Core insights (the README states them explicitly):
+1. **Passive liveness is safe only because of an asymmetry.** Signals can stop the will. Only people can start it: a guardian quorum plus a challenge period.
+2. **The first release is the loudest alarm.** A 10% slice leaving the vaults, with heirs notified, is when a living owner notices. So the *longest wait* comes right after the first slice, and a false trigger costs at most that slice.
+3. **Secrets come last.** Funds move in slices, but a revealed secret can never be un-revealed. So sealed notes are released only after distribution completes, plus a buffer.
+4. **Private by construction.** The agent reads signals inside a TEE and only timestamps leave it. In-product AI uses only an attested NEAR AI Cloud model.
+
+Originality note (for the README): inactivity-based tools exist, such as Google Inactive Account Manager and Bitcoin timelock wallets. What's new is the combination:
+- many weighted sources, read privately in a TEE;
+- a human escalation ladder before anything moves;
+- cross-chain staged execution;
+- secrets last.
 
 ### 2.2 The problem (from research on past attempts)
 Billions in crypto are lost when holders die or become incapacitated. Past attempts (dead-man's-switch contracts, Bitcoin timelock wallets, multisig/social recovery, sealed letters) mostly solved the *transfer* and failed on the *humans*:
@@ -63,20 +77,24 @@ Billions in crypto are lost when holders die or become incapacitated. Past attem
 - **Seed phrases can't go in a legal will** (wills become public).
 
 ### 2.3 Design principles (non-negotiable — the whole pitch rests on these)
-1. **Passive liveness, active escalation.** Watch normal activity in the background; ask humans for nothing until signals go quiet.
-2. **Signals can stop it; only people can start it.** Any sign of life can delay/cancel. Silence alone can never trigger execution. Execution requires a guardian quorum + a challenge period.
+1. **Passive liveness, active escalation.** The agent watches normal activity in the background (**signals**). It reaches out (**checks**: heartbeat app, Telegram, email, DMs) only when silence lasts longer than the owner's normal plus a buffer (§7.1).
+2. **Signals can stop it; only people can start it.** Any sign of life can delay or cancel. Silence alone can never trigger execution. Execution requires a quorum of *accepted* guardians plus a challenge period.
 3. **Private by construction.** The liveness agent and sealed instructions run inside a TEE. Only timestamps leave the TEE, never content. In-product AI that touches will contents uses **NEAR AI Cloud** (TEE inference), never a non-private API.
-4. **Staged and reversible as long as possible.** Release in slices, smallest first; any sign of life between stages halts the rest.
-5. **Owner never loses control while alive.** Owner can withdraw from vaults and cancel at any stage.
-6. **Honest about limits.** Shade Agent Framework is experimental and testnet-only; vault model requires moving funds; simulated signals are labelled.
+4. **Staged and reversible as long as possible.** Release in slices, smallest first, with the longest wait right after the first slice (§5.5). Any sign of life between stages halts the rest.
+5. **Secrets last.** Sealed notes are released per heir, and only after distribution completes and a buffer passes. A sign of life during the buffer means they are never released.
+6. **Owner never loses control while alive.** The owner can withdraw from vaults and cancel at any stage.
+7. **Consent and minimal data.** Guardians must accept their role before they count, and a will escalates only when it is "armed" (§5.5). Sign-up asks for a display name (jurisdiction optional) and nothing else: no date of birth, nationality or photo.
+8. **Honest about limits.** The Shade Agent Framework is experimental and testnet-only. The vault model requires moving funds. Simulated signals are labelled. Heirs are hidden in the UI but readable on-chain.
 
 ### 2.4 Threat model (put a version of this in `docs/THREAT_MODEL.md` and the README)
 | Attacker | Goal | Defenses |
 |---|---|---|
-| Greedy heir (± a colluding guardian) | Early access while owner is alive | Guardian threshold + independence; challenge period with loud owner notifications on every channel; liveness veto; staged release |
-| Outsider | Steal vault funds | Only the attested agent can request MPC signatures, and only when the will is `Executing`; owner withdrawals are owner-signed |
-| Platform / developer (us) | Read wills or sealed notes | Notes encrypted to a TEE-held key; agent code hash approved on-chain; attestation shown in UI. **Gap:** with Phala's centralized KMS, the Phala account holder can upgrade the CVM in place to code that gets the same key (§7.5); mitigated by published compose hashes + live compose hash in UI; backlog: on-chain KMS with timelocked allowlist |
-| Account hijacker after death | Keep posting to block heirs forever | Guardian liveness-override (supermajority + evidence) — backlog item |
+| Greedy heir (± a colluding guardian) | Early access while the owner is alive | Only **accepted** guardians count. Guardian threshold and independence. Challenge period with loud owner notifications on every channel. Liveness veto. Staged release with the longest wait after the first slice. Secrets last |
+| Lawyer (± a colluding heir) | Faster release through a false death proof | A death proof only shortens the remaining waits (accelerated schedule). It never skips the challenge period or a stage, and the guardian quorum is still needed to reach Challenge (§5.5) |
+| Curious observer | Learn who inherits | Heirs are hidden in the UI, agent API and notifications until Executing. **Gap:** heir accounts and NEAR shares sit in contract state, which anyone can query. This is a documented limitation; backlog: commit-reveal of heirs |
+| Outsider | Steal vault funds | Only the attested agent can request MPC signatures, and only while the will is `Executing`. Owner withdrawals are owner-signed |
+| Platform / developer (us) | Read wills or sealed notes | Notes are encrypted to a TEE-held key, the agent code hash is approved on-chain, and attestation is shown in the UI. **Gap:** with Phala's centralized KMS, the Phala account holder can upgrade the CVM in place to code that gets the same key (§7.5). Mitigated by published compose hashes and the live compose hash in the UI. Backlog: on-chain KMS with a timelocked allowlist |
+| Account hijacker after death | Keep posting or replying on Telegram to block heirs forever | Guardian liveness-override (supermajority + evidence), a backlog item |
 | Owner's own mistakes | Forgetting, lost keys | No check-ins required; stale-will review; fire drill (backlog) |
 
 ---
@@ -165,6 +183,8 @@ Key facts confirmed from docs (Oct 26, 2026):
 
 ## 5. Contract specification
 
+> §5.1–§5.4 describe v1 as built. **§5.5 is the v2 target** and supersedes them where they differ.
+
 ### 5.1 Data model (one contract, many wills keyed by owner)
 ```rust
 enum WillState {
@@ -250,6 +270,98 @@ Emit NEP-297 style JSON events for every transition (the web timeline reads them
 ### 5.4 Contract tests (write these first)
 Every row of §5.3; cancel at every stage; guardian not in list rejected; double attestation rejected; threshold edge (exactly threshold); `request_signature` rejected in every non-Executing state and for wrong path/purpose; withdrawal only by owner and only Active; `update_will` rejected after Active; storage deposit accounting; partial execution recorded when owner returns mid-execution.
 
+### 5.5 v2 target
+This section supersedes §5.1–§5.4 wherever they differ. The deployed code is still v1 until Day A lands.
+
+**Flow:**
+```
+Active ──(armed, and silence > owner's normal + buffer)──▶ Quiet: CHECKS
+   ▲        heartbeat app → email → Telegram → DMs (SIMULATED)
+   │                         │ no reply
+   │                         ▼
+   │                 WelfareCheck: guardians → friends → lawyer
+   │                         │ nobody confirms they're alive
+   │                         ▼
+   │                 GuardianVote (accepted guardians only)
+   │                         │ quorum "deceased"
+   │                         ▼
+   │                 Challenge period (owner alerted on every channel)
+   │                         │
+   │                         ▼
+   │        Executing: 10% ─(LONGEST wait)─ 20% ─ 30% ─ 40%
+   │                         │ distribution complete
+   │                         ▼
+   │                 SecretsBuffer ──▶ SecretsReleased (per heir) ──▶ Completed
+   │
+   └── any valid sign of life at any stage before Completed → back to Active
+       (partial execution recorded; remaining stages and unreleased secrets halted)
+```
+
+**Schedules** (every duration is configurable; the demo uses seconds):
+| Schedule | Slices | Waits (demo) | Waits (real default) | When |
+|---|---|---|---|---|
+| Standard | 10 / 20 / 30 / 40 | 180 s, 60 s, 60 s, 60 s | 90 d, 30 d, 30 d, 30 d | default (about 6–7 months in total) |
+| Accelerated | 10 / 30 / 60 | 60 s, 60 s, 60 s | 14 d, 14 d, 14 d | after a **death-proof attestation** |
+
+- `wait_after` of stage n is the time from the start of stage n to the start of stage n+1.
+- The last stage's `wait_after` is the time from the last slice to the start of SecretsBuffer. It also gives the foreign chains time to finish: SecretsBuffer needs every (stage, foreign chain) marked done, as Completed does in v1.
+- `secrets_buffer` is 60 s in the demo and 30 d for real. The other timings stay as they are (`quiet_after`, `nudge_period`, `welfare_period`, `vote_period`, `challenge_period`). `stage_interval` is removed.
+- The setup UI shows: "If you go quiet, the earliest anything moves is ≈ X; full distribution takes ≈ Y; secrets ≈ Z."
+
+**Data model changes (`Will`):**
+- `stages: Vec<Stage { pct: u8, wait_after: u64 }>` (standard) and `accelerated_stages: Vec<Stage>`. Each must sum to 100, with every pct > 0 and every wait > 0. They replace `stages_pct` and `timings.stage_interval`.
+- `accelerated: bool`, set by a death proof and cleared on a return to Active.
+- `guardians: Vec<Guardian { account, accepted: bool }>`. Guardians named at creation start as invited.
+- `lawyer: Option<AccountId>`. The lawyer may also be a guardian, but never the owner or an heir.
+- `heirs_hidden: bool`, default true. It applies to the UI, agent API and notifications only; the contract state stays readable (decision 2026-11-05).
+- New states: `SecretsBuffer { since }` and `SecretsReleased { since }`, before `Completed { at }`.
+
+**Methods (new or changed):**
+- `invite_guardian(account)` / `remove_guardian(account)`: owner only, Active only. `accept_guardian(owner)` is called by the invited guardian.
+- `is_armed(owner) -> { armed, missing: Vec<String> }`. A will is armed when accepted guardians ≥ threshold and it has at least 1 heir. An unarmed will never leaves Active: `advance` does nothing for it.
+  - The "≥ 1 strong signal source" rule is checked off-chain by the agent and UI. The owner's own NEAR account always counts as one.
+- `attest(...)`: accepted guardians only.
+- `attest_death_proof(owner, evidence_hash)`:
+  - Who: the lawyer alone, or the guardian quorum with evidence hashes on their attestations.
+  - When: only in GuardianVote, Challenge or Executing.
+  - Effect: sets `accelerated`. Before Executing, the whole schedule becomes the accelerated one. During Executing, the remaining stages keep their percentages and take the accelerated waits.
+  - It never skips Challenge or a stage. A lawyer's proof during GuardianVote does **not** replace the guardian quorum.
+  - It emits `death_proof_attested`.
+  - No AI verdict can trigger it. AI may only pre-check a document and show its notes to humans.
+- `contact_confirm_alive`: now also allowed for accepted guardians and the lawyer (the welfare chain), still only in Quiet/WelfareCheck.
+- `store_released_note`: only in `SecretsReleased` (v1 allowed it in Executing | Completed).
+- `i_am_alive` / `record_liveness` / guardian `Alive` in SecretsBuffer or SecretsReleased → Active. The distribution already sent stays recorded, and notes not yet released are halted.
+- Events for every transition and role action: `guardian_invited`, `guardian_accepted`, `death_proof_attested`, `secrets_buffer_started`, `secrets_released`, and so on.
+
+**Transition table changes** (on top of §5.3):
+| From | Trigger | Guard | To |
+|---|---|---|---|
+| Active | advance | **armed** and now − last_alive_at ≥ quiet_after | Quiet |
+| Executing{n} | advance | elapsed ≥ current schedule's `wait_after[n]` and n+1 < stages | Executing{n+1} (NEAR slice paid) |
+| Executing{last} | advance | elapsed ≥ `wait_after[last]` and every (stage, foreign chain) done | SecretsBuffer |
+| SecretsBuffer | advance | elapsed ≥ secrets_buffer | SecretsReleased |
+| SecretsReleased | advance | every sealed note released (late heir key registration still works until then) | Completed |
+| GuardianVote / Challenge / Executing | attest_death_proof | lawyer, or quorum with evidence | same state, `accelerated = true` |
+| any pre-Completed (incl. SecretsBuffer, SecretsReleased) | i_am_alive / record_liveness(newer) | — | Active |
+| Quiet / WelfareCheck | contact_confirm_alive | caller is a contact, an accepted guardian or the lawyer | Active |
+
+**Tests to add (tests first):**
+- every new transition;
+- an unaccepted guardian cannot attest;
+- an unarmed will never escalates;
+- acceleration from each allowed role, and rejection from every other caller;
+- acceleration never skips Challenge or a stage, mid-execution included (percentages still sum to 100);
+- `store_released_note` rejected before `SecretsReleased`;
+- a sign of life during `SecretsBuffer` halts the secrets;
+- the partial execution record after an owner returns mid-execution;
+- validation of the stage sums for both schedules.
+
+**Deploy:** the storage layout changes, so `inheirit.testnet` gets a **fresh TEE-mode redeploy**.
+- It uses the state cleaner on the same account, so the vault addresses don't change.
+- Then run `tee-agent.ts approve`. The agent re-publishes the same sealed-notes key, because the key is unset after the wipe and the app_id is unchanged.
+- Existing testnet wills are wiped, and so is the NEAR vault bookkeeping. Their foreign coins stay at the same derived addresses.
+- Redeploy `inheirit-dev.testnet` the same way.
+
 ---
 
 ## 6. Vaults and Chain Signatures
@@ -269,7 +381,8 @@ Every row of §5.3; cancel at every stage; guardian not in list rejected; double
 ```ts
 export type SignalSource =
   | 'near_onchain' | 'evm_onchain' | 'phone_heartbeat' | 'github'
-  | 'google_calendar' | 'gmail' | 'x' | 'instagram';
+  | 'google_calendar' | 'gmail' | 'x' | 'instagram'
+  | 'telegram' | 'tiktok' | 'facebook' | 'whatsapp' | 'linkedin';   // v2 additions
 
 export interface SignalAdapter {
   source: SignalSource;
@@ -279,32 +392,43 @@ export interface SignalAdapter {
   lastActivity(owner: OwnerSignalConfig): Promise<Date | null>;
 }
 ```
-| Source | Hackathon status | trustWeight | Notes |
-|---|---|---|---|
-| near_onchain | **real** | 0.9 | Any tx signed by owner's NEAR account (FastNear / NearBlocks API) |
-| evm_onchain | **real** | 0.9 | Owner's personal Sepolia address (not the vault) via Etherscan API / RPC |
-| phone_heartbeat | **real** | 0.9 | `web/heartbeat` PWA posts a signed ping when opened (owner key or per-device token) |
-| github | **real** | 0.5 | Public events API; token for rate limit |
-| google_calendar / gmail | simulated → real later | 0.7 | OAuth in testing mode, tokens stay in TEE |
-| x | **simulated** | 0.4 | API is paid/limited; demo button "simulate post" |
-| instagram | **simulated** | 0.4 | API restricted for personal accounts |
+| Source | Category | Layer | trustWeight | Hackathon status | Notes |
+|---|---|---|---|---|---|
+| near_onchain | on-chain | signal | 0.9 strong | **real** | Any tx signed by the owner's NEAR accounts (FastNEAR) |
+| evm_onchain | on-chain | signal | 0.9 strong | **real** | The owner's personal Sepolia addresses (not the vaults) |
+| phone_heartbeat | device | signal + check | 0.9 strong | **real** | `web/heartbeat` PWA: a signed ping on open, or an "I'm here" tap |
+| github | work | signal | 0.5 weak | **real** | Public events API. Optional ("if you have it") |
+| telegram | social/work | check (a reply is a signal) | 0.7 medium | **real, new (§7.7)** | Bot with long polling. Timestamps only |
+| google_calendar / gmail | work | signal + check | 0.7 medium | simulated (real only if time remains) | OAuth in testing mode, tokens stay in the TEE |
+| x / instagram / tiktok / facebook | social | signal + DM check | 0.4 weak | **simulated** | APIs paid or restricted |
+| whatsapp | social | check | 0.4 weak | **simulated** | Business API too heavy |
+| linkedin | work | signal | 0.4 weak | **simulated** | API closed |
+
+Rules:
+- A strong or medium signal (weight ≥ 0.7) counts alone. Weak signals count only when ≥ 2 different weak sources agree within 24 h; this is already built, keep it. "Medium" is the label for 0.7 (decision 2026-11-05).
+- A reply to a check is itself a signal. A DM reply is weak (0.4), because the account may be managed or hijacked. A Telegram reply is medium (0.7). A heartbeat tap is strong (0.9).
+- Every simulated source carries the `SIMULATED` tag in the UI, code and README. Work signals are optional and labelled "if you have them".
+- **Removed from scope permanently:** last-known-workplace outreach and employee directories. They are intrusive, can harm a living owner, and carry data-protection risk. An owner who wants a colleague involved adds them by name as a friend contact.
 
 Simulated adapters read from a local store the demo panel writes to (`POST /demo/signal {source, at}`), and are tagged `SIMULATED` everywhere.
 
 ### 7.2 Liveness scoring
 - Poll all adapters every N seconds (demo: 15s).
-- A signal counts as "alive" if its weight ≥ 0.7 **or** several weaker signals agree within a window. Rationale: social posts can be scheduled or run by someone else; signed on-chain txs and phone heartbeats are hard to fake.
+- A signal counts as "alive" if its weight ≥ 0.7 (strong or medium, §7.1) **or** several weaker signals agree within a window. Rationale: social posts can be scheduled or run by someone else; signed on-chain txs and phone heartbeats are hard to fake.
 - When the score says alive at time T newer than the contract's `last_alive_at`, call `record_liveness(owner, T)`.
-- **Baseline** (adaptive `quiet_after`, real mode only): median gap between strong signals over the last 90 days × a multiplier, clamped to [7d, 60d]. Plain statistics; no AI needed.
+- **Baseline** (v2: display only): the median gap between strong signals over the last 90 days, taken from the NEAR tx history the adapter already fetches and shown in words: "usually active every N days". Plain statistics, no AI. The contract's `quiet_after` stays a fixed owner setting; an adaptive `quiet_after` is backlog.
 - **Privacy rule:** adapters return timestamps only. Never log, store, or transmit content.
 
-### 7.3 Escalation driver
-- Each tick: read state; if a period has elapsed, call `advance(owner)`; on each new state, send notifications:
-  - Quiet → nudge owner (email + heartbeat app).
-  - WelfareCheck → contacts: "Have you heard from <name> recently? Confirm they're fine: <link>".
-  - GuardianVote → guardians: attest link with what's known.
-  - Challenge → owner on **every** channel: "Your will executes in X. Any activity cancels it."
-- Email via Resend. If not configured, notifications appear in the web UI's notification log (cut line).
+### 7.3 Escalation driver, checks and notifications
+- Each tick: read the state. If a period has elapsed and the will is armed, call `advance(owner)`. On each new state, notify:
+  - Quiet → **checks**, spaced across `nudge_period`: heartbeat app → email → Telegram → SIMULATED DMs. Each attempt is logged as an event (channel and time, no content). The Telegram text is: "We haven't seen activity from you for a while. Reply anything (or open the heartbeat app) and nothing else happens."
+  - WelfareCheck → guardians, then friends (contacts), then the lawyer: "Have you heard from <name> recently? Confirm they're fine: <link>". Telegram is used for anyone who linked it.
+  - GuardianVote → accepted guardians: an attest link with what's known.
+  - Challenge → the owner on **every** channel: "Your will executes in X. Any activity cancels it."
+  - Executing / SecretsBuffer / SecretsReleased → heirs. Heir identities are used in notifications only from this point on.
+- **One notification record per event**, with the list of channels and recipients it went to. This fixes the duplicate cards caused by the per-recipient fan-out in `src/escalation/driver.ts` `notificationsFor`.
+- Email: no sender exists (the cut line was taken in v1). Email shows up as a channel in the UI log. Resend is optional if time remains and the human supplies `RESEND_API_KEY`.
+- Known noise: an expired guardian vote returns the will to Active with the old `last_alive_at`, so with demo timings the ladder restarts about every 7 min. Grouped records and the human-language timeline keep this readable.
 
 ### 7.4 Executor
 - On `Executing{n}`: for each foreign chain with balance: build transfers per policy (chainsig.js) → `request_signature` via contract → format signature → broadcast → `record_execution`. NEAR stage transfers happen in the contract on `advance`.
@@ -317,7 +441,7 @@ Simulated adapters read from a local store the demo panel writes to (`POST /demo
 - Agent publishes the public key with `set_agent_pubkey`. The contract accepts it from a registered agent **only while unset**. Changing it later needs the contract owner (explicit rotation). At boot the agent compares its derived pubkey with `get_agent_pubkey()`. On a mismatch it refuses all sealed-note work and logs that loudly. It never overwrites the key silently, because a new app_id would otherwise strand every existing note.
 - Browser encrypts each note with libsodium `crypto_box_seal` to the agent pubkey; only ciphertext goes on-chain.
 - Heir, when claiming, generates an X25519 keypair in the browser (saved locally + downloadable backup) and calls `register_heir_key` from their NEAR account.
-- After execution starts, agent decrypts inside the TEE and re-seals to the heir's pubkey (`store_released_note`). Heir decrypts in the browser.
+- **v2: secrets last.** Once the will reaches `SecretsReleased` (distribution complete + `secrets_buffer`, §5.5), the agent decrypts inside the TEE and re-seals each note to its heir's pubkey (`store_released_note`, which the contract allows only in `SecretsReleased`). The heir decrypts in the browser. (v1 released notes from the moment execution started.)
 - **Disaster recovery (not the normal path):** if the CVM or its app_id is lost (deleted, Phala account problem, KMS change), the old key is gone. Then the owner re-seals: a new agent publishes a new key through owner-approved rotation, and the web app flags notes sealed to the old key and asks the owner to re-encrypt them. Document this as a known limitation.
 - **Honest trust note (README §7 and THREAT_MODEL):** we use Phala's **centralized KMS** (`kms_type: phala`), so whoever controls the Phala account can push a new compose in place, and that code would get the **same key**. Approving measurements on the agent contract does not stop it, because the KMS doesn't consult our contract. So "the developer can't read notes" rests on our operational discipline plus Phala's KMS, not on cryptography alone. Mitigations: publish every compose hash we deploy, keep public logs on, and show the live compose hash next to the approved measurements in the UI. Backlog: move to dstack's **on-chain KMS** (DstackApp contract with a compose-hash allowlist behind a timelock or multisig), which makes upgrades public and delayed.
 - Also verify the KMS signature chain that `getKey` returns (2 signatures, proving the key belongs to this app_id under the KMS root in `key_provider_info`) in the attestation panel (Day 3, nice-to-have).
@@ -328,6 +452,7 @@ Simulated adapters read from a local store the demo panel writes to (`POST /demo
 - **Policy parser:** plain-English will → JSON matching the schema below. Validate with zod. Deterministic checks after the model: shares per asset sum to 100%, every heir referenced exists, stages sum to 100%. On failure, show errors; never auto-fix silently. The owner must approve a human-readable summary before `policy_hash` is set.
 - **Heir claim guide:** a chat that explains, in plain language, what's happening and what to click next. Fed only the heir's own claim info.
 - **Attestation badge:** fetch `/v1/attestation/report` with a fresh nonce, verify per the example repo, show "Verified private inference" with details in a popover. Also show the agent's approved code hash from the contract.
+- **Startup guard:** at boot, verify the attestation for `NEARAI_MODEL` and log the result, and refuse will contents while it fails. Today only the lazy `AttestationGate.require()` runs, before each AI call (`src/ai/attestation.ts`); the boot check is Day B work.
 
 ```json
 {
@@ -356,37 +481,80 @@ Simulated adapters read from a local store the demo panel writes to (`POST /demo
 ```
 (`conditions` is parsed and displayed in the MVP; enforcing time conditions is backlog — say so in the README.)
 
+### 7.7 Telegram check (real)
+- **Bot:** created by the human via BotFather. `TELEGRAM_BOT_TOKEN` and `TELEGRAM_BOT_USERNAME` go in `.env` and in the TEE's allowed envs. A new key means `tee-agent.ts env` + `approve` (§14).
+- **Linking:** the owner (or a guardian or friend) opens `https://t.me/<bot>?start=<one-time-token>` from onboarding. The token is issued on an owner-signed request (NEP-413), is single-use and short-lived, and is kept in the agent store. The agent maps chat_id ↔ account.
+- **Long polling (`getUpdates`), not webhooks:** it only makes outbound calls, so it fits the TEE, which has no inbound webhook route.
+- **A reply counts as a signal:** any message from a linked owner chat becomes a `telegram` observation at receive time, then goes through scoring (0.7) and on to `record_liveness`. Only the timestamp is kept; message text is never logged or stored.
+- **Guardians and friends:** the same bot messages linked guardians and friends during WelfareCheck and GuardianVote. Cut line 4: owner only.
+
+### 7.8 Plain-English liveness verdict
+- Deterministic text (no LLM), recomputed every tick and returned by the agent API. Examples:
+  - "Alive. Last strong signal: NEAR transaction 10 minutes ago."
+  - "One X post seen; ignored on its own because posts can be scheduled or run by someone else."
+  - "Quiet for 9 days. Alice usually transacts every 2 days — this is unusual for her. Checks started."
+- `scoreAlive` (`src/liveness/score.ts`) returns only `{at, basis}` today. Extend it to also report the observations it ignored, and why.
+
 ---
 
-## 8. Web app
+## 8. Web app (v2)
 
 Pages:
-- `/` — landing: one-liner, how it works (the ladder diagram), "Try the demo" button.
-- `/owner` — create will (plain-English box → parsed summary → approve), vault addresses + live balances per chain, liveness timeline (per source, SIMULATED tags), current state on the ladder, sealed notes (add/remove), "I'm alive" button, withdrawal, attestation badges.
-- `/guardian/[owner]` — what's known (last signals, state), attest Deceased/Alive with evidence upload (hash on-chain, file stays off-chain).
-- `/heir/[owner]` — guided claim: register key, see released amounts + tx links per chain, decrypt sealed notes, AI guide chat.
-- `/demo` — **demo control panel for judges**: create a pre-seeded demo will, compressed clock, "simulate activity" per source, "advance" button, live event log. Clearly marked as demo tooling.
-- `/heartbeat` — installable PWA: one big "I'm here" plus passive ping on open.
+- These all exist today: `/`, `/owner`, `/guardian/[owner]`, `/heir/[owner]`, `/contact/[owner]`, `/demo`, `/heartbeat`.
+- New: guardian invite/accept.
 
-Design: calm, trustworthy, not "crypto-bro". Plain language everywhere ("your will", "guardians", "release in stages"), technical details in expandable panels.
+1. **Hero "Signs of life" panel** at the top of `/owner` and `/demo`:
+   - One live strip per source that pulses when a signal lands, with a strength tag (strong/medium/weak) and a SIMULATED tag where it applies.
+   - The ladder as a **horizontal** progress bar, showing the current step and a countdown to the next.
+   - When a sign of life lands, the ladder visibly **snaps back to Active** with an animation. This is the demo's 3-second moment.
+   - The plain-English verdict (§7.8) underneath.
+   - A privacy strip: "What the agent saw: timestamps only", plus the attestation badges (TEE agent measurements and NEAR AI model).
+2. **Human-language timeline:** "Alice went quiet", "Checks sent (heartbeat, email, Telegram)", "Friends asked", "Guardians voted", "Will executing: 10% sent". Raw state names appear only in an expandable "technical" view.
+3. **Progressive onboarding:**
+   - **Minimum will in 3 steps:**
+     1. Signals: one wallet address plus the heartbeat app.
+     2. Cast: one heir plus two guardians (invites sent).
+     3. Vault deposit, with a **live allocation preview** ("2.1 ETH + 0.03 BTC → Ada; 0.9 ETH → Tobi").
+   - **Will-strength checklist and score** afterwards: more signals, alert channels (Telegram, email), a lawyer, friends, final secrets, the heirs-hidden setting, a death-proof contact. It shows which items make the will "armed".
+   - **Minimal sign-up:** display name required, jurisdiction optional. Both are stored in the off-chain policy (hashed), not on-chain. No date of birth, nationality or photo.
+   - **Will entry:** either plain English (NEAR AI → JSON → human summary → approve) or a structured form. Percentages, not amounts.
+4. **Final secrets step** (optional, skippable):
+   - Guidance: "Prefer instructions (where the Ledger is, which drawer, who has the passphrase) over raw keys. Split secrets — e.g. seed phrase here, passphrase with your lawyer."
+   - Shown clearly: "Released last, per heir, only after distribution completes and a 30-day buffer passes."
+5. **Guardian invite/accept page**, and a **heir view that respects `heirs_hidden`**. No list of heirs is suggested to visitors (`/heir/[owner]` does this today).
+6. **Setup summary:** "If you go quiet: earliest anything moves ≈ X; full distribution ≈ Y; secrets ≈ Z."
+
+Design: calm, trustworthy, not "crypto-bro". Plain language everywhere; technical details go in expandable panels.
+
+v1 as of 2026-11-05, the starting point:
+- A vertical ladder (`web/src/components/Ladder.tsx`) with one countdown and no animation.
+- `SignalList` (`web/src/components/WillParts.tsx`) with strong/weak and SIMULATED tags.
+- Raw state names in the demo event log.
+- One notification card per recipient.
+- No sign-up data, no allocation preview, no duration summary.
 
 ---
 
-## 9. Demo scenarios (these are the acceptance tests for the MVP)
+## 9. Demo scenarios (the acceptance tests, v2)
 
 **Scenario A — "Silence doesn't kill you" (cancel):**
-1. Demo will exists with vaults funded on NEAR, Sepolia, BTC testnet.
-2. Stop all signals → state goes Quiet → WelfareCheck → GuardianVote (notifications visible).
-3. Two guardians attest Deceased → Challenge, owner notified on every channel.
-4. Open the heartbeat app, or simulate two weak signals (e.g. X post + Instagram post) → **everything cancels**, state back to Active, no funds moved. A lone X post is shown **not** cancelling first, to demonstrate §7.2.
+1. An armed demo will (guardians accepted) with vaults funded on NEAR, Sepolia and BTC testnet, and the owner's Telegram linked.
+2. Normal life: signals pulse and the verdict says "Alive". Stop all signals → Quiet: checks go out, and a Telegram message arrives on a real phone.
+3. A lone SIMULATED X post is shown **not** cancelling, and the verdict explains why.
+4. The owner replies on Telegram (or taps the heartbeat app, or two weak sources fire within 24 h) → **the ladder snaps back to Active**, the verdict explains why, and no funds move.
+   - Variant: let it reach GuardianVote → 2 guardians attest → Challenge → a sign of life then cancels.
+5. An unarmed will (a guardian hasn't accepted) never leaves Active.
 
 **Scenario B — "It actually executes" (release):**
-1. Same, but no sign of life during Challenge.
-2. Executing stage 1 (10%) → transfers land on NEAR, Sepolia and BTC testnet; explorer links shown.
-3. Heir opens claim page → guided flow → registers key → decrypts sealed note ("The Ledger is in the blue folder in the study…").
-4. Owner "returns" mid-execution → remaining stages halt; partial execution recorded.
+1. Same, but with no sign of life: quorum → Challenge → Executing.
+2. Stage 1 (10%) lands on NEAR, Sepolia and BTC testnet, with explorer links → the **longest wait** (180 s in the demo) → 20% / 30% / 40% → SecretsBuffer → SecretsReleased.
+3. The heir opens the claim page and registers a key (at any time before). The sealed note ("The Ledger is in the blue folder in the study…") decrypts only after SecretsReleased.
+4. Variants:
+   - The owner returns mid-execution → the remaining stages and the secrets halt, and the partial execution is recorded.
+   - The owner returns during SecretsBuffer → the secrets are never released.
+   - A lawyer's death proof → the remaining waits switch to accelerated, and the challenge period is not skipped.
 
-Scripts: `scripts/demo-cancel.ts`, `scripts/demo-execute.ts` run both end-to-end headlessly; the README links them.
+Scripts: `scripts/demo-cancel.ts` and `scripts/demo-execute.ts` run both headlessly; the README links them. They need updating for v2: accept guardians, stage waits, the secrets stage, acceleration.
 
 ---
 
@@ -407,82 +575,122 @@ BTC_API_URL=                 # e.g. mempool.space testnet API
 GITHUB_TOKEN=
 RESEND_API_KEY=
 NOTIFY_FROM_EMAIL=
+TELEGRAM_BOT_TOKEN=          # BotFather; never commit
+TELEGRAM_BOT_USERNAME=       # for t.me/<bot>?start=<token> links
 DEMO_MODE=true
 ```
 
 ---
 
 ## 11. README requirements (judge-facing; AI judges read it)
-1. What it is (2–3 sentences) and the problem (with the "why past attempts failed" table).
+1. Line 1 is the pitch (§2.1). Then what it is (2–3 sentences), the four insights and the originality note (§2.1), and the problem (with the "why past attempts failed" table).
 2. **Try it in 5 minutes:** numbered "do X → see Y" steps on testnet using `/demo`, no real money.
-3. How it works: the ladder diagram, the two principles (passive liveness; signals stop it, only people start it).
+3. How it works: the ladder diagram, the two principles (passive liveness; signals stop it, only people start it); signals vs checks; staged release with the long first wait; secrets last.
 4. NEAR tech used and where in the code (table from §3).
 5. Privacy: what runs in the TEE, what leaves it (timestamps only), attestation.
 6. Threat model.
-7. Honest limitations: Shade Agent Framework is experimental/testnet-only; vault model; simulated signals (listed); `conditions` not enforced yet; key persistence approach.
-8. Roadmap (backlog §13).
+7. Honest limitations: Shade Agent Framework is experimental/testnet-only; vault model; simulated signals (listed); `conditions` not enforced yet; key persistence approach; heirs hidden in the UI only (contract state is readable); email notifications shown in the UI only.
+8. Roadmap (§13).
 9. Credits: Shade Agent template (upstream link) and vendored code with its licenses; built with Claude Code.
 
 ---
 
-## 12. Build plan
+## 12. Build plan (v2)
 
-> **Dates:** "Day N" means build day N, counted from when the submission repo starts. That can be before Nov 1. The calendar dates in the headings are the original plan.
+> **Done before v2:** the Phase 0 spikes (Oct 27) and v1 build days 1–5 (Oct 27 – Nov 5): contract, agent, AI + sealed notes + attestation, web, and the hosted demo with Scenario B reaching Completed on 3 chains. Details are in the Decision log.
 
-### Phase 0 — spikes (separate `heirtest/` workspace; nothing copied over except knowledge)
-- [x] Deploy Shade Agent template locally, then once to Phala; have it sign + send a Sepolia tx. (Done 2026-10-27, local + TEE.)
-- [x] Derive a BTC testnet address with chainsig.js; send one tx from it. Note the network and RPC that worked. (Done 2026-10-27: testnet4 via mempool.space.)
-- [x] Call NEAR AI Cloud; verify one model attestation with the example repo. (Done 2026-10-27: z-ai/glm-5.3-flash, all 7 checks.)
-- [x] Confirm all [VERIFY] items in §3; record answers in the Decision log. (Done 2026-10-27; last one was dstack key persistence, spike 4.)
+### Day A — Nov 5 (runs into Nov 6): contract + Telegram
+- Contract §5.5, tests first.
+- Fresh TEE-mode redeploy of `inheirit.testnet` and `inheirit-dev.testnet`.
+- Update the agent, web and script bindings. Every user of `stages_pct` / `stage_interval` is listed in the Decision log 2026-11-05.
+- Telegram bot (§7.7): link flow, the Quiet check message, a reply → medium signal.
+- Ship **one** agent image that also carries the pending day6 fixes (`66758d5`, `3f3433b`) and the `TELEGRAM_*` env keys.
+- ✅ CLI:
+  - An unarmed will never escalates.
+  - An armed will goes Quiet → a Telegram message arrives on the human's phone → a reply → back to Active.
+  - A full run reaches `SecretsReleased` only after distribution plus the buffer.
+  - Acceleration via the lawyer works and doesn't skip the challenge period.
 
-### Day 1 (Nov 1) — Contract
-- Import template as first commit. Implement §5 with tests first (§5.4). Deploy to testnet. Derive + fund vaults.
-- ✅ CLI-only: create will → walk every state → cancel with `i_am_alive`.
+### Day B — Nov 6: the killer feature made visible
+- Hero signs-of-life panel, snap-back animation, plain-English verdict, privacy strip, human-language timeline, grouped notifications.
+- Startup attestation check for `NEARAI_MODEL` (§7.6).
+- ✅ In the browser: stop the signals → watch the ladder climb with countdowns → reply on Telegram (or tap heartbeat) → the ladder snaps back, with the verdict explaining why.
 
-### Day 2 (Nov 2) — Agent + money movement
-- Signal adapters (real: near_onchain, evm_onchain, github; simulated store), scoring, escalation driver, notifications. Executor for NEAR, ETH, then BTC. One Phala TEE deploy to confirm.
-- ✅ CLI-only run: silence → … → execution with funds landing on 3 chains (or 2 if BTC is cut).
+### Day C — Nov 7: onboarding + secrets + end-to-end
+- Progressive onboarding: 3-step minimum will, strength checklist, allocation preview, minimal sign-up.
+- Guardian accept page, final secrets step, heirs-hidden handling, setup summary.
+- Update the demo scripts (`demo-cancel`, `demo-execute`) for the v2 flow, including the secrets stage and acceleration.
+- Test the **heir claim on the hosted app** (register key → sealed note decrypts → AI guide). It was skipped on 2026-11-05.
+- ✅ A new user creates a minimum will in under 3 minutes, and both demo scenarios pass end-to-end in the browser and headlessly.
 
-### Day 3 (Nov 3) — AI + sealed notes + attestation
-- Policy parser + validation + approval → policy_hash. Sealed-note crypto end to end. Attestation verification (NEAR AI Cloud + agent code hash).
-- NEAR AI attestation = **vendor and adapt** the TS checks from `nearai/nearai-cloud-verifier` `ts/model_verifier.ts` (`checkTdxQuote`, `checkReportData`, `checkGpu`, the mr_config/compose check) into `agent/src/ai/attestation.ts`. Return a structured pass/fail per check and log nothing. Add `@phala/dcap-qvl-node` (WASM). Use ethers v6 `verifyMessage` for the chat signature. Keep the MIT notice and credit the source. On startup and before any will-content request: refuse if any check fails, or if the configured model has no attestation. Badge shows: TDX quote `UpToDate` + report data binds signer + nonce + NVIDIA verdict + signature recovers to attested address.
-- ✅ Write will in English → seal a note → execute → only the heir can decrypt.
+### Cut lines (in order, if Days A–C slip)
+1. Heirs hidden at contract level → UI-only hiding plus a documented limitation. **Already taken** (decision 2026-11-05).
+2. Accelerated schedule UI → contract + CLI only.
+3. Will-strength *score* → a checklist without the score.
+4. Telegram for guardians → owner only.
 
-### Day 4 (Nov 4) — Web
-- All pages in §8, including `/demo` and `/heartbeat`.
-- ✅ Scenarios A and B run fully in the browser.
+**Never cut:** the snap-back moment, the Telegram owner check, standard staging with a long first wait, secrets-last gating.
 
-### Day 5 (Nov 5) — End to end + README + rough demo
-- Run A and B repeatedly, fix bugs, demo scripts, README per §11, threat model doc, rough recording.
-- ✅ A judge following only the README can reproduce both scenarios.
+### Nov 8–14 — improve, test, break, audit
+- **Nov 8–9, break it:** adversarial testing session(s). Each finding becomes a test, then a fix. Cover:
+  - greedy-heir scenarios and a colluding guardian;
+  - replayed or forged signals, and simulated-signal spam;
+  - signing a payload outside `Executing`, and double execution;
+  - an early `store_released_note`;
+  - an agent restart mid-execution;
+  - Bitcoin UTXO and fee edge cases;
+  - empty or partly funded vaults.
+- **Nov 10, audit:** a fresh Claude Code session with no prior context reviews the contract and agent against `docs/THREAT_MODEL.md` and this spec, and reports findings only. Fix what it finds. Also confirm the Intel TDX check (nearai-cloud-verifier) still passes before showing the "verified" badge.
+- **Nov 11, polish:**
+  - Copy, empty states, mobile layout, performance.
+  - README per §11: the pitch, the insights from §2.1, "do X → see Y", the list of simulated sources, limitations, roadmap.
+  - Replace `<WEB_URL>` in `README.md` with `https://inheirit.vercel.app` and check "try it in 5 minutes" against the hosted app.
+- **Nov 12, demo:** record the 90 s video (script below) and draft the X post for the human.
+- **Nov 13:** buffer, final README pass, repo made public (the human approves).
+- **Nov 13–14:** the human submits (never the agent). Aim to submit by Nov 13.
 
-### Cut lines (in order, if behind)
-1. Drop BTC (keep NEAR + ETH). 2. Notifications in UI only (no email). 3. Fixed silence threshold instead of baseline. **Never cut:** the cancel moment, cross-chain release, sealed note to heir.
+**Demo video script (~90 s):**
+1. One line: "A will that doesn't make you prove you're alive."
+2. Normal life: signals pulse, nothing happens; the verdict says "Alive."
+3. Silence: the ladder climbs, a Telegram message arrives on a real phone, friends and guardians are asked.
+4. The owner replies on Telegram → **the ladder snaps back** → the verdict explains why.
+5. Replay without a reply: quorum → challenge → 10% lands on NEAR/Sepolia/BTC → the long wait (fast-forwarded) → the remaining slices → buffer → the heir opens a sealed note.
+6. Close on the privacy strip and "Built on NEAR: Chain Signatures, Shade Agents (TEE), NEAR AI Cloud."
 
 ---
 
-## 13. Backlog (Nov 6–14, alongside the human's other work)
-- Hardening: guardian disagreement, partial vault funding, fee estimation, BTC UTXO edge cases, more tests, idempotency audit.
+## 13. Roadmap (README) and backlog
+**Roadmap (README only, not built now):**
+- a human adjudicator for disputes and heir support;
+- real Gmail / Calendar / X / Instagram / WhatsApp / LinkedIn adapters;
+- an adaptive baseline per source;
+- incapacity mode (a caretaker allowance via function-call keys);
+- fire-drill mode;
+- stale-will review;
+- a lawyer companion letter;
+- gasless heir claims;
+- an optional mainnet Intents payout ("receive as USDC on chain X"; **human approval required**).
+
+**Engineering backlog (from v1, still open):**
+- Hardening: guardian disagreement, partial vault funding, fee estimation, BTC UTXO edge cases, an idempotency audit.
 - Guardian liveness-override (supermajority + evidence) for hijacked accounts.
-- **Fire drill mode:** rehearse execution with heirs/guardians on a throwaway testnet will.
-- **Incapacity mode:** caretaker gets a capped allowance via function-call keys/sub-account.
-- **Stale-will review:** detect new uncovered assets / empty vaults; AI explains.
-- Real Google Calendar/Gmail adapter (OAuth testing mode, tokens in TEE).
-- ERC-20 / test USDC vaults; enforce `conditions` (e.g. not_before).
-- Gasless heir claims (meta transactions/relayer); named account onboarding for non-crypto heirs.
-- Lawyer companion letter (generated, mentions the plan exists, no secrets).
-- Optional mainnet moment: heir receives as USDC on another chain via 1Click (small real amount, **human approval required**).
-- Demo video (60–90s), X post draft for the human, final README pass. Submit early — human does it.
+- ERC-20 / test USDC vaults.
+- Enforce `conditions` (e.g. not_before).
+- Contract-level heir hiding (commit-reveal).
+- Email via Resend.
+- An adaptive `quiet_after` driven by the baseline.
+- Archive or reset a will after Completed.
+- Named-account onboarding for non-crypto heirs.
 
 ---
 
 ## 14. Status (update every session)
-- **Phase:** Day 5 nearly done (2026-11-05). The demo is **hosted and working**: web `https://inheirit.vercel.app` (Vercel project from `wizardroyal/Inheirit`, Root Directory `web`, production branch `main`, env `NEXT_PUBLIC_AGENT_URL` = the TEE API URL below, `NEXT_PUBLIC_CONTRACT_ID=inheirit.testnet`) against `inheirit.testnet` + the Phala TEE agent. `main` and `web-day4` are pushed and equal at the time of writing; Vercel redeploys on every push to `main`. The repo is still **private** (must be public by 2026-11-14T23:59Z; the human decides when).
+- **Phase:** v2 Day A (2026-11-05). CLAUDE.md now holds the v2 spec (§2.1, §5.5, §7.1–§7.8, §8, §9, §12). **No v2 code exists yet**: the deployed contract, agent and web are still v1. The v1 demo is **hosted and working**: web `https://inheirit.vercel.app` (Vercel project from `wizardroyal/Inheirit`, Root Directory `web`, production branch `main`, env `NEXT_PUBLIC_AGENT_URL` = the TEE API URL below, `NEXT_PUBLIC_CONTRACT_ID=inheirit.testnet`) against `inheirit.testnet` + the Phala TEE agent. `main` and `web-day4` are pushed and equal at the time of writing; Vercel redeploys on every push to `main`. The repo is still **private** (must be public by 2026-11-14T23:59Z; the human decides when).
 - **Last checkpoint:** ✅ 2026-11-05: Scenario B ran to **Completed on all three chains on the hosted app** (owner `alice.inheirit-kjgw3v.testnet`, details in the Decision log). Scenario A's cancel moment was also run by the human on the hosted app (guardian vote → Challenge → owner sign of life → Active). Tests: 126 vitest, agent typecheck clean, web typecheck clean.
 - **TEE agent (provision once; never re-create, §7.5):** CVM `inheirit-agent`, vm `e3685437-e716-493a-ac4e-3717a72e7fdd`, **app_id `d5b714731becca502b6bd054a5cf6ffa5ce71f61`**, dstack-0.5.12, tdx.small, gateway `dstack-pha-prod9.phala.network`. Image `unwizarding/inheirit-agent@sha256:e69291f930b037f422cb514fcdc9f99487b391d6f27d07197324d57b7e52fd2b` (day5), live compose hash `bd3a0e8866d57a54888d9b46cd1ce3d400f5e6df8c4e6995c405b130b32a8659` (9 allowed_envs, incl. DEMO_FAUCET_* and NEAR_RPC_URL). It is the only approved hash on 2026-11-05; earlier hashes are retired. `NEAR_RPC_URL` in the TEE = keyed FastNEAR only (key sent as a bearer header). Agent account changes on every boot (implicit account); on 2026-11-05 10:00Z it is `1665caee5fb1e4b0d127f1395a8cd24de98a29d7e9797ec47582b4c09dc5e752`. **Sealed-notes key on `inheirit.testnet`: `ae74cf06b6be6e3896aa9e9641f4d67e8a598db39724903cec7f1955c2ffa51e`** (app_id `d5b71473…`, from dstack in the TEE). API: `https://d5b714731becca502b6bd054a5cf6ffa5ce71f61-3000.dstack-pha-prod9.phala.network`. Logs: `https://d5b714731becca502b6bd054a5cf6ffa5ce71f61-8090.dstack-pha-prod9.phala.network/logs/shade-agent-app?text&bare&timestamps&tail=50`. Record in `deploy/tee-agent.json`; tool `scripts/tee-agent.ts provision|approve|upgrade|env|retire|status|stop|start` (needs the shade CLI keyring: Phala key + testnet account `paid-outside.testnet`; **the keyring is wiped on every WSL restart**, see Decision log 2026-11-05). It costs about $0.06/h while running; `stop` keeps the app_id and key.
-- **Not yet in the TEE (committed, ships with the next image):** `66758d5` faucet skips UTXOs it already spent + retries once on `missingorspent`; `3f3433b` `src/near-rpc.ts` transport-only RPC failover. Until that image is live, **keep `NEAR_RPC_URL` in `.env` to ONE URL** (the keyed FastNEAR one); a 2-URL list crash-loops the current image. After the new image is live, it is safe to set `NEAR_RPC_URL=https://test.rpc.fastnear.com?apiKey=…,https://near-testnet.drpc.org` and run `tee-agent.ts env` (no new hash: the key list is unchanged).
+- **Not yet in the TEE (committed; ships with the v2 Day A image, decision 2026-11-05):** `66758d5` faucet skips UTXOs it already spent + retries once on `missingorspent`; `3f3433b` `src/near-rpc.ts` transport-only RPC failover. Until that image is live, **keep `NEAR_RPC_URL` in `.env` to ONE URL** (the keyed FastNEAR one); a 2-URL list crash-loops the current image. After the new image is live, it is safe to set `NEAR_RPC_URL=https://test.rpc.fastnear.com?apiKey=…,https://near-testnet.drpc.org` and run `tee-agent.ts env` (no new hash: the key list is unchanged).
 - **How to ship an agent change (the flow that worked on 2026-11-05):** (1) human: `docker build --platform linux/amd64 -t unwizarding/inheirit-agent:<tag> .` and `docker push …` (Docker Desktop with WSL integration on; trailing ` .` matters); (2) Claude: pin the pushed digest on the `image:` line of `docker-compose.yaml`; (3) make sure the keyring has both credentials (`tee-agent.ts status` works); (4) CVM must be **running** (`tee-agent.ts start` if not); (5) `tee-agent.ts upgrade` (approves the new hash before reboot); (6) only if `ENV_KEYS` in `scripts/tee-agent.ts` gained a key: `tee-agent.ts env` (retry while it says "Another operation is already in progress"), wait ~45 s, then `tee-agent.ts approve` **immediately** (the env update changes the compose hash; unapproved = registration fails and burns agent NEAR); (7) watch the logs for `Agent registered` after the newest `Agent account ID` line; (8) `tee-agent.ts retire <old hashes>`; append to `deploy/tee-agent.json`; commit. A pure value change in `.env` (same keys) is just `tee-agent.ts env`, no approve.
-- **Next steps (in order):** (1) the human builds + pushes `day6`, Claude ships it as above (faucet + failover fixes), then optionally adds the drpc fallback URL; (2) Claude replaces `<WEB_URL>` in `README.md` with `https://inheirit.vercel.app`, checks the README's "try it in 5 minutes" steps against the hosted app, and does a final README pass; (3) test the **heir claim on the hosted app** (register key → sealed note decrypts → AI guide), which was skipped in the 2026-11-05 run; (4) the human's list of **UI and logic improvements** (the human says there is a lot; ask for the list), including the noisy repeated notifications when a guardian vote expires and the ladder restarts every ~7 min; (5) demo video 60–90 s + X post draft (human records/posts; Claude can draft script and text); (6) make the repo public, re-read the live `HACKATHON.md`, the human submits.
+- **Next steps (in order):** (1) Day A (§12): write the contract §5.5 tests first, then implement. Redeploy `inheirit-dev.testnet` fresh, then `inheirit.testnet` (TEE mode, then re-approve). Then update the agent, web and script bindings (list in the Decision log 2026-11-05). (2) The human creates the Telegram bot with BotFather and puts `TELEGRAM_BOT_TOKEN` / `TELEGRAM_BOT_USERNAME` in `.env`. Claude builds §7.7. (3) The human builds and pushes **one** v2 image, which includes the day6 fixes. Claude ships it with the flow above, including step 6 (`TELEGRAM_*` are new env keys). Optionally add the drpc fallback URL afterwards. (4) Day B and Day C per §12; Day C includes the hosted heir-claim test. (5) Nov 8–14 per §12: break, audit, polish (the README `<WEB_URL>` pass), demo video and X post draft. Then the human makes the repo public and submits.
 - **Contracts:** `inheirit.testnet` = TEE mode (the real one; only the attested CVM agent). `inheirit-dev.testnet` = local mode for laptop runs (`scripts/deploy-dev-contract.ts`; self-owned throwaway demo key; its sealed-notes key is a LOCAL DEV key, not protected).
 - **Blockers / open questions:** (1) `/api/owners` is no longer demo-only: signed requests work in any mode. (2) Local machine: mempool.space is **unreachable from the home network** (IPv6 down, all IPv4 addresses time out; the old `/etc/hosts` pin is gone), so check BTC through the TEE logs or the explorer in the browser. (3) Local agents on :3000/:3001 from October may still be running; stop whichever isn't needed. (4) Stranded test coins: 0.003 Sepolia ETH + 30,000 sats in the vaults of `alice.inheirit-4aqpxg.testnet` (keys lost; see Decision log). (5) In this Claude session the shell's `grep` was a broken wrapper; use `/usr/bin/grep` if `grep` prints "claude native binary not installed".
 
@@ -588,4 +796,34 @@ DEMO_MODE=true
 - 2026-11-05 — [VERIFIED] **near-js `FailoverRpcProvider` crashes a fresh agent.** It fails over on *any* error, so "account doesn't exist" (every new implicit agent account at boot) became "Exceeded 2 providers", which ShadeClient doesn't recognise: the day5 agent crash-looped with a 2-URL list. Mitigated by a single URL in the TEE env; fixed in code by `src/near-rpc.ts` (fail over only on HTTP-status/network errors), which ships with the next image. Until then keep `NEAR_RPC_URL` to one URL.
 - 2026-11-05 — [VERIFIED] **Scenario B on the hosted app, all three chains, to Completed.** Owner `alice.inheirit-kjgw3v.testnet`, heir `bola.inheirit-kjgw3v.testnet`, TEE agent on day5 image. Vaults: 1 NEAR, 0.002 Sepolia ETH + 20,000 sats from the demo faucet (BTC needed one press of "Fund empty vaults" after the `missingorspent` failure). Released 10% / 30% / 60%, one stage a minute (10:17–10:20Z): NEAR 0.1 / 0.3 / 0.6 by contract transfer; ETH 0.0002 / 0.0006 / 0.0011999 (`0x7b3e9c6f…374e`, `0xbfd8c044…faa3`, `0xba164d1f…e2f9`); BTC 2,000 / 6,000 / 11,608 sats (`11ebedc2…bb55`, `790c2d40…ef9`, `6b2bc7de…dda`); the last stage pays what's left after fees. ETH and BTC went to the faucet pool addresses (= the demo heir's receive addresses), so the coins recycle. Each BTC stage needed one MPC signature and landed ~12 s after the ETH one. Not tested in this run: the heir never registered a key, so 0 notes were re-sealed (heir claim on the hosted app is still to do).
 - 2026-11-05 — The human's earlier hosted run (owner `alice.inheirit-6d9m66.testnet`): guardian vote, owner cancel on attest, and Scenario B stage 1 on NEAR + ETH with the owner's return halting the rest (`owner_alive`). It also showed the repeated **vote-expired cycle**: with no guardian action the 300 s vote fails, the will returns to Active (old `last_alive_at`, by design §5.3 / Decision 2026-10-27 (8)) and the ladder restarts about every 7 min, re-sending the same notifications. The event log now labels it (`063dae3`); the repeated notifications are still noisy (improvement list).
-
+- 2026-11-05 — **v2 spec merged** from the human's `CLAUDE-update-v2.md` after a plan-mode reconciliation against the code. The human approved the reconciliation, including the resolutions below. §2.1, §2.3, §2.4, §5.5, §7.1, §7.3, §7.5, §7.6, §7.7, §7.8, §8, §9, §10, §12, §13 and §14 were rewritten or extended. v1 history (§5.1–§5.4, earlier log entries) is kept.
+- 2026-11-05 — Pitch fixed: "A will that doesn't make you prove you're alive."
+- 2026-11-05 — Signals and checks are separate layers. Replies to checks are weighted signals: DM weak, Telegram medium, heartbeat strong.
+- 2026-11-05 — Telegram is the real check channel for the hackathon (bot, long polling, timestamps only).
+- 2026-11-05 — Last-known-workplace outreach and employee directories are removed permanently. They are intrusive and risk harm to living owners.
+- 2026-11-05 — The standard schedule is 10/20/30/40 with the longest wait after the first slice. The accelerated schedule is 10/30/60, and only a lawyer attestation or a guardian quorum with evidence can trigger it. Acceleration never skips the challenge period or a stage. The 40/60 option is dropped.
+- 2026-11-05 — Final secrets are a separate, last stage after distribution plus a buffer, released per heir.
+- 2026-11-05 — Guardians must accept their invites, and only accepted guardians count. A will must be "armed" to escalate.
+- 2026-11-05 — Heirs are hidden by default until execution.
+- 2026-11-05 — Sign-up is minimised to a display name (+ optional jurisdiction). No date of birth, nationality or photo.
+- 2026-11-05 — Progressive onboarding: a 3-step minimum will plus a will-strength checklist.
+- 2026-11-05 — Build runs Nov 5–7. Nov 8–14 is reserved for break/audit/polish/demo. Aim to submit Nov 13.
+- 2026-11-05 — **Reconciliation resolutions** (where v2 conflicted with itself or with the code; the human approved these recommendations):
+  - (1) **Medium = trustWeight 0.7, which counts alone**, the same threshold as strong. The scorer stays two-tier at 0.7. Gmail and Calendar (SIMULATED, 0.7) already count alone today.
+  - (3) **`wait_after` of the last stage** is the gap between the last slice and the start of SecretsBuffer. It also lets the foreign chains finish, so SecretsBuffer needs every (stage, chain) done.
+  - (4) **Accelerating:** before Executing, the will switches to the full 10/30/60 schedule. During Executing, it keeps the remaining percentages and takes only the accelerated waits, so totals stay at 100 and no stage is skipped.
+  - (5) **The contract's "armed" check** is accepted guardians ≥ threshold plus ≥ 1 heir. The contract can't see the signal configuration, so "≥ 1 strong signal source" is checked by the agent and UI; the owner's own NEAR account always counts.
+  - (6) **Heirs hidden at the UI, API and notification level only** (cut line 1 taken up front). NEAR payouts and `register_heir_key` need heir accounts on-chain, so contract state stays readable. This is documented as a limitation.
+  - (7) **A lawyer's death proof during GuardianVote only sets `accelerated`.** The guardian quorum is still needed to reach Challenge, which protects against a lawyer colluding with an heir.
+  - (8) **Email has no sender yet** (v1 cut line). Checks are: heartbeat app (UI) and Telegram, which are real; email, which goes to the UI log only (Resend is optional and needs a key); DMs, which are SIMULATED log entries.
+  - (9) **The baseline is display-only** ("usually active every N days", from the NEAR tx history). The contract's `quiet_after` stays a fixed owner setting.
+  - (10) **The pending day6 image** (`66758d5` faucet, `3f3433b` RPC failover) ships inside the v2 Day A image, which means one human docker build instead of two. The README `<WEB_URL>` pass moves to Nov 11. The hosted heir-claim test moves into Day C.
+  - Also decided: `SecretsReleased → Completed` once every sealed note has been released, so a late heir key registration still works. A sign of life in SecretsBuffer or SecretsReleased returns the will to Active and halts the notes not yet released. Accepted guardians and the lawyer may also `contact_confirm_alive` during Quiet/WelfareCheck, which can only delay. The display name and jurisdiction live in the off-chain policy, not on-chain.
+- 2026-11-05 — **Gaps found while reconciling:**
+  - (a) §12 Day 3 planned a NEAR AI attestation check **at startup**, but only the lazy `AttestationGate.require()` before each AI call exists (`src/ai/attestation.ts`). The boot check moves to Day B.
+  - (b) No email sender was ever built. Every notification record is `channel: "ui"`.
+  - (c) The duplicate notification cards come from `notificationsFor` in `src/escalation/driver.ts`, which writes one record per owner recipient ("(wallet)", the email address, "(heartbeat app)").
+  - (d) Code that depends on `stages_pct` / `stage_interval` and must change with §5.5:
+    - agent: `src/near/will-contract.ts`, `src/escalation/driver.ts`, `src/executor/amounts.ts`, `src/executor/executor.ts`, `src/policy/policy.ts`;
+    - web: `web/src/lib/will.ts` (`nextStepIn`, `LADDER`), `web/src/lib/config.ts` (`DEMO_TIMINGS` / `REAL_TIMINGS`), `web/src/lib/demo.ts`, `web/src/components/WillParts.tsx`;
+    - scripts: `scripts/demo-cancel.ts`, `scripts/demo-execute.ts`, `scripts/demo-sealed-note.ts`, `scripts/day1-walkthrough.mjs`.
