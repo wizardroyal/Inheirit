@@ -112,6 +112,23 @@ export class HeartbeatAdapter implements SignalAdapter {
   }
 }
 
+/**
+ * Replies to the Telegram check from a chat linked to the owner (CLAUDE.md §7.7). Medium weight
+ * (0.7, counts alone): the chat was bound through an owner-signed link, but a phone can be in
+ * someone else's hands.
+ */
+export class TelegramAdapter implements SignalAdapter {
+  source = "telegram" as const;
+  simulated = false;
+  trustWeight = 0.7;
+  constructor(private readonly store: Store) {}
+
+  async lastActivity(owner: OwnerSignalConfig): Promise<Date | null> {
+    const at = this.store.get().telegramReplies[owner.owner];
+    return at ? new Date(at) : null;
+  }
+}
+
 /** SIMULATED source: returns what the demo panel recorded for it. */
 export class SimulatedAdapter implements SignalAdapter {
   simulated = true;
@@ -130,6 +147,10 @@ export class SimulatedAdapter implements SignalAdapter {
 export const SIMULATED_SOURCES: { source: SignalSource; trustWeight: number }[] = [
   { source: "x", trustWeight: 0.4 },
   { source: "instagram", trustWeight: 0.4 },
+  { source: "tiktok", trustWeight: 0.4 },
+  { source: "facebook", trustWeight: 0.4 },
+  { source: "whatsapp", trustWeight: 0.4 },
+  { source: "linkedin", trustWeight: 0.4 },
   { source: "google_calendar", trustWeight: 0.7 },
   { source: "gmail", trustWeight: 0.7 },
 ];

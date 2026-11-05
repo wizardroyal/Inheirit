@@ -15,7 +15,8 @@ import {
   type WillView,
 } from "../near/will-contract";
 import type { SignalAdapter } from "../signals/adapters";
-import type { Notification, OwnerSignalConfig, Store } from "../state/store";
+import type { OwnerSignalConfig, Store } from "../state/store";
+import { CHECK_TEXT, type TelegramBot } from "../telegram/bot";
 
 /** Seconds of margin so a reported time is never ahead of the chain's block time. */
 const CHAIN_CLOCK_MARGIN_S = 5;
@@ -34,6 +35,8 @@ export interface DriverDeps {
   store: Store;
   executor?: Executor;
   notes?: NoteReleaser;
+  /** Telegram check bot; absent when not configured. */
+  telegram?: Pick<TelegramBot, "notify" | "isLinked">;
   now?: () => Date;
   log?: (msg: string) => void;
   /**
@@ -73,59 +76,60 @@ export function isAdvanceDue(will: WillView, nowS: number): boolean {
   return false;
 }
 
-/** Who to tell, and what, when a will enters `state` (§7.3). */
-export function notificationsFor(state: StateName, will: WillView, cfg: OwnerSignalConfig, contacts: string[]): Omit<Notification, "at">[] {
+/** A message for one event; the driver records it once and delivers it on every channel it can. */
+export interface Message {
+  event: string;
+  to: string[];
+  subject: string;
+  body: string;
+}
+
+/** Who to tell, and what, when a will enters `state` (§7.3). Quiet is handled by the checks. */
+export function notificationsFor(state: StateName, will: WillView, cfg: OwnerSignalConfig, contacts: string[]): Message[] {
   const owner = will.owner;
-  const ownerChannels = [`${owner} (wallet)`, ...(cfg.email ? [cfg.email] : []), `${owner} (heartbeat app)`];
-  const toOwner = (subject: string, body: string) =>
-    ownerChannels.map((to) => ({ owner, to, channel: "ui" as const, subject, body }));
+  const toOwner = [owner, ...(cfg.email ? [cfg.email] : [])];
+  const msg = (to: string[], subject: string, body: string): Message[] => (to.length ? [{ event: state, to, subject, body }] : []);
   switch (state) {
-    case "Quiet":
-      return toOwner("Are you there?", "We haven't seen activity from you for a while. Open the heartbeat app or sign any transaction and nothing else happens.");
     case "WelfareCheck":
       // The welfare chain: guardians, then friends, then the lawyer.
-      return [...acceptedGuardians(will), ...contacts, ...(will.lawyer ? [will.lawyer] : [])].map((to) => ({
-        owner,
-        to,
-        channel: "ui" as const,
-        subject: `Have you heard from ${owner} recently?`,
-        body: `If they're fine, confirm it here: /contact/${owner}`,
-      }));
+      return msg(
+        [...acceptedGuardians(will), ...contacts, ...(will.lawyer ? [will.lawyer] : [])],
+        `Have you heard from ${owner} recently?`,
+        `If they're fine, confirm it here: /contact/${owner}`,
+      );
     case "GuardianVote":
-      return acceptedGuardians(will).map((to) => ({
-        owner,
-        to,
-        channel: "ui" as const,
-        subject: `Guardian vote for ${owner}`,
-        body: `${owner} has been silent and didn't answer a welfare check. Attest only with evidence: /guardian/${owner}`,
-      }));
+      return msg(
+        acceptedGuardians(will),
+        `Guardian vote for ${owner}`,
+        `${owner} has been silent and didn't answer a welfare check. Attest only with evidence: /guardian/${owner}`,
+      );
     case "Challenge": {
       const hours = Math.round(will.timings.challenge_period / 3600);
-      return toOwner(
+      return msg(
+        toOwner,
         "Your will executes soon",
         `Guardians attested. Your will starts executing in ${hours >= 1 ? `${hours} h` : `${will.timings.challenge_period} s`}. Any activity cancels it.`,
       );
     }
     case "Executing":
-      return will.heirs.map((h) => ({
-        owner,
-        to: h.account_id,
-        channel: "ui" as const,
-        subject: `${owner}'s will is being executed`,
-        body: `Assets are being released to you in stages. Your claim page: /heir/${owner}`,
-      }));
+      return msg(
+        will.heirs.map((h) => h.account_id),
+        `${owner}'s will is being executed`,
+        `Assets are being released to you in stages. Your claim page: /heir/${owner}`,
+      );
     case "SecretsReleased":
-      return will.heirs.map((h) => ({
-        owner,
-        to: h.account_id,
-        channel: "ui" as const,
-        subject: `Sealed notes from ${owner} are ready`,
-        body: `Distribution is complete. Notes left for you can now be opened on your claim page: /heir/${owner}`,
-      }));
+      return msg(
+        will.heirs.map((h) => h.account_id),
+        `Sealed notes from ${owner} are ready`,
+        `Distribution is complete. Notes left for you can now be opened on your claim page: /heir/${owner}`,
+      );
     default:
       return [];
   }
 }
+
+/** Outreach while Quiet, in this order, spaced evenly across nudge_period (§7.3). */
+export const CHECK_STEPS = ["heartbeat", "email", "telegram", "dm"] as const;
 
 export class Driver {
   private readonly now: () => Date;
@@ -189,18 +193,63 @@ export class Driver {
     const state = stateName(will.state);
     if (store.get().notifiedState[cfg.owner] !== state) {
       const contacts = store.get().policies[cfg.owner]?.contacts ?? [];
-      const at = this.now().toISOString();
-      const sent = notificationsFor(state, will, cfg, contacts).map((n) => ({ ...n, at }));
-      store.update((s) => {
-        s.notifiedState[cfg.owner] = state;
-        s.notifications.push(...sent);
-        s.notifications = s.notifications.slice(-500);
-      });
+      store.update((s) => (s.notifiedState[cfg.owner] = state));
+      for (const m of notificationsFor(state, will, cfg, contacts)) await this.deliver(cfg.owner, m);
     }
+    if (typeof will.state !== "string" && "Quiet" in will.state) await this.runChecks(cfg, will.state.Quiet.since, will.timings.nudge_period, nowS);
 
     if (state === "Executing" && this.deps.executor) await this.deps.executor.run(cfg.owner, will);
     // Secrets last: only once distribution and the buffer are over (the contract enforces it too).
     if (state === "SecretsReleased" && this.deps.notes) await this.deps.notes.run(will);
+  }
+
+  /** Records one notification and sends it on Telegram to every recipient with a linked chat. */
+  private async deliver(owner: string, m: Message, channels: string[] = ["ui"]): Promise<void> {
+    const out = [...channels];
+    if (this.deps.telegram) {
+      let sent = 0;
+      for (const to of m.to) {
+        try {
+          if (await this.deps.telegram.notify(to, `${m.subject}\n\n${m.body}`)) sent++;
+        } catch (e) {
+          this.log(`[telegram] ${owner}: message to ${to} failed: ${e instanceof Error ? e.message : String(e)}`);
+        }
+      }
+      if (sent) out.push("telegram");
+    }
+    this.record(owner, m, out);
+  }
+
+  private record(owner: string, m: Message, channels: string[]) {
+    const at = this.now().toISOString();
+    this.deps.store.update((s) => {
+      s.notifications.push({ at, owner, ...m, channels });
+      s.notifications = s.notifications.slice(-500);
+    });
+  }
+
+  /** Sends the Quiet checks that are due: step i at since + i/4 of the nudge period. */
+  private async runChecks(cfg: OwnerSignalConfig, since: number, nudgePeriod: number, nowS: number): Promise<void> {
+    const owner = cfg.owner;
+    const prev = this.deps.store.get().checks[owner];
+    const done = prev?.since === since ? [...prev.done] : [];
+    for (const [i, step] of CHECK_STEPS.entries()) {
+      if (done.includes(step) || nowS < since + Math.floor((i * nudgePeriod) / CHECK_STEPS.length)) continue;
+      done.push(step);
+      this.deps.store.update((s) => (s.checks[owner] = { since, done: [...done] }));
+      const check = (subject: string, body = CHECK_TEXT): Message => ({ event: "check", to: [owner], subject, body });
+      if (step === "heartbeat") this.record(owner, check("Check: heartbeat app"), ["ui", "heartbeat app"]);
+      else if (step === "email" && cfg.email)
+        this.record(owner, { ...check("Check: email"), to: [cfg.email], body: `${CHECK_TEXT} (Email delivery isn't set up in this build; shown in the app instead.)` }, ["ui"]);
+      else if (step === "telegram" && this.deps.telegram?.isLinked(owner)) {
+        try {
+          await this.deps.telegram.notify(owner, CHECK_TEXT);
+          this.record(owner, check("Check: Telegram"), ["telegram"]);
+        } catch (e) {
+          this.log(`[telegram] ${owner}: check failed: ${e instanceof Error ? e.message : String(e)}`);
+        }
+      } else if (step === "dm") this.record(owner, check("Check: DM (SIMULATED)"), ["dm (SIMULATED)"]);
+    }
   }
 
   private async observe(cfg: OwnerSignalConfig): Promise<Observation[]> {

@@ -13,6 +13,7 @@ import { stateName, type WillContract, type WillView } from "./near/will-contrac
 import { checkPolicy, policyHash, type Policy } from "./policy/policy";
 import { SIMULATED_SOURCES } from "./signals/adapters";
 import type { Store } from "./state/store";
+import type { TelegramBot } from "./telegram/bot";
 
 export interface ApiDeps {
   contract: WillContract;
@@ -29,6 +30,8 @@ export interface ApiDeps {
     amounts: { eth_wei: string; btc_sats: number };
     send(chain: "Eth" | "Btc", to: string): Promise<FaucetSend>;
   };
+  /** Telegram check bot; absent when TELEGRAM_BOT_TOKEN / TELEGRAM_BOT_USERNAME aren't set. */
+  telegram?: Pick<TelegramBot, "issueLink" | "isLinked" | "username">;
   /** Override the default rate limits (tests). */
   limiters?: { draft: RateLimiter; guide: RateLimiter; faucet: RateLimiter };
   /** Absent when NEARAI_API_KEY isn't configured. */
@@ -235,6 +238,22 @@ export function api(deps: ApiDeps): Hono {
     const owner = c.req.query("owner");
     const all = store.get().notifications;
     return c.json(owner ? all.filter((n) => n.owner === owner) : all);
+  });
+
+  // Telegram link (§7.7): a one-time t.me deep link for the signing account (owner, guardian or friend).
+  // Always signed: a chat linked to someone else's account could keep their will "alive".
+  app.post("/api/telegram/link", async (c) => {
+    if (!deps.telegram) return c.json({ error: "Telegram is not configured on this agent" }, 503);
+    const body = (await c.req.json()) as { signed?: unknown };
+    if (!body?.signed) return c.json({ error: "Linking Telegram must be signed by the account" }, 401);
+    const r = await ownerRequest(body, "telegram_link", z.object({}).passthrough(), z.never());
+    if (r.error) return c.json(r.error.body, r.error.status);
+    return c.json({ ok: true, account: r.owner, ...deps.telegram.issueLink(r.owner) });
+  });
+
+  app.get("/api/telegram/:account", (c) => {
+    if (!deps.telegram) return c.json({ enabled: false, linked: false });
+    return c.json({ enabled: true, bot: deps.telegram.username, linked: deps.telegram.isLinked(c.req.param("account")) });
   });
 
   // Demo vault faucet: pool addresses (the demo heir receives at the same addresses, so coins cycle).

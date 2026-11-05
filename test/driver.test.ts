@@ -157,23 +157,39 @@ describe("Driver", () => {
     await t.driver.tick();
     expect(t.contract.w.state).toBe("Active");
   });
-  it("advances only when due and notifies once per state", async () => {
-    const t = setup("Active");
+  it("advances only when due and notifies once per state, as one grouped record", async () => {
+    const t = setup({ GuardianVote: { since: T0 + 10 } });
     await t.driver.tick();
     expect(t.contract.calls).toEqual([]);
-    t.setNow(T0 + 100);
+    t.contract.w.state = { Challenge: { since: T0 + 50 } };
     await t.driver.tick();
-    expect(t.contract.calls).toEqual(["advance"]);
-    const toOwner = t.store.get().notifications.filter((n) => n.subject === "Are you there?").map((n) => n.to);
-    expect(toOwner).toContain("alice@example.com");
+    const challenge = t.store.get().notifications.filter((n) => n.event === "Challenge");
+    expect(challenge).toHaveLength(1);
+    expect(challenge[0].to).toEqual(["alice.testnet", "alice@example.com"]);
+    expect(challenge[0].channels).toEqual(["ui"]);
     await t.driver.tick();
-    expect(t.store.get().notifications.filter((n) => n.subject === "Are you there?")).toHaveLength(toOwner.length);
+    expect(t.store.get().notifications.filter((n) => n.event === "Challenge")).toHaveLength(1);
+  });
+  it("sends the Quiet checks in order, spaced across the nudge period", async () => {
+    const t = setup({ Quiet: { since: T0 + 50 } }, [], { timings: { ...will().timings, nudge_period: 40 } });
+    const subjects = () => t.store.get().notifications.filter((n) => n.event === "check").map((n) => n.subject);
+    await t.driver.tick();
+    expect(subjects()).toEqual(["Check: heartbeat app"]);
+    t.setNow(T0 + 60);
+    await t.driver.tick();
+    expect(subjects()).toEqual(["Check: heartbeat app", "Check: email"]);
+    t.setNow(T0 + 80);
+    await t.driver.tick();
+    // Telegram (step 3) is skipped without a bot; the SIMULATED DM is step 4.
+    expect(subjects()).toEqual(["Check: heartbeat app", "Check: email", "Check: DM (SIMULATED)"]);
+    await t.driver.tick();
+    expect(subjects()).toHaveLength(3);
   });
   it("tells guardians when the vote opens", async () => {
     const t = setup({ WelfareCheck: { since: T0 } });
     t.setNow(T0 + 10);
     await t.driver.tick();
-    expect(t.store.get().notifications.filter((n) => n.subject.startsWith("Guardian vote")).map((n) => n.to)).toEqual(["g1.testnet", "g2.testnet"]);
+    expect(t.store.get().notifications.filter((n) => n.subject.startsWith("Guardian vote")).flatMap((n) => n.to)).toEqual(["g1.testnet", "g2.testnet"]);
   });
   it("asks only accepted guardians to vote", async () => {
     const t = setup({ WelfareCheck: { since: T0 } }, [], {
@@ -181,14 +197,14 @@ describe("Driver", () => {
     });
     t.setNow(T0 + 10);
     await t.driver.tick();
-    expect(t.store.get().notifications.filter((n) => n.subject.startsWith("Guardian vote")).map((n) => n.to)).toEqual(["g1.testnet", "g2.testnet"]);
+    expect(t.store.get().notifications.filter((n) => n.subject.startsWith("Guardian vote")).flatMap((n) => n.to)).toEqual(["g1.testnet", "g2.testnet"]);
   });
   it("the welfare check asks guardians, then friends, then the lawyer", async () => {
     const t = setup({ Quiet: { since: T0 } }, [], { lawyer: "lawyer.testnet" });
     t.store.update((s) => (s.policies["alice.testnet"] = { contacts: ["friend@example.com"] } as never));
     t.setNow(T0 + 10);
     await t.driver.tick();
-    expect(t.store.get().notifications.filter((n) => n.subject.startsWith("Have you heard")).map((n) => n.to)).toEqual([
+    expect(t.store.get().notifications.filter((n) => n.subject.startsWith("Have you heard")).flatMap((n) => n.to)).toEqual([
       "g1.testnet",
       "g2.testnet",
       "friend@example.com",
@@ -216,6 +232,39 @@ describe("Driver", () => {
       await t.driver.tick();
       expect(t.noted).toEqual([]);
     }
+  });
+});
+
+describe("Telegram delivery", () => {
+  function withBot(linked: string[]) {
+    const sent: [string, string][] = [];
+    const telegram = {
+      isLinked: (a: string) => linked.includes(a),
+      notify: async (a: string, text: string) => (linked.includes(a) ? (sent.push([a, text]), true) : false),
+    };
+    const store = new Store(null);
+    store.update((s) => (s.owners["alice.testnet"] = { owner: "alice.testnet" }));
+    let nowS = T0 + 50;
+    const contract = new FakeContract(will({ Quiet: { since: T0 + 50 } }, { timings: { ...will().timings, nudge_period: 40 } }), () => nowS);
+    const driver = new Driver({ contract, adapters: [], store, telegram, now: () => new Date(nowS * 1000), log: () => {} });
+    return { driver, store, contract, sent, setNow: (s: number) => (nowS = s) };
+  }
+  it("sends the owner's Telegram check when it is due", async () => {
+    const t = withBot(["alice.testnet"]);
+    t.setNow(T0 + 80);
+    await t.driver.tick();
+    expect(t.sent.map(([a]) => a)).toEqual(["alice.testnet"]);
+    expect(t.sent[0][1]).toMatch(/Reply anything/);
+    const tg = t.store.get().notifications.find((n) => n.subject === "Check: Telegram");
+    expect(tg?.channels).toEqual(["telegram"]);
+  });
+  it("adds telegram to an event's channels when a recipient is linked", async () => {
+    const t = withBot(["g1.testnet"]);
+    t.contract.w.state = { GuardianVote: { since: T0 } };
+    await t.driver.tick();
+    const vote = t.store.get().notifications.find((n) => n.event === "GuardianVote");
+    expect(vote?.channels).toEqual(["ui", "telegram"]);
+    expect(t.sent.map(([a]) => a)).toEqual(["g1.testnet"]);
   });
 });
 

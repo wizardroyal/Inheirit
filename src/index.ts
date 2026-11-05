@@ -19,7 +19,16 @@ import { ShadeWillContract, type WillView } from "./near/will-contract";
 import { toHex } from "./sealed/crypto";
 import { loadSealedKey } from "./sealed/key-source";
 import { ensureAgentKey, NoteReleaser } from "./sealed/releaser";
-import { EvmNonceAdapter, GithubAdapter, HeartbeatAdapter, NearOnchainAdapter, SIMULATED_SOURCES, SimulatedAdapter } from "./signals/adapters";
+import {
+  EvmNonceAdapter,
+  GithubAdapter,
+  HeartbeatAdapter,
+  NearOnchainAdapter,
+  SIMULATED_SOURCES,
+  SimulatedAdapter,
+  TelegramAdapter,
+} from "./signals/adapters";
+import { HttpTelegramApi, TelegramBot } from "./telegram/bot";
 import type { Policy } from "./policy/policy";
 import { Store } from "./state/store";
 import { parseEther } from "viem";
@@ -118,6 +127,7 @@ const adapters = [
   new EvmNonceAdapter(config.sepoliaRpc(), store),
   new GithubAdapter(config.githubToken()),
   new HeartbeatAdapter(store),
+  new TelegramAdapter(store),
   ...SIMULATED_SOURCES.map((s) => new SimulatedAdapter(s.source, s.trustWeight, store)),
 ];
 
@@ -132,11 +142,23 @@ try {
 }
 const notes = new NoteReleaser(contract, notesEnabled ? sealed.keypair : null);
 
+// Telegram check bot (§7.7): long polling, so it needs no inbound URL.
+const tgToken = config.telegramToken();
+const tgUsername = config.telegramUsername();
+const telegram = tgToken && tgUsername ? new TelegramBot(new HttpTelegramApi(tgToken), store, tgUsername) : undefined;
+if (telegram) {
+  console.log(`[telegram] check bot on: @${tgUsername}`);
+  void telegram.run();
+} else {
+  console.log("[telegram] TELEGRAM_BOT_TOKEN / TELEGRAM_BOT_USERNAME not set; Telegram checks off");
+}
+
 const driver = new Driver({
   contract,
   adapters,
   store,
   notes,
+  telegram,
   executor: new StagedExecutor(contract, vaults, store),
   demoWatchMs: config.demoMode() ? config.demoWatchHours() * 3_600_000 : undefined,
 });
@@ -184,6 +206,7 @@ const faucet =
 
 const app = api({
   faucet,
+  telegram,
   ai,
   auth: new Nep413Verifier({ recipient: agentContractId, accessKey: rpcAccessKey(rpcEndpoints[0]) }),
   contract,

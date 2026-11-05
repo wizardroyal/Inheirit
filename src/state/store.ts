@@ -17,11 +17,19 @@ export interface OwnerSignalConfig {
   watchedSince?: string;
 }
 
+/**
+ * One record per event (CLAUDE.md §7.3), listing everyone it was for and every channel it went
+ * through. "ui" is always included: the web app's notification log.
+ */
 export interface Notification {
   at: string;
   owner: string;
-  to: string;
-  channel: "ui" | "email";
+  /** The will state entered, or "check" for one outreach attempt while Quiet. */
+  event: string;
+  /** Recipients: NEAR accounts or email addresses. */
+  to: string[];
+  /** e.g. ["ui", "telegram"]; "dm (SIMULATED)" for simulated DMs. Email has no sender yet. */
+  channels: string[];
   subject: string;
   body: string;
 }
@@ -55,6 +63,16 @@ export interface AgentState {
   /** Last will state the driver notified about: owner -> state name. */
   notifiedState: Record<string, string>;
   notifications: Notification[];
+  /** Pending Telegram deep-link tokens: token -> account (one-time, short-lived). */
+  telegramLinks: Record<string, { account: string; expiresAt: string }>;
+  /** Linked Telegram chats: account -> chat. */
+  telegramChats: Record<string, { chatId: number; linkedAt: string }>;
+  /** Latest reply from a linked chat: account -> ISO receive time. Never the text. */
+  telegramReplies: Record<string, string>;
+  /** getUpdates offset (last handled update_id + 1). */
+  telegramOffset: number;
+  /** Quiet-state checks already sent: owner -> { quiet since (s), channels done }. */
+  checks: Record<string, { since: number; done: string[] }>;
   /** Demo faucet top-ups already sent: owner -> sends (one funding per will). */
   faucetSends: Record<string, { chain: "Eth" | "Btc"; to: string; amount: string; txHash: string }[]>;
 }
@@ -70,6 +88,11 @@ const EMPTY: AgentState = {
   pendingTxs: {},
   notifiedState: {},
   notifications: [],
+  telegramLinks: {},
+  telegramChats: {},
+  telegramReplies: {},
+  telegramOffset: 0,
+  checks: {},
   faucetSends: {},
 };
 

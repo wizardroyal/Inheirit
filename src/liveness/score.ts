@@ -11,8 +11,13 @@ export type SignalSource =
   | "github"
   | "google_calendar"
   | "gmail"
+  | "telegram"
   | "x"
-  | "instagram";
+  | "instagram"
+  | "tiktok"
+  | "facebook"
+  | "whatsapp"
+  | "linkedin";
 
 export interface Observation {
   source: SignalSource;

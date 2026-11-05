@@ -29,6 +29,9 @@ export const config = {
   faucetBtcKey: () => process.env.DEMO_FAUCET_BTC_KEY || undefined,
   faucetEth: () => env("DEMO_FAUCET_ETH", "0.002"),
   faucetSats: () => Number(env("DEMO_FAUCET_SATS", "20000")),
+  // Telegram check bot (CLAUDE.md §7.7); off unless both are set.
+  telegramToken: () => process.env.TELEGRAM_BOT_TOKEN || undefined,
+  telegramUsername: () => (process.env.TELEGRAM_BOT_USERNAME || "").replace(/^@/, "") || undefined,
 };
 
 export interface RpcEndpoint {

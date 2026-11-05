@@ -25,7 +25,7 @@ const DSTACK_VERSION = "0.5.12"; // CLI 2.4.0 only knows 0.5.7/0.5.8, which Phal
 const INSTANCE_TYPE = "tdx.small";
 const COMPOSE = "./docker-compose.yaml";
 // Part of the compose hash (allowed_envs): changing this list is a new measured version
-const ENV_KEYS = ["AGENT_CONTRACT_ID", "SPONSOR_ACCOUNT_ID", "SPONSOR_PRIVATE_KEY", "DEMO_MODE", "NEARAI_API_KEY", "NEARAI_MODEL", "DEMO_FAUCET_ETH_KEY", "DEMO_FAUCET_BTC_KEY", "NEAR_RPC_URL"];
+const ENV_KEYS = ["AGENT_CONTRACT_ID", "SPONSOR_ACCOUNT_ID", "SPONSOR_PRIVATE_KEY", "DEMO_MODE", "NEARAI_API_KEY", "NEARAI_MODEL", "DEMO_FAUCET_ETH_KEY", "DEMO_FAUCET_BTC_KEY", "NEAR_RPC_URL", "TELEGRAM_BOT_TOKEN", "TELEGRAM_BOT_USERNAME"];
 const RECORD = "deploy/tee-agent.json";
 const PHALA_API = "https://cloud-api.phala.network/api/v1";
 const CONTRACT = process.env.AGENT_CONTRACT_ID || "inheirit.testnet";
