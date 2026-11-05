@@ -89,7 +89,11 @@ export function explainLiveness(will: WillView, observations: Observation[], now
   let headline: string;
   switch (state) {
     case "Active":
-      headline = `Alive. ${lastSeen()}`;
+      // Active but already past quiet_after (e.g. a guardian vote just expired): not a sign of life.
+      headline =
+        isArmed(will) && nowMs - lastAliveMs >= will.timings.quiet_after * 1000
+          ? `No sign of life for ${quietFor}; the checks start again shortly. ${lastSeen()}`
+          : `Alive. ${lastSeen()}`;
       if (!isArmed(will)) {
         details.push(
           `Not armed: ${acceptedGuardians(will).length} of ${will.guardian_threshold} required guardians have accepted, so nothing can start, however long the silence.`,

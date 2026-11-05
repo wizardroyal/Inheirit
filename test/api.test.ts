@@ -180,6 +180,14 @@ describe("GET /api/overview/:owner", () => {
     expect(body.notifications.map((n: { owner: string }) => n.owner)).toEqual(["alice.testnet"]);
     expect(body.telegram).toEqual({ enabled: false, linked: false });
   });
+  it("reports which sources are watched as flags, never the owner's addresses or handles", async () => {
+    const t = setup(true);
+    t.store.update((s) => (s.owners["alice.testnet"] = { owner: "alice.testnet", email: "alice@example.com", evmAddress: "0x" + "a".repeat(40), github: "alice-gh" }));
+    const text = await (await t.app.request("/api/overview/alice.testnet")).text();
+    expect(text).not.toMatch(/alice@example\.com|aaaaaaaa|alice-gh/);
+    expect(JSON.parse(text).status.watching).toMatchObject({ evm: true, github: true, email: true });
+    expect(await (await t.app.request("/api/status/alice.testnet")).text()).not.toMatch(/alice@example\.com/);
+  });
   it("still answers for an owner without a will", async () => {
     const body = await (await setup(true).app.request("/api/overview/nobody.testnet")).json();
     expect(body.status).toBeNull();

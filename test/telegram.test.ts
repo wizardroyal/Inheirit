@@ -38,6 +38,14 @@ describe("TelegramBot", () => {
     expect(t.api.sent.at(-1)?.[1]).toMatch(/not valid/);
   });
 
+  it("refuses to link a group chat (any member's message would count as the owner's)", async () => {
+    const t = setup();
+    const token = new URL(t.bot.issueLink("alice.testnet").url).searchParams.get("start")!;
+    await t.bot.handle({ update_id: 1, message: { chat: { id: -100, type: "group" }, text: `/start ${token}` } });
+    expect(t.bot.isLinked("alice.testnet")).toBe(false);
+    expect(t.api.sent.at(-1)?.[1]).toMatch(/private chat/);
+  });
+
   it("rejects an expired link", async () => {
     const t = setup();
     const token = new URL(t.bot.issueLink("alice.testnet").url).searchParams.get("start")!;

@@ -279,14 +279,15 @@ export function StrengthChecklist({ will }: { will: Will }) {
   const signals = overview?.signals;
   const status = overview?.status;
   const tg = overview?.telegram;
-  const watching = (status?.watching ?? {}) as { evmAddress?: string; github?: string; email?: string };
+  // Newer agents return flags (evm/github/email); older ones returned the values themselves.
+  const watching = (status?.watching ?? {}) as { evm?: boolean; github?: boolean | string; evmAddress?: string };
   const accepted = acceptedGuardians(will).length;
   const items: { label: string; done: boolean; required?: boolean; hint?: string }[] = [
     { label: `Guardians accepted (${accepted} of ${will.guardian_threshold} needed)`, done: isArmed(will), required: true, hint: `Send each guardian /guardian/${owner}` },
     { label: "At least one heir", done: will.heirs.length > 0, required: true },
     { label: "A strong sign-of-life source (your NEAR account)", done: true, required: true },
     { label: "Heartbeat app used", done: !!signals?.heartbeat, hint: "Open /heartbeat on your phone once" },
-    { label: "Another source (Sepolia address or GitHub)", done: !!(watching.evmAddress || watching.github) },
+    { label: "Another source (Sepolia address or GitHub)", done: !!(watching.evm || watching.evmAddress || watching.github) },
     { label: "Telegram linked for checks", done: !!tg?.linked },
     { label: "Friends for a welfare check", done: will.contacts.length > 0 },
     { label: "A lawyer (can speed up release with a death certificate)", done: !!will.lawyer },

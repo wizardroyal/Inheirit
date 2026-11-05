@@ -20,7 +20,7 @@ function will(state: WillState = "Active", extra: Partial<WillView> = {}): WillV
     stages: [{ pct: 100, wait_after: 1 }],
     accelerated_stages: [{ pct: 100, wait_after: 1 }],
     round_stages: [],
-    timings: { quiet_after: 120, nudge_period: 60, welfare_period: 60, vote_period: 300, challenge_period: 120, secrets_buffer: 60 },
+    timings: { quiet_after: 3600, nudge_period: 60, welfare_period: 60, vote_period: 300, challenge_period: 120, secrets_buffer: 60 },
     policy_hash: "0".repeat(64),
     foreign_chains: [],
     lawyer: null,
@@ -69,6 +69,10 @@ describe("explainLiveness", () => {
   it("describes Quiet with how long and what happens next", () => {
     const v = explainLiveness(will({ Quiet: { since: nowS - 60 } }, { last_alive_at: nowS - 9 * 86400 }), [], now);
     expect(v.headline).toBe("Quiet for 9 days. Checks started: heartbeat app, email, Telegram, then DMs. Any reply stops it.");
+  });
+  it("does not say Alive when an Active will is already overdue (e.g. after an expired vote)", () => {
+    const v = explainLiveness(will("Active", { last_alive_at: nowS - 7200 }), [o("near_onchain", 7200, 0.9)], now);
+    expect(v.headline).toMatch(/^No sign of life for 2 hours; the checks start again shortly\./);
   });
   it("flags timestamps in the future", () => {
     const v = explainLiveness(will(), [{ ...o("near_onchain", 0, 0.9), at: new Date(now.getTime() + 3600_000) }], now);

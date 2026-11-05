@@ -20,6 +20,7 @@ export function SignsOfLife({ owner, will }: { owner: string; will: Will }) {
     refresh();
   }, [state, refresh]);
   const snapped = useSnapBack(state, will.last_alive_at);
+  const movedThisRound = will.executions.some((e) => e.round === will.execution_round);
   const pulsing = usePulses(data?.observations);
   const idx = LADDER.findIndex((r) => r.state === state);
   const next = nextStepIn(will, now);
@@ -74,7 +75,11 @@ export function SignsOfLife({ owner, will }: { owner: string; will: Will }) {
       {data?.verdict && (
         <div className="rounded-lg bg-accent-soft px-4 py-3">
           {/* The agent's verdict can trail the chain by a poll; at the snap-back, say what just happened. */}
-          <p className="font-medium">{snapped > 0 ? "Sign of life recorded on-chain. Everything is cancelled; nothing moved." : data.verdict.headline}</p>
+          <p className="font-medium">{snapped > 0
+              ? movedThisRound
+                ? "Sign of life recorded on-chain. The remaining stages and the secrets are halted; what was already sent stays sent."
+                : "Sign of life recorded on-chain. Everything is cancelled; nothing moved."
+              : data.verdict.headline}</p>
           {data.verdict.details.map((d) => (
             <p key={d} className="mt-1 text-sm text-muted">
               {d}
@@ -117,19 +122,24 @@ export function SignsOfLife({ owner, will }: { owner: string; will: Will }) {
   );
 }
 
-/** Returns a changing key for a few seconds after the will returns to Active from an escalation. */
+/**
+ * Returns a changing key for a few seconds after a sign of life brings an escalating will back to
+ * Active. An expired guardian vote also returns to Active, but without a new sign of life
+ * (last_alive_at unchanged), so it does not snap back.
+ */
 function useSnapBack(state: StateName, lastAlive: number): number {
-  const prev = useRef<StateName | null>(null);
+  const prev = useRef<{ state: StateName; lastAlive: number } | null>(null);
   const [key, setKey] = useState(0);
   useEffect(() => {
     const was = prev.current;
-    prev.current = state;
-    if (was && was !== "Active" && was !== "Completed" && state === "Active") {
-      setKey(Date.now());
-      const t = setTimeout(() => setKey(0), 3500);
-      return () => clearTimeout(t);
-    }
+    prev.current = { state, lastAlive };
+    if (was && was.state !== "Active" && was.state !== "Completed" && state === "Active" && lastAlive > was.lastAlive) setKey(Date.now());
   }, [state, lastAlive]);
+  useEffect(() => {
+    if (!key) return;
+    const t = setTimeout(() => setKey(0), 3500);
+    return () => clearTimeout(t);
+  }, [key]);
   return key;
 }
 

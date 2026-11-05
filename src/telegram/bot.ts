@@ -9,7 +9,7 @@ import type { Store } from "../state/store";
 
 export interface TelegramUpdate {
   update_id: number;
-  message?: { chat: { id: number }; text?: string };
+  message?: { chat: { id: number; type?: string }; text?: string };
 }
 
 export interface TelegramApi {
@@ -96,6 +96,11 @@ export class TelegramBot {
     if (!msg) return;
     const chatId = msg.chat.id;
     const text = msg.text ?? "";
+    // Only one-to-one chats: in a group, any member's message would count as the owner's sign of life.
+    if (msg.chat.type && msg.chat.type !== "private") {
+      if (/^\/start\b/.test(text)) await this.api.sendMessage(chatId, "Please link from a private chat with me, not a group.");
+      return;
+    }
     const accounts = Object.entries(this.store.get().telegramChats)
       .filter(([, c]) => c.chatId === chatId)
       .map(([a]) => a);

@@ -14,7 +14,7 @@ import { checkPolicy, policyHash, type Policy } from "./policy/policy";
 import { SIMULATED_SOURCES } from "./signals/adapters";
 import type { SignalSource } from "./liveness/score";
 import { explainLiveness } from "./liveness/verdict";
-import type { Store } from "./state/store";
+import type { OwnerSignalConfig, Store } from "./state/store";
 import type { TelegramBot } from "./telegram/bot";
 
 export interface ApiDeps {
@@ -65,6 +65,11 @@ const DemoSignal = z.object({
   source: z.enum(SIMULATED_SOURCES.map((s) => s.source) as [string, ...string[]]),
   at: z.string().datetime().optional(),
 });
+
+/** Public view of what the agent watches: which sources are set, never the addresses or handles. */
+function watchingFlags(cfg: OwnerSignalConfig | undefined) {
+  return cfg ? { evm: !!cfg.evmAddress, github: !!cfg.github, email: !!cfg.email, since: cfg.watchedSince ?? null } : null;
+}
 
 export function api(deps: ApiDeps): Hono {
   const app = new Hono();
@@ -168,7 +173,7 @@ export function api(deps: ApiDeps): Hono {
           ? {
               state: stateName(will.state),
               last_alive_at: will.last_alive_at,
-              watching: s.owners[owner] ?? null,
+              watching: watchingFlags(s.owners[owner]),
               has_policy: !!s.policies[owner],
               simulated_signals: s.simulated[owner] ?? {},
             }
@@ -262,7 +267,7 @@ export function api(deps: ApiDeps): Hono {
       state: stateName(will.state),
       will_state: will.state,
       last_alive_at: will.last_alive_at,
-      watching: s.owners[owner] ?? null,
+      watching: watchingFlags(s.owners[owner]),
       has_policy: !!s.policies[owner],
       simulated_signals: s.simulated[owner] ?? {},
     });
