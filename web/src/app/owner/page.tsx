@@ -6,7 +6,7 @@ import { ActAs, ImportKey } from "@/components/ActAs";
 import { AgentBadge, AiBadge } from "@/components/Attestation";
 import { Ladder } from "@/components/Ladder";
 import { ActionButton, Card, ErrorNote, Field, inputCls, Pill } from "@/components/ui";
-import { TelegramLink } from "@/components/TelegramLink";
+import { QuickSetup, StrengthChecklist } from "@/components/Onboarding";
 import { SignsOfLife } from "@/components/SignsOfLife";
 import { NotificationLog, Releases, SignalList, WatchStatus } from "@/components/WillParts";
 import { agent, type DraftResult } from "@/lib/agent";
@@ -40,8 +40,30 @@ function Owner() {
         <ActAs value={owner} onChange={setOwner} suggested={casts.map((c) => c.owner)} />
         <ImportKey />
       </div>
-      {owner && loaded && (!will || creating) && <WriteWill owner={owner} onCreating={setCreating} onCreated={refresh} />}
+      {owner && loaded && (!will || creating) && <CreateWill owner={owner} onCreating={setCreating} onCreated={refresh} />}
       {owner && will && !creating && <Dashboard will={will} refresh={refresh} />}
+    </div>
+  );
+}
+
+/** Quick setup (3 steps) by default; the plain-English route through NEAR AI is the alternative. */
+function CreateWill(props: { owner: string; onCreating: (b: boolean) => void; onCreated: () => void }) {
+  const [mode, setMode] = useState<"quick" | "english">("quick");
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap gap-2 text-sm">
+        <ActionButton tone={mode === "quick" ? undefined : "quiet"} onClick={async () => setMode("quick")}>
+          Quick setup (3 steps)
+        </ActionButton>
+        <ActionButton tone={mode === "english" ? undefined : "quiet"} onClick={async () => setMode("english")}>
+          Write it in plain English
+        </ActionButton>
+      </div>
+      {mode === "quick" ? (
+        <QuickSetup {...props} summary={(stagesPct, demoClock) => <SetupSummary stagesPct={stagesPct} demoClock={demoClock} />} />
+      ) : (
+        <WriteWill {...props} />
+      )}
     </div>
   );
 }
@@ -180,9 +202,6 @@ function Dashboard({ will, refresh }: { will: Will; refresh: () => void }) {
         <Card title="Signs of life the agent watches">
           <SignalList owner={owner} will={will} />
           <WatchSettings owner={owner} />
-          <div className="mt-4">
-            <TelegramLink account={owner} purpose="If you go quiet, the agent can check in on Telegram first. Any reply means you're fine." />
-          </div>
         </Card>
         <Card title="People">
           <dl className="space-y-1 text-sm">
@@ -221,6 +240,7 @@ function Dashboard({ will, refresh }: { will: Will; refresh: () => void }) {
         </Card>
       </div>
       <div className="space-y-6">
+        <StrengthChecklist will={will} />
         <Card title="NEAR vault">
           <p className="text-2xl">{formatNear(will.near_balance)} NEAR</p>
           {active ? <NearVaultActions owner={owner} refresh={refresh} /> : <p className="text-xs text-muted">Deposits and withdrawals are open while the will is Active.</p>}

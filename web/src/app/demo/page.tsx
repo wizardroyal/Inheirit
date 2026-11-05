@@ -136,7 +136,7 @@ function WillPanel({ cast }: { cast: Cast }) {
     return (
       <Card title="2 · Write the demo will">
         <p className="text-sm text-muted">
-          Alice leaves everything to Bola, released in three stages (10%, 30%, 60%). Two of three guardians must confirm. 1 NEAR goes into the
+          Alice leaves everything to Bola, released in four stages (10%, 20%, 30%, 40%) with the longest wait after the first. Two of three guardians must confirm. 1 NEAR goes into the
           NEAR vault; the Sepolia and BTC vaults are addresses derived by Chain Signatures, which you can fund from a faucet.
         </p>
         <div className="mt-3 flex flex-wrap gap-4 text-sm">
