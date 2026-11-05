@@ -7,16 +7,29 @@ import { formatNear, signRequest } from "@/lib/near";
 import { ago, schedule, SOURCE_LABELS, type Will } from "@/lib/will";
 import { ActionButton, ExtLink, Pill, short, SimulatedTag } from "./ui";
 
-const SOURCES: { source: SignalSource; simulated: boolean; weight: number }[] = [
+/** Every source the agent reads (agent §7.1), with its weight and whether it is SIMULATED. */
+export const SOURCES: { source: SignalSource; simulated: boolean; weight: number }[] = [
   { source: "near_onchain", simulated: false, weight: 0.9 },
   { source: "evm_onchain", simulated: false, weight: 0.9 },
   { source: "phone_heartbeat", simulated: false, weight: 0.9 },
+  { source: "telegram", simulated: false, weight: 0.7 },
   { source: "github", simulated: false, weight: 0.5 },
   { source: "google_calendar", simulated: true, weight: 0.7 },
   { source: "gmail", simulated: true, weight: 0.7 },
   { source: "x", simulated: true, weight: 0.4 },
   { source: "instagram", simulated: true, weight: 0.4 },
+  { source: "tiktok", simulated: true, weight: 0.4 },
+  { source: "facebook", simulated: true, weight: 0.4 },
+  { source: "whatsapp", simulated: true, weight: 0.4 },
+  { source: "linkedin", simulated: true, weight: 0.4 },
 ];
+
+/** strong (>= 0.9) and medium (0.7) count alone; weak needs a second source within 24 h. */
+export function strength(weight: number): { label: "strong" | "medium" | "weak"; tone: "accent" | "neutral" } {
+  if (weight >= 0.9) return { label: "strong", tone: "accent" };
+  if (weight >= 0.7) return { label: "medium", tone: "accent" };
+  return { label: "weak", tone: "neutral" };
+}
 
 /** Latest sign of life per source, as the agent last saw it. Timestamps only, never content. */
 export function SignalList({ owner, will }: { owner: string; will: Will | null }) {
@@ -31,7 +44,7 @@ export function SignalList({ owner, will }: { owner: string; will: Will | null }
               <span className="flex items-center gap-2">
                 {SOURCE_LABELS[s.source]}
                 {s.simulated && <SimulatedTag />}
-                <Pill tone={s.weight >= 0.7 ? "accent" : "neutral"}>{s.weight >= 0.7 ? "strong" : "weak"}</Pill>
+                <Pill tone={strength(s.weight).tone}>{strength(s.weight).label}</Pill>
               </span>
               <span className="text-muted">{at ? ago(at) : "nothing seen"}</span>
             </li>
@@ -40,7 +53,7 @@ export function SignalList({ owner, will }: { owner: string; will: Will | null }
       </ul>
       {will && <p className="text-xs text-muted">Last confirmed sign of life on-chain: {ago(will.last_alive_at)}.</p>}
       <p className="text-xs text-muted">
-        A strong signal counts on its own. Weak ones (social posts can be scheduled or run by someone else) count only when two different
+        A strong or medium signal counts on its own. Weak ones (social posts can be scheduled or run by someone else) count only when two different
         sources agree within 24 h. Only timestamps are read; never content.
       </p>
       {error && <p className="text-xs text-danger">Agent unreachable: {error}</p>}

@@ -55,12 +55,19 @@ export type VaultInfo = Record<"Eth" | "Btc", { address: string; balance: string
 
 export type DraftResult = PolicyDraft;
 
+/** Plain-English liveness verdict from the agent (deterministic, no LLM). */
+export interface Verdict {
+  headline: string;
+  details: string[];
+  ignored: { source: SignalSource; reason: string }[];
+}
+
 export const agent = {
   root: () => req<{ message: string; demoMode: boolean }>("/"),
   info: () => req<AgentInfo>("/api/agent-info"),
   aiAttestation: () => req<AttestationResult>("/api/attestation/ai"),
   notifications: (owner: string) => req<Notification[]>(`/api/notifications?owner=${encodeURIComponent(owner)}`),
-  signals: (owner: string) => req<{ observations: Observations; heartbeat: string | null }>(`/api/signals/${encodeURIComponent(owner)}`),
+  signals: (owner: string) => req<{ observations: Observations; heartbeat: string | null; verdict: Verdict | null }>(`/api/signals/${encodeURIComponent(owner)}`),
   vaults: (owner: string) => req<VaultInfo>(`/api/vaults/${encodeURIComponent(owner)}`),
   status: (owner: string) => req<{ state: string; watching: unknown; has_policy: boolean; simulated_signals: Record<string, string> }>(`/api/status/${encodeURIComponent(owner)}`),
   registerOwner: (signed: SignedRequest) => req<{ ok: true; watching: unknown }>("/api/owners", { signed }),

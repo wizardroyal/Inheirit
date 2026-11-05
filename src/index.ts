@@ -169,6 +169,12 @@ const ai = nearaiKey
   ? (() => {
       const client = new NearAiClient(config.nearaiBaseUrl(), nearaiKey, config.nearaiModel());
       const gate = new AttestationGate(client.model, liveDeps(client.baseUrl, nearaiKey));
+      // Startup check (§7.6): log whether the configured model attests. Will contents stay gated by
+      // gate.require() before every request either way; this only surfaces a bad model at boot.
+      void gate.current().then(
+        (r) => console.log(`[ai] ${client.model} attestation at startup: ${r.ok ? "passed" : `FAILED (${r.error}); will contents will be refused`}`),
+        (e) => console.error(`[ai] ${client.model} attestation at startup could not run: ${e instanceof Error ? e.message : e}`),
+      );
       return {
         attestation: () => gate.current(),
         draftPolicy: (owner: string, text: string) => draftPolicy(owner, text, client, gate),

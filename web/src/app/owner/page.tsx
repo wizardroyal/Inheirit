@@ -7,6 +7,7 @@ import { AgentBadge, AiBadge } from "@/components/Attestation";
 import { Ladder } from "@/components/Ladder";
 import { ActionButton, Card, ErrorNote, Field, inputCls, Pill } from "@/components/ui";
 import { TelegramLink } from "@/components/TelegramLink";
+import { SignsOfLife } from "@/components/SignsOfLife";
 import { NotificationLog, Releases, SignalList, WatchStatus } from "@/components/WillParts";
 import { agent, type DraftResult } from "@/lib/agent";
 import { DEMO_SCHEDULE, REAL_SCHEDULE } from "@/lib/config";
@@ -162,7 +163,9 @@ function Dashboard({ will, refresh }: { will: Will; refresh: () => void }) {
   const s = stateName(will.state);
   const active = s === "Active";
   return (
-    <div className="grid gap-6 lg:grid-cols-[1fr_1.1fr]">
+    <div className="space-y-6">
+      <SignsOfLife owner={owner} will={will} />
+      <div className="grid gap-6 lg:grid-cols-[1fr_1.1fr]">
       <div className="space-y-6">
         <Card title="Where your will is">
           <WatchStatus owner={owner} will={will} canSign />
@@ -235,6 +238,7 @@ function Dashboard({ will, refresh }: { will: Will; refresh: () => void }) {
         <Card title="Trust">
           <AgentBadge />
         </Card>
+      </div>
       </div>
     </div>
   );

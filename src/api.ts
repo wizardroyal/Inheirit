@@ -12,6 +12,8 @@ import type { ChainVault } from "./executor/executor";
 import { stateName, type WillContract, type WillView } from "./near/will-contract";
 import { checkPolicy, policyHash, type Policy } from "./policy/policy";
 import { SIMULATED_SOURCES } from "./signals/adapters";
+import type { SignalSource } from "./liveness/score";
+import { explainLiveness } from "./liveness/verdict";
 import type { Store } from "./state/store";
 import type { TelegramBot } from "./telegram/bot";
 
@@ -142,9 +144,14 @@ export function api(deps: ApiDeps): Hono {
   });
 
   // Latest activity per source (timestamps only, never content) for the liveness timeline.
-  app.get("/api/signals/:owner", (c) => {
+  // Includes the plain-English verdict (§7.8): what counts as a sign of life, what was ignored and why.
+  app.get("/api/signals/:owner", async (c) => {
     const owner = c.req.param("owner");
-    return c.json({ observations: store.get().observations[owner] ?? {}, heartbeat: store.get().heartbeats[owner] ?? null });
+    const seen = store.get().observations[owner] ?? {};
+    const will = await cached(`will:${owner}`, 5000, () => contract.getWill(owner)).catch(() => null);
+    const observations = Object.entries(seen).map(([source, o]) => ({ source: source as SignalSource, at: new Date(o!.at), trustWeight: o!.trustWeight, simulated: o!.simulated }));
+    const verdict = will ? explainLiveness(will, observations, new Date()) : null;
+    return c.json({ observations: seen, heartbeat: store.get().heartbeats[owner] ?? null, verdict });
   });
 
   // NEAR AI Cloud attestation for the configured model: public, contains no will content.

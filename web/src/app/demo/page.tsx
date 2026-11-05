@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { AgentBadge } from "@/components/Attestation";
 import { Ladder } from "@/components/Ladder";
 import { ActionButton, Card, Details, ExtLink, Pill, short, SimulatedTag } from "@/components/ui";
+import { SignsOfLife } from "@/components/SignsOfLife";
 import { NotificationLog, Releases, SignalList, WatchStatus } from "@/components/WillParts";
 import { agent, type SignalSource } from "@/lib/agent";
 import { CONTRACT_ID, DEMO_SCHEDULE, explorer } from "@/lib/config";
@@ -12,7 +13,7 @@ import { acceptAsGuardians, addSealedNote, createCast, createWill, DEMO_NOTE, de
 import { useKeys, usePoll, useWill } from "@/lib/hooks";
 import type { Cast } from "@/lib/keys";
 import { call, formatNear, signRequest } from "@/lib/near";
-import { ago, stateName, type Will } from "@/lib/will";
+import { ago, stateName, type StateName, type Will } from "@/lib/will";
 
 const SIMULATED: { source: SignalSource; label: string }[] = [
   { source: "x", label: "X post" },
@@ -128,6 +129,7 @@ function WillPanel({ cast }: { cast: Cast }) {
   const [log, setLog] = useState<string[]>([]);
   const progress = (m: string) => setLog((l) => [...l, m]);
   const events = useEventLog(will ?? null);
+  const [technical, setTechnical] = useState(false);
 
   if (!loaded) return <Card>Loading…</Card>;
   if (!will || creating)
@@ -195,7 +197,9 @@ function WillPanel({ cast }: { cast: Cast }) {
   const s = stateName(will.state);
   const done = s === "Completed";
   return (
-    <div className="grid gap-6 lg:grid-cols-[1fr_1.1fr]">
+    <div className="space-y-6">
+      <SignsOfLife owner={cast.owner} will={will} />
+      <div className="grid gap-6 lg:grid-cols-[1fr_1.1fr]">
       <div className="space-y-6">
         <Card title="Where the will is" aside={<Link href={`/owner?as=${cast.owner}`} className="text-sm text-accent underline">owner view</Link>}>
           <WatchStatus owner={cast.owner} will={will} canSign />
@@ -275,13 +279,23 @@ function WillPanel({ cast }: { cast: Cast }) {
         <Card title="Released so far">
           <Releases will={will} />
         </Card>
-        <Card title="Event log" aside={<span className="text-xs text-muted">as seen by this page</span>}>
+        <Card
+          title="What happened"
+          aside={
+            <label className="flex items-center gap-1 text-xs text-muted">
+              <input type="checkbox" checked={technical} onChange={(e) => setTechnical(e.target.checked)} /> technical names
+            </label>
+          }
+        >
           {events.length === 0 && <p className="text-sm text-muted">Waiting for changes…</p>}
           <ul className="space-y-1 text-sm">
             {[...events].reverse().map((e, i) => (
               <li key={i} className="flex gap-3">
                 <span className="w-16 shrink-0 text-xs text-muted">{e.at}</span>
-                <span>{e.text}</span>
+                <span>
+                  {e.text}
+                  {technical && e.tech && <span className="ml-2 font-mono text-xs text-muted">{e.tech}</span>}
+                </span>
               </li>
             ))}
           </ul>
@@ -292,6 +306,7 @@ function WillPanel({ cast }: { cast: Cast }) {
         <Card title="Trust">
           <AgentBadge />
         </Card>
+      </div>
       </div>
     </div>
   );
@@ -356,32 +371,63 @@ function FaucetButton({ owner, will }: { owner: string; will: Will }) {
 /** Turns successive will snapshots into a readable log of what changed. */
 function useEventLog(will: Will | null) {
   const prev = useRef<Will | null>(null);
-  const [events, setEvents] = useState<{ at: string; text: string }[]>([]);
+  const [events, setEvents] = useState<{ at: string; text: string; tech?: string }[]>([]);
   useEffect(() => {
     if (!will) return;
     const p = prev.current;
     prev.current = will;
     if (!p) return;
-    const out: string[] = [];
+    const out: { text: string; tech?: string }[] = [];
     const a = stateName(p.state);
     const b = stateName(will.state);
     if (a !== b || JSON.stringify(p.state) !== JSON.stringify(will.state)) {
-      if (a === b && b === "Executing") out.push(`Stage ${(will.state as { Executing: { stage: number } }).Executing.stage + 1} started`);
+      const tech = `${a} → ${b}`;
       // No new sign of life: the vote period ran out short of the threshold (§5.3 vote_failed)
-      else if (a === "GuardianVote" && b === "Active" && will.last_alive_at === p.last_alive_at)
-        out.push("Guardian vote expired without enough confirmations → Active. The owner is still silent, so the ladder starts again");
-      else out.push(`${a} → ${b}`);
+      if (a === "GuardianVote" && b === "Active" && will.last_alive_at === p.last_alive_at)
+        out.push({ text: "The guardian vote expired without enough confirmations. The owner is still silent, so the ladder starts again", tech });
+      else out.push({ text: describeTransition(a, b, will), tech });
     }
-    if (will.last_alive_at > p.last_alive_at) out.push("Sign of life recorded on-chain");
-    for (const x of will.attestations.slice(p.attestations.length)) out.push(`${short(x.guardian, 10)} attested ${x.kind}`);
-    for (const x of will.executions.slice(p.executions.length)) out.push(`Released ${x.chain} stage ${x.stage + 1} to ${short(x.to, 8)}`);
-    for (const x of will.released_notes.slice(p.released_notes.length)) out.push(`Note "${x.label}" re-sealed to ${short(x.heir, 10)}`);
-    for (const x of will.halted.slice(p.halted.length)) out.push(`Execution halted: ${x.reason}`);
+    if (will.last_alive_at > p.last_alive_at) out.push({ text: "Sign of life recorded on-chain", tech: "record_liveness" });
+    for (const x of will.attestations.slice(p.attestations.length))
+      out.push({ text: `${short(x.guardian, 10)} confirmed ${x.kind === "Deceased" ? "a passing" : "they're alive"}`, tech: `attest(${x.kind})` });
+    for (const x of will.executions.slice(p.executions.length))
+      out.push({ text: `Stage ${x.stage + 1} sent on ${x.chain === "Near" ? "NEAR" : x.chain === "Eth" ? "Sepolia" : "Bitcoin testnet"} to ${short(x.to, 8)}`, tech: "record_execution" });
+    for (const x of will.released_notes.slice(p.released_notes.length))
+      out.push({ text: `Sealed note "${x.label}" released to ${short(x.heir, 10)}`, tech: "store_released_note" });
+    for (const x of will.halted.slice(p.halted.length)) out.push({ text: "Remaining stages and secrets halted: the owner is alive", tech: `halt(${x.reason})` });
     if (out.length) {
       const at = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-      setEvents((e) => [...e, ...out.map((text) => ({ at, text }))].slice(-100));
+      setEvents((e) => [...e, ...out.map((o) => ({ at, ...o }))].slice(-100));
     }
   }, [will]);
   return events;
 }
 
+/** The ladder in plain words for the timeline; raw state names stay in the technical view. */
+function describeTransition(a: StateName, b: StateName, will: Will): string {
+  const who = short(will.owner, 14);
+  if (b === "Active") return `Sign of life: back to All good`;
+  switch (b) {
+    case "Quiet":
+      return `${who} went quiet. Checks sent: heartbeat app, email, Telegram, DMs`;
+    case "WelfareCheck":
+      return "No reply to the checks. Guardians, friends and the lawyer asked";
+    case "GuardianVote":
+      return "Guardians asked to vote";
+    case "Challenge":
+      return "Guardians voted. Challenge period: the owner is told on every channel";
+    case "Executing": {
+      const e = (will.state as { Executing: { stage: number } }).Executing;
+      const pct = (will.round_stages[e.stage] ?? { pct: 0 }).pct;
+      return a === "Executing" ? `Will executing: stage ${e.stage + 1} (${pct}%) sent` : `Will executing: ${pct}% sent`;
+    }
+    case "SecretsBuffer":
+      return "Everything distributed. Waiting before releasing secrets";
+    case "SecretsReleased":
+      return "Secrets released to heirs";
+    case "Completed":
+      return "The will has been carried out";
+    default:
+      return `${a} → ${b}`;
+  }
+}
