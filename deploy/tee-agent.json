@@ -20,7 +20,7 @@
       "compose_hash": "3e2c026e634e40f5dc59f1f8a903eb075dded79f3a311c72189a303e1fe7ad69",
       "image": "unwizarding/inheirit-agent@sha256:489433b7b890b7789098adc622ab078f873bf80eb609300894ad164e69ece74a",
       "at": "2026-11-05T08:04:00.000Z",
-      "note": "env update (allowed_envs + DEMO_FAUCET_*); live, only approved hash"
+      "note": "env update (allowed_envs + DEMO_FAUCET_*); retired 2026-11-05"
     },
     {
       "compose_hash": "6dbe2dbede75a7e5023e03eb706e6390b745974bea9a7c216771bf0e109d5505",
@@ -31,7 +31,19 @@
       "compose_hash": "bd3a0e8866d57a54888d9b46cd1ce3d400f5e6df8c4e6995c405b130b32a8659",
       "image": "unwizarding/inheirit-agent@sha256:e69291f930b037f422cb514fcdc9f99487b391d6f27d07197324d57b7e52fd2b",
       "at": "2026-11-05T09:50:00.000Z",
-      "note": "env update (allowed_envs + NEAR_RPC_URL); live, only approved hash"
+      "note": "env update (allowed_envs + NEAR_RPC_URL); retired 2026-11-05"
+    },
+    {
+      "compose_hash": "f7e8c235680063383d61f58271e44e8987cde15bb89ce65d7d54b246791089c0",
+      "image": "unwizarding/inheirit-agent@sha256:d963ec85460c4b972e47380c938932a33140df32f5d26a11fa6889b9989d50e3",
+      "at": "2026-11-05T12:41:17.962Z",
+      "note": "v2a image (contract v2, Telegram, Day B); retired 2026-11-05 after the env update"
+    },
+    {
+      "compose_hash": "f8ddfdc4d2bdefd30b6f5b47c2fd3f81b2647fa95b3e1761db492b5dc9fb1d00",
+      "image": "unwizarding/inheirit-agent@sha256:d963ec85460c4b972e47380c938932a33140df32f5d26a11fa6889b9989d50e3",
+      "at": "2026-11-05T12:44:27.000Z",
+      "note": "env update (allowed_envs + TELEGRAM_BOT_TOKEN, TELEGRAM_BOT_USERNAME); live, only approved hash"
     }
   ]
 }
