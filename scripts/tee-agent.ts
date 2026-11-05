@@ -18,6 +18,7 @@ import { Account } from "@near-js/accounts";
 import type { KeyPairString } from "@near-js/crypto";
 import { JsonRpcProvider } from "@near-js/providers";
 import { KeyPairSigner } from "@near-js/signers";
+import { rpcEndpoints } from "../src/config";
 
 const APP_NAME = "inheirit-agent";
 const DSTACK_VERSION = "0.5.12"; // CLI 2.4.0 only knows 0.5.7/0.5.8, which Phala no longer offers
@@ -28,7 +29,7 @@ const ENV_KEYS = ["AGENT_CONTRACT_ID", "SPONSOR_ACCOUNT_ID", "SPONSOR_PRIVATE_KE
 const RECORD = "deploy/tee-agent.json";
 const PHALA_API = "https://cloud-api.phala.network/api/v1";
 const CONTRACT = process.env.AGENT_CONTRACT_ID || "inheirit.testnet";
-const provider = new JsonRpcProvider({ url: (process.env.NEAR_RPC_URL || "https://test.rpc.fastnear.com").split(",")[0].trim() });
+const provider = new JsonRpcProvider(rpcEndpoints(process.env.NEAR_RPC_URL || "https://test.rpc.fastnear.com")[0]);
 
 interface Record {
   app_name: string;
