@@ -874,3 +874,10 @@ DEMO_MODE=true
   - As expected from 2026-10-29, the compose update kept the old `allowed_envs`, so the agent logged "TELEGRAM… not set". `tee-agent.ts env` (`allowed_envs_changed: true`) restarted it at 12:44:27. `approve` for `f8ddfdc4…` landed about 30 s later.
   - The agent had 2 failed register attempts (about 0.04 NEAR) and registered at 12:45:15. The Telegram bot is on.
   - `retire` takes **one hash per call**. Both `bd3a0e88…` and `f7e8c235…` are retired.
+- 2026-11-05 — [VERIFIED] **Scenario A on the hosted stack** (`inheirit.testnet` and the v2a TEE agent, owner `hosteda.inheirit-fund-sp6ecr.testnet`, `scripts/demo-cancel.ts`).
+  - The ladder: Quiet 125 s → WelfareCheck 189 s → GuardianVote 254 s → Challenge 259 s.
+  - The lone SIMULATED X post was ignored: still Challenge 40 s later.
+  - The signed heartbeat brought the will back to Active, with the vault untouched.
+  - Screenshots came from the same web code run locally against the hosted backend: the verdict explaining the ignored X post, and **the snap-back flash, seen running**.
+  - Fixed: at the snap-back, the verdict box lagged a poll behind ("Challenge period…" next to All good). The panel now refetches on every state change and shows "Sign of life recorded…" while the flash is up.
+- 2026-11-05 — [VERIFIED] **`inheirit.vercel.app` is behind Vercel's Security Checkpoint.** curl gets a 403 challenge page, and headless Chromium gets "Failed to verify your browser (Code 21)". Normal browsers pass. Risk: AI judges fetching the site with tools would be blocked. Asked the human to check Vercel → Firewall (Attack Challenge Mode / bot protection). Until then, test the hosted backend by running `web/` locally with `NEXT_PUBLIC_AGENT_URL` set to the TEE URL and `NEXT_PUBLIC_CONTRACT_ID=inheirit.testnet`.

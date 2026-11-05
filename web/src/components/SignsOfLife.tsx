@@ -13,8 +13,9 @@ import { SOURCE_LABELS, ago } from "@/lib/will";
 
 export function SignsOfLife({ owner, will }: { owner: string; will: Will }) {
   const now = useNow();
-  const { data } = usePoll(() => agent.signals(owner), 4000, [owner]);
   const state = stateName(will.state);
+  // Refetch as soon as the state changes, so the verdict never describes the previous state for long.
+  const { data } = usePoll(() => agent.signals(owner), 4000, [owner, state]);
   const snapped = useSnapBack(state, will.last_alive_at);
   const pulsing = usePulses(data?.observations);
   const idx = LADDER.findIndex((r) => r.state === state);
@@ -69,7 +70,8 @@ export function SignsOfLife({ owner, will }: { owner: string; will: Will }) {
       {/* Verdict */}
       {data?.verdict && (
         <div className="rounded-lg bg-accent-soft px-4 py-3">
-          <p className="font-medium">{data.verdict.headline}</p>
+          {/* The agent's verdict can trail the chain by a poll; at the snap-back, say what just happened. */}
+          <p className="font-medium">{snapped > 0 ? "Sign of life recorded on-chain. Everything is cancelled; nothing moved." : data.verdict.headline}</p>
           {data.verdict.details.map((d) => (
             <p key={d} className="mt-1 text-sm text-muted">
               {d}
