@@ -38,16 +38,41 @@ impl Contract {
         self.settle_storage(&owner, initial, env::attached_deposit());
     }
 
+    /// Invites one more guardian. It counts only after it calls accept_guardian. Only while Active.
+    #[payable]
+    pub fn invite_guardian(&mut self, account: AccountId) {
+        let owner = env::predecessor_account_id();
+        let mut will = self.will(&owner);
+        require!(
+            will.state == WillState::Active,
+            "Guardians can be invited only while Active"
+        );
+        require!(will.guardian(&account).is_none(), "Duplicate guardian");
+        require!(will.guardians.len() < MAX_GUARDIANS, "At most 10 guardians");
+        let heirs: Vec<&AccountId> = will.heirs.iter().map(|h| &h.account_id).collect();
+        require_valid_guardian(&account, &owner, &heirs);
+        let initial = env::storage_usage();
+        will.guardians.push(Guardian {
+            account_id: account.clone(),
+            accepted: false,
+        });
+        will.last_alive_at = now_s();
+        emit(
+            "guardian_invited",
+            serde_json::json!({ "owner": owner, "guardian": account }),
+        );
+        self.save(will);
+        self.wills.flush();
+        self.settle_storage(&owner, initial, env::attached_deposit());
+    }
+
     /// Adds the attached NEAR to the will's NEAR vault. Closed once execution starts.
     #[payable]
     pub fn deposit_near(&mut self) {
         let owner = env::predecessor_account_id();
         let mut will = self.will(&owner);
         require!(
-            !matches!(
-                will.state,
-                WillState::Executing { .. } | WillState::Completed { .. }
-            ),
+            !will.execution_started(),
             "Vault deposits are closed once execution starts"
         );
         let amount = env::attached_deposit().as_yoctonear();

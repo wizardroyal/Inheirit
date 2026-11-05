@@ -8,10 +8,7 @@ impl Contract {
     pub fn attest(&mut self, owner: AccountId, kind: AttestKind, evidence_hash: Option<String>) {
         let guardian = env::predecessor_account_id();
         let mut will = self.will(&owner);
-        require!(
-            will.guardians.contains(&guardian),
-            "Not a guardian of this will"
-        );
+        will.require_accepted_guardian(&guardian);
         require!(
             matches!(will.state, WillState::GuardianVote { .. }),
             "Attestations are accepted only during GuardianVote"
@@ -51,13 +48,89 @@ impl Contract {
         self.save(will);
     }
 
-    /// A welfare contact confirms the owner is fine. Can only delay, so it is limited to the
-    /// early states (Quiet, WelfareCheck).
+    /// An invited guardian accepts the role. Only accepted guardians count toward the quorum.
+    pub fn accept_guardian(&mut self, owner: AccountId) {
+        let guardian = env::predecessor_account_id();
+        let mut will = self.will(&owner);
+        require!(
+            !matches!(will.state, WillState::Completed { .. }),
+            "Will already completed"
+        );
+        let entry = will
+            .guardians
+            .iter_mut()
+            .find(|g| g.account_id == guardian)
+            .unwrap_or_else(|| env::panic_str("Not a guardian of this will"));
+        require!(!entry.accepted, "Already accepted");
+        entry.accepted = true;
+        emit(
+            "guardian_accepted",
+            serde_json::json!({ "owner": owner, "guardian": guardian }),
+        );
+        self.save(will);
+    }
+
+    /// Evidence of death that speeds up the remaining release (CLAUDE.md §5.5). The lawyer's
+    /// proof alone, or proofs from a quorum of accepted guardians, switch the will to the
+    /// accelerated schedule. It never skips the vote, the challenge period or a stage.
+    pub fn attest_death_proof(&mut self, owner: AccountId, evidence_hash: String) {
+        let by = env::predecessor_account_id();
+        let mut will = self.will(&owner);
+        require_hex32(&evidence_hash, "evidence_hash");
+        require!(
+            matches!(
+                will.state,
+                WillState::GuardianVote { .. }
+                    | WillState::Challenge { .. }
+                    | WillState::Executing { .. }
+            ),
+            "Death proofs are accepted only in GuardianVote, Challenge or Executing"
+        );
+        let is_lawyer = will.lawyer.as_ref() == Some(&by);
+        if !is_lawyer {
+            if will.guardian(&by).is_none() {
+                env::panic_str("Only the lawyer or a guardian can attest a death proof");
+            }
+            will.require_accepted_guardian(&by);
+        }
+        require!(
+            !will.death_proofs.iter().any(|p| p.by == by),
+            "Already submitted a death proof"
+        );
+        require!(
+            will.death_proofs.len() < MAX_DEATH_PROOFS,
+            "Death proof limit reached"
+        );
+        let proof = DeathProof {
+            by,
+            evidence_hash,
+            at: now_s(),
+        };
+        emit(
+            "death_proof_attested",
+            serde_json::json!({ "owner": owner, "proof": proof, "lawyer": is_lawyer }),
+        );
+        will.death_proofs.push(proof);
+        let guardian_proofs = will
+            .death_proofs
+            .iter()
+            .filter(|p| will.guardian(&p.by).is_some_and(|g| g.accepted))
+            .count();
+        if is_lawyer || guardian_proofs >= will.guardian_threshold as usize {
+            will.accelerate();
+        }
+        self.save(will);
+    }
+
+    /// Someone in the welfare chain (a contact, an accepted guardian or the lawyer) confirms the
+    /// owner is fine. Can only delay, so it is limited to the early states (Quiet, WelfareCheck).
     pub fn contact_confirm_alive(&mut self, owner: AccountId) {
         let contact = env::predecessor_account_id();
         let mut will = self.will(&owner);
         require!(
-            will.contacts.contains(&contact),
+            will.contacts.contains(&contact)
+                || will.guardian(&contact).is_some_and(|g| g.accepted)
+                || will.lawyer.as_ref() == Some(&contact),
             "Not a contact of this will"
         );
         require!(

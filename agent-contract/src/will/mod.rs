@@ -1,4 +1,5 @@
-//! Heirloom will: the state machine from CLAUDE.md §5. One contract holds many wills, keyed by owner.
+//! Heirloom will: the state machine from CLAUDE.md §5 (v2: §5.5). One contract holds many wills,
+//! keyed by owner.
 //!
 //! All times are UNIX seconds; all durations are seconds. Amounts on foreign chains are decimal
 //! strings in the chain's smallest unit (wei, sats); NEAR amounts are yoctoNEAR.
@@ -33,6 +34,8 @@ pub const MAX_PENDING_WITHDRAWALS: usize = 5;
 pub const MAX_SIGNATURES_PER_STAGE_CHAIN: u8 = 16;
 pub const MAX_SIGNATURES_PER_WITHDRAWAL: u8 = 16;
 pub const MAX_EXECUTION_RECORDS: usize = 200;
+/// The lawyer plus every guardian.
+pub const MAX_DEATH_PROOFS: usize = MAX_GUARDIANS + 1;
 pub const MAX_REF_CHARS: usize = 128; // addresses and tx hashes
 pub const BPS_TOTAL: u16 = 10_000;
 
@@ -72,6 +75,14 @@ pub enum WillState {
         since: u64,
         stage_started: u64,
     },
+    /// Distribution is complete; sealed notes wait out `secrets_buffer` before release.
+    SecretsBuffer {
+        since: u64,
+    },
+    /// The agent may now re-seal notes to heirs; Completed once every note is released.
+    SecretsReleased {
+        since: u64,
+    },
     Completed {
         at: u64,
     },
@@ -85,7 +96,9 @@ impl WillState {
             | WillState::WelfareCheck { since }
             | WillState::GuardianVote { since }
             | WillState::Challenge { since }
-            | WillState::Executing { since, .. } => Some(*since),
+            | WillState::Executing { since, .. }
+            | WillState::SecretsBuffer { since }
+            | WillState::SecretsReleased { since } => Some(*since),
             WillState::Active | WillState::Completed { .. } => None,
         }
     }
@@ -98,6 +111,8 @@ impl WillState {
             WillState::GuardianVote { .. } => "GuardianVote",
             WillState::Challenge { .. } => "Challenge",
             WillState::Executing { .. } => "Executing",
+            WillState::SecretsBuffer { .. } => "SecretsBuffer",
+            WillState::SecretsReleased { .. } => "SecretsReleased",
             WillState::Completed { .. } => "Completed",
         }
     }
@@ -111,7 +126,33 @@ pub struct Timings {
     pub welfare_period: u64,
     pub vote_period: u64,
     pub challenge_period: u64,
-    pub stage_interval: u64,
+    /// Wait between the end of distribution and the release of sealed notes.
+    pub secrets_buffer: u64,
+}
+
+/// One release slice: `pct` of the vault snapshot, then `wait_after` seconds until the next
+/// slice (after the last slice: until SecretsBuffer starts).
+#[near(serializers = [borsh, json])]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Stage {
+    pub pct: u8,
+    pub wait_after: u64,
+}
+
+#[near(serializers = [borsh, json])]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Guardian {
+    pub account_id: AccountId,
+    /// Only accepted guardians count toward the quorum and arm the will.
+    pub accepted: bool,
+}
+
+#[near(serializers = [borsh, json])]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DeathProof {
+    pub by: AccountId,
+    pub evidence_hash: String,
+    pub at: u64,
 }
 
 #[near(serializers = [json])]
@@ -139,15 +180,24 @@ pub struct Heir {
 #[derive(Clone, Debug)]
 pub struct WillConfig {
     pub heirs: Vec<HeirInput>,
+    /// Invited guardians; each must call accept_guardian before it counts.
     pub guardians: Vec<AccountId>,
     pub guardian_threshold: u8,
     pub contacts: Vec<AccountId>,
-    pub stages_pct: Vec<u8>,
+    /// Standard schedule (CLAUDE.md §5.5: 10/20/30/40, longest wait after the first slice).
+    pub stages: Vec<Stage>,
+    /// Schedule used after a death proof (e.g. 10/30/60 with short waits).
+    pub accelerated_stages: Vec<Stage>,
     pub timings: Timings,
     /// Hex sha256 of the approved policy JSON.
     pub policy_hash: String,
     /// Foreign chains with an MPC-derived vault (Eth, Btc).
     pub foreign_chains: Vec<Chain>,
+    /// May attest a death proof and is part of the welfare chain. May also be a guardian.
+    pub lawyer: Option<AccountId>,
+    /// Hide heir identities in the UI, agent API and notifications until execution. The
+    /// contract state itself stays readable (CLAUDE.md §2.4).
+    pub heirs_hidden: bool,
 }
 
 #[near(serializers = [borsh, json])]
@@ -241,13 +291,16 @@ pub struct SignCount {
 pub struct Will {
     pub owner: AccountId,
     pub heirs: Vec<Heir>,
-    pub guardians: Vec<AccountId>,
+    pub guardians: Vec<Guardian>,
     pub guardian_threshold: u8,
     pub contacts: Vec<AccountId>,
-    pub stages_pct: Vec<u8>,
+    pub stages: Vec<Stage>,
+    pub accelerated_stages: Vec<Stage>,
     pub timings: Timings,
     pub policy_hash: String,
     pub foreign_chains: Vec<Chain>,
+    pub lawyer: Option<AccountId>,
+    pub heirs_hidden: bool,
     pub state: WillState,
     pub last_alive_at: u64,
     pub created_at: u64,
@@ -269,6 +322,21 @@ pub struct Will {
     /// MPC signatures requested per (stage, chain) in the current round.
     pub sign_counts: Vec<SignCount>,
     pub halted: Vec<HaltRecord>,
+    /// Set by a death proof; cleared whenever the will returns to Active.
+    pub accelerated: bool,
+    /// Death proofs of the current escalation; cleared whenever the will returns to Active.
+    pub death_proofs: Vec<DeathProof>,
+    /// The schedule of the current (or last) execution round, snapshotted when it started.
+    pub round_stages: Vec<Stage>,
+    /// When the current (or last) execution round started.
+    pub round_started_at: u64,
+}
+
+#[near(serializers = [json])]
+pub struct ArmedStatus {
+    pub armed: bool,
+    /// What is still needed, in plain words.
+    pub missing: Vec<String>,
 }
 
 #[near(serializers = [borsh, json])]
@@ -313,6 +381,30 @@ fn require_unique<T: PartialEq>(items: &[T], msg: &str) {
     }
 }
 
+fn validate_stages(stages: &[Stage], name: &str) {
+    require!(
+        !stages.is_empty() && stages.len() <= MAX_STAGES,
+        format!("{}: 1-10 stages required", name)
+    );
+    require!(
+        stages.iter().all(|s| s.pct > 0),
+        "Each stage must release > 0%"
+    );
+    require!(
+        stages.iter().all(|s| s.wait_after > 0),
+        "Every stage wait must be > 0"
+    );
+    let sum: u32 = stages.iter().map(|s| s.pct as u32).sum();
+    require!(sum == 100, format!("{} must sum to 100", name));
+}
+
+/// The guardian checks shared by create/update_will and invite_guardian.
+pub fn require_valid_guardian(g: &AccountId, owner: &AccountId, heirs: &[&AccountId]) {
+    require!(g != owner, "The owner cannot be a guardian");
+    // Guardian independence (threat model): a greedy heir must not count toward quorum.
+    require!(!heirs.contains(&g), "A guardian cannot be an heir");
+}
+
 impl WillConfig {
     pub fn validate(&self, owner: &AccountId) {
         require!(
@@ -339,13 +431,8 @@ impl WillConfig {
             "1-10 guardians required"
         );
         require_unique(&self.guardians, "Duplicate guardian");
-        require!(
-            !self.guardians.contains(owner),
-            "The owner cannot be a guardian"
-        );
         for g in &self.guardians {
-            // Guardian independence (threat model): a greedy heir must not count toward quorum.
-            require!(!heir_ids.contains(&g), "A guardian cannot be an heir");
+            require_valid_guardian(g, owner, &heir_ids);
         }
         require!(
             self.guardian_threshold >= 1
@@ -360,16 +447,13 @@ impl WillConfig {
             "The owner cannot be a contact"
         );
 
-        require!(
-            !self.stages_pct.is_empty() && self.stages_pct.len() <= MAX_STAGES,
-            "1-10 stages required"
-        );
-        require!(
-            self.stages_pct.iter().all(|p| *p > 0),
-            "Each stage must release > 0%"
-        );
-        let stage_sum: u32 = self.stages_pct.iter().map(|p| *p as u32).sum();
-        require!(stage_sum == 100, "Stages must sum to 100");
+        if let Some(l) = &self.lawyer {
+            require!(l != owner, "The owner cannot be the lawyer");
+            require!(!heir_ids.contains(&l), "The lawyer cannot be an heir");
+        }
+
+        validate_stages(&self.stages, "Stages");
+        validate_stages(&self.accelerated_stages, "Accelerated stages");
 
         let t = &self.timings;
         require!(
@@ -379,7 +463,7 @@ impl WillConfig {
                 t.welfare_period,
                 t.vote_period,
                 t.challenge_period,
-                t.stage_interval
+                t.secrets_buffer
             ]
             .iter()
             .all(|d| *d > 0),
@@ -410,20 +494,34 @@ impl WillConfig {
             })
             .collect()
     }
+
+    /// Invited guardians; a guardian kept from `previous` keeps its acceptance.
+    fn guardians(&self, previous: &[Guardian]) -> Vec<Guardian> {
+        self.guardians
+            .iter()
+            .map(|g| Guardian {
+                account_id: g.clone(),
+                accepted: previous.iter().any(|p| &p.account_id == g && p.accepted),
+            })
+            .collect()
+    }
 }
 
 impl Will {
     fn new(owner: AccountId, cfg: WillConfig, now: u64) -> Self {
         Will {
             heirs: cfg.heirs(&[]),
+            guardians: cfg.guardians(&[]),
             owner,
-            guardians: cfg.guardians,
             guardian_threshold: cfg.guardian_threshold,
             contacts: cfg.contacts,
-            stages_pct: cfg.stages_pct,
+            stages: cfg.stages,
+            accelerated_stages: cfg.accelerated_stages,
             timings: cfg.timings,
             policy_hash: cfg.policy_hash,
             foreign_chains: cfg.foreign_chains,
+            lawyer: cfg.lawyer,
+            heirs_hidden: cfg.heirs_hidden,
             state: WillState::Active,
             last_alive_at: now,
             created_at: now,
@@ -440,6 +538,10 @@ impl Will {
             stage_done: vec![],
             sign_counts: vec![],
             halted: vec![],
+            accelerated: false,
+            death_proofs: vec![],
+            round_stages: vec![],
+            round_started_at: 0,
         }
     }
 
@@ -451,14 +553,17 @@ impl Will {
                 "Remove sealed notes for heirs you drop first"
             );
         }
+        self.guardians = cfg.guardians(&self.guardians);
         self.heirs = heirs;
-        self.guardians = cfg.guardians;
         self.guardian_threshold = cfg.guardian_threshold;
         self.contacts = cfg.contacts;
-        self.stages_pct = cfg.stages_pct;
+        self.stages = cfg.stages;
+        self.accelerated_stages = cfg.accelerated_stages;
         self.timings = cfg.timings;
         self.policy_hash = cfg.policy_hash;
         self.foreign_chains = cfg.foreign_chains;
+        self.lawyer = cfg.lawyer;
+        self.heirs_hidden = cfg.heirs_hidden;
     }
 
     pub fn heir(&self, account: &AccountId) -> Option<&Heir> {
@@ -472,8 +577,93 @@ impl Will {
         );
     }
 
+    pub fn guardian(&self, account: &AccountId) -> Option<&Guardian> {
+        self.guardians.iter().find(|g| &g.account_id == account)
+    }
+
+    /// Panics unless `account` is a guardian who accepted.
+    pub fn require_accepted_guardian(&self, account: &AccountId) {
+        let g = self
+            .guardian(account)
+            .unwrap_or_else(|| env::panic_str("Not a guardian of this will"));
+        require!(g.accepted, "Guardian has not accepted");
+    }
+
+    pub fn accepted_guardians(&self) -> usize {
+        self.guardians.iter().filter(|g| g.accepted).count()
+    }
+
+    /// What the will still needs before it may escalate (empty = armed). The "strong signal
+    /// source" requirement is checked off-chain: the owner's NEAR account always counts.
+    pub fn armed_missing(&self) -> Vec<String> {
+        let mut missing = vec![];
+        let accepted = self.accepted_guardians();
+        if accepted < self.guardian_threshold as usize {
+            missing.push(format!(
+                "{} of {} required guardians have accepted",
+                accepted, self.guardian_threshold
+            ));
+        }
+        if self.heirs.is_empty() {
+            missing.push("No heir".to_string());
+        }
+        missing
+    }
+
+    /// Last stage of the current execution round.
     pub fn last_stage(&self) -> u8 {
-        (self.stages_pct.len() - 1) as u8
+        require!(!self.round_stages.is_empty(), "Will has never executed");
+        (self.round_stages.len() - 1) as u8
+    }
+
+    /// True once funds may have left the vaults (no more deposits).
+    pub fn execution_started(&self) -> bool {
+        matches!(
+            self.state,
+            WillState::Executing { .. }
+                | WillState::SecretsBuffer { .. }
+                | WillState::SecretsReleased { .. }
+                | WillState::Completed { .. }
+        )
+    }
+
+    /// A liveness time newer than this returns the will to Active. From execution onward it is
+    /// the start of execution, so a signal seen during any stage still halts the secrets.
+    pub fn liveness_cutoff(&self) -> Option<u64> {
+        match self.state {
+            WillState::SecretsBuffer { .. } | WillState::SecretsReleased { .. } => {
+                Some(self.round_started_at)
+            }
+            _ => self.state.since(),
+        }
+    }
+
+    /// Switches the will to the accelerated schedule. Before execution the whole schedule is
+    /// replaced when execution starts; during execution the remaining stages keep their
+    /// percentages and each wait is capped at the accelerated wait, so no stage is skipped.
+    pub fn accelerate(&mut self) {
+        if self.accelerated {
+            return;
+        }
+        self.accelerated = true;
+        if let WillState::Executing { stage, .. } = self.state {
+            let fast = &self.accelerated_stages;
+            for i in stage as usize..self.round_stages.len() {
+                let cap = fast[i.min(fast.len() - 1)].wait_after;
+                let s = &mut self.round_stages[i];
+                s.wait_after = s.wait_after.min(cap);
+            }
+        }
+        emit(
+            "will_accelerated",
+            serde_json::json!({ "owner": self.owner, "round_stages": self.round_stages }),
+        );
+    }
+
+    fn all_notes_released(&self) -> bool {
+        self.sealed_notes
+            .iter()
+            .all(|n| self.released_notes.iter().any(|r| r.note_id == n.id))
     }
 
     pub fn is_stage_done(&self, stage: u8, chain: Chain) -> bool {
@@ -510,7 +700,14 @@ impl Will {
             "Will already completed"
         );
         self.last_alive_at = self.last_alive_at.max(alive_at);
-        if let WillState::Executing { stage, .. } = self.state {
+        let halted_stage = match self.state {
+            WillState::Executing { stage, .. } => Some(stage),
+            WillState::SecretsBuffer { .. } | WillState::SecretsReleased { .. } => {
+                Some(self.last_stage())
+            }
+            _ => None,
+        };
+        if let Some(stage) = halted_stage {
             let halt = HaltRecord {
                 round: self.execution_round,
                 stage,
@@ -524,6 +721,8 @@ impl Will {
             self.halted.push(halt);
         }
         self.attestations.clear();
+        self.death_proofs.clear();
+        self.accelerated = false;
         if self.state != WillState::Active {
             self.set_state(WillState::Active, reason);
         }
@@ -606,7 +805,7 @@ impl Contract {
         let amount = if stage == will.last_stage() {
             will.near_balance.0
         } else {
-            will.near_snapshot.0 * will.stages_pct[stage as usize] as u128 / 100
+            will.near_snapshot.0 * will.round_stages[stage as usize].pct as u128 / 100
         }
         .min(will.near_balance.0);
         if amount == 0 {
@@ -660,7 +859,10 @@ impl Contract {
         let t = will.timings.clone();
         let elapsed = |since: u64| now.saturating_sub(since);
         match will.state.clone() {
-            WillState::Active if elapsed(will.last_alive_at) >= t.quiet_after => {
+            WillState::Active
+                if elapsed(will.last_alive_at) >= t.quiet_after
+                    && will.armed_missing().is_empty() =>
+            {
                 will.set_state(WillState::Quiet { since: now }, "silence");
             }
             WillState::Quiet { since } if elapsed(since) >= t.nudge_period => {
@@ -678,6 +880,12 @@ impl Contract {
             }
             WillState::Challenge { since } if elapsed(since) >= t.challenge_period => {
                 will.execution_round += 1;
+                will.round_stages = if will.accelerated {
+                    will.accelerated_stages.clone()
+                } else {
+                    will.stages.clone()
+                };
+                will.round_started_at = now;
                 will.near_snapshot = will.near_balance;
                 will.stage_done.clear();
                 will.sign_counts.clear();
@@ -687,14 +895,20 @@ impl Contract {
                 stage,
                 since,
                 stage_started,
-            } if elapsed(stage_started) >= t.stage_interval => {
+            } if elapsed(stage_started) >= will.round_stages[stage as usize].wait_after => {
                 if stage < will.last_stage() {
                     self.start_stage(will, stage + 1, since, now);
                 } else if will.all_foreign_stages_done() {
-                    will.set_state(WillState::Completed { at: now }, "all_stages_done");
+                    will.set_state(WillState::SecretsBuffer { since: now }, "distribution_done");
                 } else {
                     return false;
                 }
+            }
+            WillState::SecretsBuffer { since } if elapsed(since) >= t.secrets_buffer => {
+                will.set_state(WillState::SecretsReleased { since: now }, "buffer_passed");
+            }
+            WillState::SecretsReleased { .. } if will.all_notes_released() => {
+                will.set_state(WillState::Completed { at: now }, "secrets_released");
             }
             _ => return false,
         }

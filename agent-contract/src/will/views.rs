@@ -27,6 +27,19 @@ impl Contract {
         })
     }
 
+    /// Whether the will may escalate, and what it still needs if not (CLAUDE.md §5.5).
+    pub fn is_armed(&self, owner: AccountId) -> ArmedStatus {
+        let missing = self
+            .wills
+            .get(&owner)
+            .map(|w| w.armed_missing())
+            .unwrap_or_else(|| vec!["No will".to_string()]);
+        ArmedStatus {
+            armed: missing.is_empty(),
+            missing,
+        }
+    }
+
     pub fn get_agent_pubkey(&self) -> Option<AgentKey> {
         self.agent_key.clone()
     }

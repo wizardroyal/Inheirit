@@ -39,8 +39,8 @@ impl Contract {
             "liveness_recorded",
             serde_json::json!({ "owner": owner, "at": at, "source": "agent" }),
         );
-        match will.state.since() {
-            Some(since) if at > since => will.reset_to_active("signal_alive", at),
+        match will.liveness_cutoff() {
+            Some(cutoff) if at > cutoff => will.reset_to_active("signal_alive", at),
             _ => will.last_alive_at = at,
         }
         self.save(will);
@@ -229,12 +229,10 @@ impl Contract {
     ) {
         self.require_agent();
         let mut will = self.will(&owner);
+        // Secrets last (CLAUDE.md §5.5): only after distribution and the buffer.
         require!(
-            matches!(
-                will.state,
-                WillState::Executing { .. } | WillState::Completed { .. }
-            ),
-            "Notes are released only after execution starts"
+            matches!(will.state, WillState::SecretsReleased { .. }),
+            "Notes are released only in SecretsReleased"
         );
         let note = will
             .sealed_notes

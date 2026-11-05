@@ -136,17 +136,24 @@ async fn setup() -> R<World> {
             "guardians": [w.g1.id, w.g2.id],
             "guardian_threshold": 2,
             "contacts": [],
-            "stages_pct": [50, 50],
+            "stages": [{ "pct": 50, "wait_after": 600 }, { "pct": 50, "wait_after": 600 }],
+            "accelerated_stages": [{ "pct": 100, "wait_after": 600 }],
             "timings": { "quiet_after": one, "nudge_period": one, "welfare_period": one,
-                         "vote_period": 600, "challenge_period": one, "stage_interval": 600 },
+                         "vote_period": 600, "challenge_period": one, "secrets_buffer": 600 },
             "policy_hash": POLICY_HASH,
-            "foreign_chains": ["Eth"]
+            "foreign_chains": ["Eth"],
+            "lawyer": null,
+            "heirs_hidden": true
         }}),
         Some(NearToken::from_near(1)),
     )
     .await?
     .assert_success();
     w.call(&w.owner, "deposit_near", json!({}), Some(NearToken::from_near(2))).await?.assert_success();
+    // Only accepted guardians arm the will (CLAUDE.md §5.5).
+    for g in [&w.g1, &w.g2] {
+        w.call(g, "accept_guardian", json!({ "owner": w.owner.id }), None).await?.assert_success();
+    }
     Ok(w)
 }
 

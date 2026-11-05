@@ -18,6 +18,7 @@ const G1: &str = "g1.testnet";
 const G2: &str = "g2.testnet";
 const G3: &str = "g3.testnet";
 const C1: &str = "friend.testnet";
+const LAWYER: &str = "lawyer.testnet";
 const STRANGER: &str = "mallory.testnet";
 
 const T0: u64 = 1_800_000_000; // seconds
@@ -26,6 +27,7 @@ const STORAGE_DEPOSIT: NearToken = NearToken::from_near(1);
 const PAYLOAD: &str = "0101010101010101010101010101010101010101010101010101010101010101";
 const POLICY_HASH: &str = "aa00000000000000000000000000000000000000000000000000000000000000";
 const HEIR_KEY: &str = "bb00000000000000000000000000000000000000000000000000000000000000";
+const EVIDENCE: &str = "cc00000000000000000000000000000000000000000000000000000000000000";
 
 fn acc(s: &str) -> AccountId {
     s.parse().unwrap()
@@ -84,8 +86,22 @@ impl T {
     /// Demo will: 2 heirs (80/20 NEAR), 3 guardians (2-of-3), 1 contact, stages 10/30/60,
     /// ETH + BTC vaults, demo timings, funded with 10 NEAR.
     fn with_will() -> Self {
+        Self::with_config(config())
+    }
+
+    /// Creates the will, funds it with 10 NEAR and has every guardian accept (so it is armed).
+    fn with_config(cfg: WillConfig) -> Self {
+        let mut t = Self::unaccepted(cfg);
+        for g in [G1, G2, G3] {
+            t.as_(g).accept_guardian(acc(OWNER));
+        }
+        t
+    }
+
+    /// Creates and funds the will; no guardian has accepted yet, so it is not armed.
+    fn unaccepted(cfg: WillConfig) -> Self {
         let mut t = T::new();
-        t.pay(OWNER, STORAGE_DEPOSIT).create_will(config());
+        t.pay(OWNER, STORAGE_DEPOSIT).create_will(cfg);
         t.pay(OWNER, NearToken::from_near(10)).deposit_near();
         t
     }
@@ -131,6 +147,35 @@ impl T {
         ));
     }
 
+    /// Runs every stage of the harness schedule (10/30/60, 60 s waits), marks every foreign
+    /// (stage, chain) done and enters SecretsBuffer.
+    fn to_secrets_buffer(&mut self) {
+        self.to_executing();
+        self.to_secrets_buffer_from_executing();
+    }
+
+    fn to_secrets_released(&mut self) {
+        self.to_secrets_buffer();
+        self.wait(60);
+        assert!(self.advance());
+        assert!(matches!(self.state(), WillState::SecretsReleased { .. }));
+    }
+
+    /// No sealed notes in the harness will, so SecretsReleased completes on the next advance.
+    fn to_completed(&mut self) {
+        self.to_secrets_released();
+        assert!(self.advance());
+        assert!(matches!(self.state(), WillState::Completed { .. }));
+    }
+
+    fn mark_all_done(&mut self, stages: u8) {
+        for stage in 0..stages {
+            for chain in [Chain::Eth, Chain::Btc] {
+                self.as_(AGENT).mark_stage_done(acc(OWNER), stage, chain);
+            }
+        }
+    }
+
     fn sign(&mut self, chain: Chain, purpose: SignPurpose) {
         self.as_(AGENT)
             .request_signature(acc(OWNER), chain, PAYLOAD.to_string(), purpose)
@@ -156,8 +201,15 @@ fn demo_timings() -> Timings {
         welfare_period: 60,
         vote_period: 300,
         challenge_period: 120,
-        stage_interval: 60,
+        secrets_buffer: 60,
     }
+}
+
+fn stages(pcts: &[u8], waits: &[u64]) -> Vec<Stage> {
+    pcts.iter()
+        .zip(waits)
+        .map(|(&pct, &wait_after)| Stage { pct, wait_after })
+        .collect()
 }
 
 fn config() -> WillConfig {
@@ -177,11 +229,21 @@ fn config() -> WillConfig {
         guardians: vec![acc(G1), acc(G2), acc(G3)],
         guardian_threshold: 2,
         contacts: vec![acc(C1)],
-        stages_pct: vec![10, 30, 60],
+        stages: stages(&[10, 30, 60], &[60, 60, 60]),
+        accelerated_stages: stages(&[10, 30, 60], &[20, 20, 20]),
         timings: demo_timings(),
         policy_hash: POLICY_HASH.into(),
         foreign_chains: vec![Chain::Eth, Chain::Btc],
+        lawyer: Some(acc(LAWYER)),
+        heirs_hidden: true,
     }
+}
+
+/// The v2 standard schedule from CLAUDE.md §5.5: 10/20/30/40 with the longest wait first.
+fn config_v2() -> WillConfig {
+    let mut c = config();
+    c.stages = stages(&[10, 20, 30, 40], &[180, 60, 60, 60]);
+    c
 }
 
 fn near(n: u128) -> u128 {
@@ -242,7 +304,7 @@ fn create_invalid(mutate: impl FnOnce(&mut WillConfig)) {
 #[test]
 #[should_panic(expected = "Stages must sum to 100")]
 fn stages_must_sum_to_100() {
-    create_invalid(|c| c.stages_pct = vec![10, 30, 50]);
+    create_invalid(|c| c.stages = stages(&[10, 30, 50], &[60, 60, 60]));
 }
 
 #[test]
@@ -431,7 +493,7 @@ fn executing_advances_stage_after_interval() {
 }
 
 #[test]
-fn last_stage_releases_everything_left_and_completes_when_foreign_chains_done() {
+fn last_stage_releases_everything_left_then_secrets_buffer_when_foreign_chains_done() {
     let mut t = T::with_will();
     t.to_executing();
     t.wait(60);
@@ -444,12 +506,16 @@ fn last_stage_releases_everything_left_and_completes_when_foreign_chains_done() 
 
     t.wait(60);
     assert!(!t.advance(), "foreign chains not done yet");
-    for stage in 0..3 {
-        for chain in [Chain::Eth, Chain::Btc] {
-            t.as_(AGENT).mark_stage_done(acc(OWNER), stage, chain);
-        }
-    }
+    t.mark_all_done(3);
     assert!(t.advance());
+    assert!(matches!(t.state(), WillState::SecretsBuffer { .. }));
+
+    t.wait(59);
+    assert!(!t.advance(), "buffer not over");
+    t.wait(1);
+    assert!(t.advance());
+    assert!(matches!(t.state(), WillState::SecretsReleased { .. }));
+    assert!(t.advance(), "no notes to release");
     assert!(matches!(t.state(), WillState::Completed { .. }));
     assert!(!t.advance(), "Completed is terminal");
 }
@@ -463,6 +529,8 @@ fn states_before_completed() -> Vec<fn(&mut T)> {
         T::to_vote,
         T::to_challenge,
         T::to_executing,
+        T::to_secrets_buffer,
+        T::to_secrets_released,
     ]
 }
 
@@ -526,18 +594,7 @@ fn record_liveness_by_non_agent_rejected() {
 #[should_panic(expected = "Will already completed")]
 fn i_am_alive_after_completed_rejected() {
     let mut t = T::with_will();
-    t.to_executing();
-    for _ in 0..2 {
-        t.wait(60);
-        t.advance();
-    }
-    for stage in 0..3 {
-        for chain in [Chain::Eth, Chain::Btc] {
-            t.as_(AGENT).mark_stage_done(acc(OWNER), stage, chain);
-        }
-    }
-    t.wait(60);
-    t.advance();
+    t.to_completed();
     t.as_(OWNER).i_am_alive();
 }
 
@@ -623,7 +680,14 @@ fn release_sign_panics_in(reach: Option<fn(&mut T)>) -> bool {
 #[test]
 fn release_signature_rejected_in_every_non_executing_state() {
     assert!(release_sign_panics_in(None), "Active");
-    for reach in [T::to_quiet, T::to_welfare, T::to_vote, T::to_challenge] {
+    for reach in [
+        T::to_quiet,
+        T::to_welfare,
+        T::to_vote,
+        T::to_challenge,
+        T::to_secrets_buffer,
+        T::to_secrets_released,
+    ] {
         assert!(release_sign_panics_in(Some(reach)));
     }
     assert!(
@@ -680,10 +744,9 @@ fn release_signature_after_stage_done_rejected() {
 #[test]
 #[should_panic(expected = "Chain has no vault")]
 fn release_signature_for_chain_without_vault_rejected() {
-    let mut t = T::new();
     let mut cfg = config();
     cfg.foreign_chains = vec![Chain::Eth];
-    t.pay(OWNER, STORAGE_DEPOSIT).create_will(cfg);
+    let mut t = T::with_config(cfg);
     t.to_executing();
     t.sign(Chain::Btc, SignPurpose::Release { stage: 0 });
 }
@@ -866,16 +929,19 @@ fn sealed_note_release_flow() {
         .add_sealed_note(acc(H1), "Ledger".into(), vec![7u8; 100].into());
     assert_eq!(t.will().sealed_notes.len(), 1);
     t.as_(H1).register_heir_key(acc(OWNER), HEIR_KEY.into());
-    t.to_executing();
+    t.to_secrets_released();
+    assert!(!t.advance(), "a note is still unreleased");
     t.as_(AGENT)
         .store_released_note(acc(OWNER), 0, acc(H1), vec![9u8; 148].into());
     let released = t.c.get_released_notes(acc(OWNER), acc(H1));
     assert_eq!(released.len(), 1);
     assert_eq!(released[0].note_id, 0);
+    assert!(t.advance());
+    assert!(matches!(t.state(), WillState::Completed { .. }));
 }
 
 #[test]
-#[should_panic(expected = "Notes are released only after execution starts")]
+#[should_panic(expected = "Notes are released only in SecretsReleased")]
 fn note_release_before_execution_rejected() {
     let mut t = T::with_will();
     t.pay(OWNER, STORAGE_DEPOSIT)
@@ -892,7 +958,7 @@ fn note_release_without_heir_key_rejected() {
     let mut t = T::with_will();
     t.pay(OWNER, STORAGE_DEPOSIT)
         .add_sealed_note(acc(H1), "Ledger".into(), vec![7u8; 100].into());
-    t.to_executing();
+    t.to_secrets_released();
     t.as_(AGENT)
         .store_released_note(acc(OWNER), 0, acc(H1), vec![9u8; 148].into());
 }
@@ -904,7 +970,7 @@ fn note_release_to_wrong_heir_rejected() {
     t.pay(OWNER, STORAGE_DEPOSIT)
         .add_sealed_note(acc(H1), "Ledger".into(), vec![7u8; 100].into());
     t.as_(H2).register_heir_key(acc(OWNER), HEIR_KEY.into());
-    t.to_executing();
+    t.to_secrets_released();
     t.as_(AGENT)
         .store_released_note(acc(OWNER), 0, acc(H2), vec![9u8; 148].into());
 }
@@ -971,4 +1037,383 @@ fn agent_pubkey_set_once_then_only_admin_rotates() {
     t.as_(ADMIN)
         .rotate_agent_pubkey(POLICY_HASH.into(), "new-app".into());
     assert_eq!(t.c.get_agent_pubkey().unwrap().app_id, "new-app");
+}
+
+// ---------------------------------------------------------------- v2: guardian consent, armed wills
+
+#[test]
+fn unarmed_will_never_escalates() {
+    let mut t = T::unaccepted(config());
+    let status = t.c.is_armed(acc(OWNER));
+    assert!(!status.armed);
+    assert!(!status.missing.is_empty());
+    t.wait(100_000);
+    assert!(!t.advance());
+    assert_eq!(t.state(), WillState::Active);
+
+    t.as_(G1).accept_guardian(acc(OWNER));
+    assert!(!t.c.is_armed(acc(OWNER)).armed, "1 accepted < threshold 2");
+    assert!(!t.advance());
+
+    t.as_(G2).accept_guardian(acc(OWNER));
+    let status = t.c.is_armed(acc(OWNER));
+    assert!(status.armed && status.missing.is_empty());
+    assert!(t.advance());
+    assert!(matches!(t.state(), WillState::Quiet { .. }));
+}
+
+#[test]
+#[should_panic(expected = "Guardian has not accepted")]
+fn unaccepted_guardian_cannot_attest() {
+    let mut t = T::unaccepted(config());
+    t.as_(G1).accept_guardian(acc(OWNER));
+    t.as_(G2).accept_guardian(acc(OWNER));
+    t.to_vote();
+    t.as_(G3).attest(acc(OWNER), AttestKind::Deceased, None);
+}
+
+#[test]
+#[should_panic(expected = "Not a guardian")]
+fn accept_by_non_guardian_rejected() {
+    let mut t = T::unaccepted(config());
+    t.as_(STRANGER).accept_guardian(acc(OWNER));
+}
+
+#[test]
+#[should_panic(expected = "Already accepted")]
+fn double_accept_rejected() {
+    let mut t = T::with_will();
+    t.as_(G1).accept_guardian(acc(OWNER));
+}
+
+#[test]
+fn invite_guardian_adds_an_unaccepted_guardian() {
+    let mut t = T::with_will();
+    t.pay(OWNER, STORAGE_DEPOSIT)
+        .invite_guardian(acc("g4.testnet"));
+    let w = t.will();
+    let g4 = w
+        .guardians
+        .iter()
+        .find(|g| g.account_id == acc("g4.testnet"))
+        .unwrap();
+    assert!(!g4.accepted);
+    assert_eq!(w.guardians.iter().filter(|g| g.accepted).count(), 3);
+}
+
+#[test]
+#[should_panic(expected = "A guardian cannot be an heir")]
+fn invite_heir_as_guardian_rejected() {
+    let mut t = T::with_will();
+    t.pay(OWNER, STORAGE_DEPOSIT).invite_guardian(acc(H1));
+}
+
+#[test]
+#[should_panic(expected = "Duplicate guardian")]
+fn invite_existing_guardian_rejected() {
+    let mut t = T::with_will();
+    t.pay(OWNER, STORAGE_DEPOSIT).invite_guardian(acc(G1));
+}
+
+#[test]
+#[should_panic(expected = "only while Active")]
+fn invite_guardian_rejected_while_escalating() {
+    let mut t = T::with_will();
+    t.to_quiet();
+    t.pay(OWNER, STORAGE_DEPOSIT)
+        .invite_guardian(acc("g4.testnet"));
+}
+
+#[test]
+fn update_will_keeps_acceptance_of_retained_guardians() {
+    let mut t = T::with_will();
+    let mut cfg = config();
+    cfg.guardians = vec![acc(G1), acc("g4.testnet")];
+    cfg.guardian_threshold = 1;
+    t.pay(OWNER, STORAGE_DEPOSIT).update_will(cfg);
+    let w = t.will();
+    assert_eq!(w.guardians.len(), 2);
+    assert!(w.guardians[0].accepted, "G1 keeps its acceptance");
+    assert!(!w.guardians[1].accepted, "g4 is a new invite");
+}
+
+#[test]
+fn lawyer_may_be_a_guardian() {
+    let mut cfg = config();
+    cfg.lawyer = Some(acc(G1));
+    let t = T::with_config(cfg);
+    assert_eq!(t.will().lawyer, Some(acc(G1)));
+}
+
+#[test]
+#[should_panic(expected = "The lawyer cannot be an heir")]
+fn lawyer_cannot_be_heir() {
+    create_invalid(|c| c.lawyer = Some(acc(H1)));
+}
+
+#[test]
+#[should_panic(expected = "The owner cannot be the lawyer")]
+fn owner_cannot_be_lawyer() {
+    create_invalid(|c| c.lawyer = Some(acc(OWNER)));
+}
+
+#[test]
+fn guardian_and_lawyer_can_confirm_alive_during_welfare_check() {
+    for who in [G3, LAWYER] {
+        let mut t = T::with_will();
+        t.to_welfare();
+        t.as_(who).contact_confirm_alive(acc(OWNER));
+        assert_eq!(t.state(), WillState::Active);
+    }
+}
+
+// ---------------------------------------------------------------- v2: schedules and validation
+
+#[test]
+#[should_panic(expected = "Accelerated stages must sum to 100")]
+fn accelerated_stages_must_sum_to_100() {
+    create_invalid(|c| c.accelerated_stages = stages(&[10, 30], &[20, 20]));
+}
+
+#[test]
+#[should_panic(expected = "Every stage wait must be > 0")]
+fn zero_stage_wait_rejected() {
+    create_invalid(|c| c.stages = stages(&[50, 50], &[60, 0]));
+}
+
+#[test]
+#[should_panic(expected = "All timings must be > 0")]
+fn zero_secrets_buffer_rejected() {
+    create_invalid(|c| c.timings.secrets_buffer = 0);
+}
+
+#[test]
+fn standard_schedule_waits_longest_after_the_first_slice() {
+    let mut t = T::with_config(config_v2());
+    t.to_executing();
+    assert_eq!(t.will().near_balance.0, near(9), "10% first");
+    t.wait(179);
+    assert!(!t.advance(), "the longest wait comes after the first slice");
+    t.wait(1);
+    assert!(t.advance());
+    assert_eq!(t.will().near_balance.0, near(7), "then 20%");
+    t.wait(60);
+    assert!(t.advance());
+    assert_eq!(t.will().near_balance.0, near(4), "then 30%");
+    t.wait(60);
+    assert!(t.advance());
+    assert_eq!(t.will().near_balance.0, 0, "then the rest (40%)");
+    t.mark_all_done(4);
+    t.wait(59);
+    assert!(!t.advance());
+    t.wait(1);
+    assert!(t.advance());
+    assert!(matches!(t.state(), WillState::SecretsBuffer { .. }));
+}
+
+// ---------------------------------------------------------------- v2: acceleration
+
+#[test]
+fn lawyer_death_proof_in_vote_accelerates_but_still_needs_quorum_and_challenge() {
+    let mut t = T::with_config(config_v2());
+    t.to_vote();
+    t.as_(LAWYER)
+        .attest_death_proof(acc(OWNER), EVIDENCE.into());
+    assert!(t.will().accelerated);
+    assert!(
+        matches!(t.state(), WillState::GuardianVote { .. }),
+        "no quorum skip"
+    );
+
+    t.as_(G1).attest(acc(OWNER), AttestKind::Deceased, None);
+    t.as_(G2).attest(acc(OWNER), AttestKind::Deceased, None);
+    assert!(matches!(t.state(), WillState::Challenge { .. }));
+    t.wait(119);
+    assert!(!t.advance(), "challenge period is never skipped");
+    t.wait(1);
+    assert!(t.advance());
+    let w = t.will();
+    assert_eq!(
+        w.round_stages, w.accelerated_stages,
+        "whole schedule switched before execution"
+    );
+    t.wait(20);
+    assert!(t.advance());
+    assert!(matches!(t.state(), WillState::Executing { stage: 1, .. }));
+    assert_eq!(
+        t.will().near_balance.0,
+        near(6),
+        "10% + 30% (accelerated slices)"
+    );
+}
+
+#[test]
+fn death_proof_during_execution_keeps_percentages_and_shortens_waits() {
+    let mut t = T::with_config(config_v2());
+    t.to_executing();
+    t.wait(10);
+    t.as_(LAWYER)
+        .attest_death_proof(acc(OWNER), EVIDENCE.into());
+    let w = t.will();
+    let pcts: Vec<u8> = w.round_stages.iter().map(|s| s.pct).collect();
+    assert_eq!(pcts, vec![10, 20, 30, 40], "percentages unchanged");
+    let waits: Vec<u64> = w.round_stages.iter().map(|s| s.wait_after).collect();
+    assert_eq!(
+        waits,
+        vec![20, 20, 20, 20],
+        "capped at the accelerated waits"
+    );
+    t.wait(10);
+    assert!(t.advance(), "stage 0 now ends 20 s after it started");
+    assert!(matches!(t.state(), WillState::Executing { stage: 1, .. }));
+    assert_eq!(t.will().near_balance.0, near(7));
+}
+
+#[test]
+fn guardian_quorum_with_evidence_accelerates() {
+    let mut t = T::with_will();
+    t.to_challenge();
+    t.as_(G1).attest_death_proof(acc(OWNER), EVIDENCE.into());
+    assert!(!t.will().accelerated, "one guardian is not a quorum");
+    t.as_(G2).attest_death_proof(acc(OWNER), EVIDENCE.into());
+    assert!(t.will().accelerated);
+    assert!(matches!(t.state(), WillState::Challenge { .. }));
+}
+
+#[test]
+#[should_panic(expected = "Already submitted a death proof")]
+fn double_death_proof_rejected() {
+    let mut t = T::with_will();
+    t.to_challenge();
+    t.as_(G1).attest_death_proof(acc(OWNER), EVIDENCE.into());
+    t.as_(G1).attest_death_proof(acc(OWNER), EVIDENCE.into());
+}
+
+#[test]
+fn death_proof_rejected_from_other_callers_and_early_states() {
+    let panics = |reach: fn(&mut T), who: &'static str| {
+        let mut t = T::with_will();
+        reach(&mut t);
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            t.as_(who).attest_death_proof(acc(OWNER), EVIDENCE.into())
+        }))
+        .is_err()
+    };
+    for who in [STRANGER, H1, C1, OWNER] {
+        assert!(
+            panics(T::to_vote, who),
+            "{} may not attest a death proof",
+            who
+        );
+    }
+    for reach in [T::to_quiet, T::to_welfare] {
+        assert!(panics(reach, LAWYER), "too early");
+    }
+    assert!(panics(T::to_secrets_buffer, LAWYER), "too late");
+    assert!(!panics(T::to_executing, LAWYER));
+}
+
+#[test]
+#[should_panic(expected = "Guardian has not accepted")]
+fn unaccepted_guardian_death_proof_rejected() {
+    let mut t = T::unaccepted(config());
+    t.as_(G1).accept_guardian(acc(OWNER));
+    t.as_(G2).accept_guardian(acc(OWNER));
+    t.to_challenge();
+    t.as_(G3).attest_death_proof(acc(OWNER), EVIDENCE.into());
+}
+
+#[test]
+#[should_panic(expected = "evidence_hash")]
+fn death_proof_needs_hex_evidence() {
+    let mut t = T::with_will();
+    t.to_vote();
+    t.as_(LAWYER)
+        .attest_death_proof(acc(OWNER), "nothex".into());
+}
+
+#[test]
+fn acceleration_cleared_on_return_to_active() {
+    let mut t = T::with_will();
+    t.to_vote();
+    t.as_(LAWYER)
+        .attest_death_proof(acc(OWNER), EVIDENCE.into());
+    t.as_(OWNER).i_am_alive();
+    let w = t.will();
+    assert!(!w.accelerated);
+    assert!(w.death_proofs.is_empty());
+}
+
+// ---------------------------------------------------------------- v2: secrets last
+
+#[test]
+#[should_panic(expected = "Notes are released only in SecretsReleased")]
+fn note_release_during_execution_rejected() {
+    let mut t = T::with_will();
+    t.pay(OWNER, STORAGE_DEPOSIT)
+        .add_sealed_note(acc(H1), "Ledger".into(), vec![7u8; 100].into());
+    t.as_(H1).register_heir_key(acc(OWNER), HEIR_KEY.into());
+    t.to_executing();
+    t.as_(AGENT)
+        .store_released_note(acc(OWNER), 0, acc(H1), vec![9u8; 148].into());
+}
+
+#[test]
+#[should_panic(expected = "Notes are released only in SecretsReleased")]
+fn note_release_during_secrets_buffer_rejected() {
+    let mut t = T::with_will();
+    t.pay(OWNER, STORAGE_DEPOSIT)
+        .add_sealed_note(acc(H1), "Ledger".into(), vec![7u8; 100].into());
+    t.as_(H1).register_heir_key(acc(OWNER), HEIR_KEY.into());
+    t.to_secrets_buffer();
+    t.as_(AGENT)
+        .store_released_note(acc(OWNER), 0, acc(H1), vec![9u8; 148].into());
+}
+
+#[test]
+fn sign_of_life_during_secrets_buffer_halts_secrets() {
+    let mut t = T::with_will();
+    t.pay(OWNER, STORAGE_DEPOSIT)
+        .add_sealed_note(acc(H1), "Ledger".into(), vec![7u8; 100].into());
+    t.to_secrets_buffer();
+    t.wait(10);
+    t.as_(OWNER).i_am_alive();
+    let w = t.will();
+    assert_eq!(w.state, WillState::Active);
+    assert_eq!(w.halted.len(), 1);
+    assert_eq!(w.halted[0].stage, 2, "halted after the last slice");
+    assert!(w.released_notes.is_empty());
+    assert_eq!(w.near_balance.0, 0, "distribution already sent stays sent");
+    assert_eq!(
+        w.executions
+            .iter()
+            .filter(|e| e.chain == Chain::Near)
+            .count(),
+        6,
+        "3 stages x 2 heirs recorded"
+    );
+}
+
+#[test]
+fn liveness_seen_during_execution_but_recorded_in_buffer_still_halts() {
+    let mut t = T::with_will();
+    t.to_executing();
+    let during_execution = t.now + 5;
+    t.to_secrets_buffer_from_executing();
+    t.wait(1);
+    assert!(t.as_(AGENT).record_liveness(acc(OWNER), during_execution));
+    assert_eq!(t.state(), WillState::Active);
+}
+
+impl T {
+    fn to_secrets_buffer_from_executing(&mut self) {
+        for _ in 0..2 {
+            self.wait(60);
+            assert!(self.advance());
+        }
+        self.mark_all_done(3);
+        self.wait(60);
+        assert!(self.advance());
+        assert!(matches!(self.state(), WillState::SecretsBuffer { .. }));
+    }
 }
