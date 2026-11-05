@@ -2,7 +2,6 @@
 import "dotenv/config";
 import { serve } from "@hono/node-server";
 import { ShadeClient } from "@neardefi/shade-agent-js";
-import { FailoverRpcProvider, JsonRpcProvider } from "@near-js/providers";
 import { AttestationGate, liveDeps } from "./ai/attestation";
 import { NearAiClient } from "./ai/nearai";
 import { heirGuide, type GuideTurn } from "./ai/heir-guide";
@@ -12,6 +11,7 @@ import { Nep413Verifier, rpcAccessKey } from "./auth/nep413";
 import { BtcVault } from "./chains/btc";
 import { EvmVault } from "./chains/evm";
 import { config, env } from "./config";
+import { nearRpcProvider } from "./near-rpc";
 import { DemoFaucet } from "./demo/faucet";
 import { Driver } from "./escalation/driver";
 import { StagedExecutor } from "./executor/executor";
@@ -31,7 +31,7 @@ const sponsorPrivateKey = env("SPONSOR_PRIVATE_KEY");
 // NEAR RPC: one URL or a comma-separated list with failover. The agent's calls all come from one IP,
 // and FastNEAR's free tier throttles it (429), so a keyed or second endpoint can be configured.
 const rpcEndpoints = config.nearRpcEndpoints();
-const rpc = rpcEndpoints.length > 1 ? new FailoverRpcProvider(rpcEndpoints.map((e) => new JsonRpcProvider(e))) : new JsonRpcProvider(rpcEndpoints[0]);
+const rpc = nearRpcProvider(rpcEndpoints);
 
 // Initialize Shade Agent client
 const agent = await ShadeClient.create({
