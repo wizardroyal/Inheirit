@@ -30,8 +30,8 @@ const sponsorPrivateKey = env("SPONSOR_PRIVATE_KEY");
 
 // NEAR RPC: one URL or a comma-separated list with failover. The agent's calls all come from one IP,
 // and FastNEAR's free tier throttles it (429), so a keyed or second endpoint can be configured.
-const rpcUrls = config.nearRpc().split(",").map((u) => u.trim()).filter(Boolean);
-const rpc = rpcUrls.length > 1 ? new FailoverRpcProvider(rpcUrls.map((url) => new JsonRpcProvider({ url }))) : new JsonRpcProvider({ url: rpcUrls[0] });
+const rpcEndpoints = config.nearRpcEndpoints();
+const rpc = rpcEndpoints.length > 1 ? new FailoverRpcProvider(rpcEndpoints.map((e) => new JsonRpcProvider(e))) : new JsonRpcProvider(rpcEndpoints[0]);
 
 // Initialize Shade Agent client
 const agent = await ShadeClient.create({
@@ -185,7 +185,7 @@ const faucet =
 const app = api({
   faucet,
   ai,
-  auth: new Nep413Verifier({ recipient: agentContractId, accessKey: rpcAccessKey(rpcUrls[0]) }),
+  auth: new Nep413Verifier({ recipient: agentContractId, accessKey: rpcAccessKey(rpcEndpoints[0]) }),
   contract,
   store,
   vaults,

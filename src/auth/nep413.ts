@@ -111,11 +111,11 @@ export class Nep413Verifier {
 export class AuthError extends Error {}
 
 /** view_access_key over NEAR JSON-RPC. */
-export function rpcAccessKey(rpcUrl: string, fetchImpl: typeof fetch = fetch): AuthDeps["accessKey"] {
+export function rpcAccessKey(rpc: { url: string; headers?: Record<string, string> }, fetchImpl: typeof fetch = fetch): AuthDeps["accessKey"] {
   return async (accountId, publicKey) => {
-    const res = await fetchImpl(rpcUrl, {
+    const res = await fetchImpl(rpc.url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { ...rpc.headers, "Content-Type": "application/json" },
       body: JSON.stringify({
         jsonrpc: "2.0",
         id: "auth",

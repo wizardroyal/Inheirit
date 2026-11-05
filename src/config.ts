@@ -10,6 +10,7 @@ export const config = {
   contractId: () => env("AGENT_CONTRACT_ID"),
   /** One URL or a comma-separated list (tried in order on failure). */
   nearRpc: () => env("NEAR_RPC_URL", "https://test.rpc.fastnear.com"),
+  nearRpcEndpoints: () => rpcEndpoints(env("NEAR_RPC_URL", "https://test.rpc.fastnear.com")),
   fastnearTxApi: () => env("FASTNEAR_TX_API", "https://tx.test.fastnear.com"),
   sepoliaRpc: () => env("SEPOLIA_RPC_URL", "https://ethereum-sepolia-rpc.publicnode.com"),
   btcApi: () => env("BTC_API_URL", "https://mempool.space/testnet4/api"),
@@ -29,3 +30,26 @@ export const config = {
   faucetEth: () => env("DEMO_FAUCET_ETH", "0.002"),
   faucetSats: () => Number(env("DEMO_FAUCET_SATS", "20000")),
 };
+
+export interface RpcEndpoint {
+  url: string;
+  headers?: Record<string, string>;
+}
+
+/**
+ * Parse NEAR_RPC_URL. An `apiKey` query parameter (FastNEAR's form) is moved into an
+ * `Authorization: Bearer` header: near-js puts the URL in some error messages, and the TEE's logs are public.
+ */
+export function rpcEndpoints(list: string): RpcEndpoint[] {
+  return list
+    .split(",")
+    .map((u) => u.trim())
+    .filter(Boolean)
+    .map((raw) => {
+      const u = new URL(raw);
+      const key = u.searchParams.get("apiKey");
+      if (!key) return { url: raw };
+      u.searchParams.delete("apiKey");
+      return { url: u.toString(), headers: { Authorization: `Bearer ${key}` } };
+    });
+}
