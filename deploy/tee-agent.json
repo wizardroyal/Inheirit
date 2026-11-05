@@ -43,7 +43,18 @@
       "compose_hash": "f8ddfdc4d2bdefd30b6f5b47c2fd3f81b2647fa95b3e1761db492b5dc9fb1d00",
       "image": "unwizarding/inheirit-agent@sha256:d963ec85460c4b972e47380c938932a33140df32f5d26a11fa6889b9989d50e3",
       "at": "2026-11-05T12:44:27.000Z",
-      "note": "env update (allowed_envs + TELEGRAM_BOT_TOKEN, TELEGRAM_BOT_USERNAME); live, only approved hash"
+      "note": "env update (allowed_envs + TELEGRAM_BOT_TOKEN, TELEGRAM_BOT_USERNAME); retired 2026-11-05"
+    },
+    {
+      "compose_hash": "68ab3ff84784d16aebe67c078cfe6a9f5fb0378daff3d31d245329c3a0c276c3",
+      "image": "unwizarding/inheirit-agent@sha256:fc7e49e9f539959d3f78ac13a3ab9192375efe93013bf7ea28c91aa6f9918f43",
+      "at": "2026-11-05T14:06:08.093Z"
+    },
+    {
+      "compose_hash": "68ab3ff84784d16aebe67c078cfe6a9f5fb0378daff3d31d245329c3a0c276c3",
+      "image": "unwizarding/inheirit-agent@sha256:fc7e49e9f539959d3f78ac13a3ab9192375efe93013bf7ea28c91aa6f9918f43",
+      "at": "2026-11-05T14:06:00.000Z",
+      "note": "v2b image (/api/overview, calmer polling); live, only approved hash"
     }
   ]
 }
