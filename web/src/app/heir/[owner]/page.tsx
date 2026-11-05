@@ -10,7 +10,7 @@ import { keys } from "@/lib/keys";
 import { agent } from "@/lib/agent";
 import { call, signRequest, view } from "@/lib/near";
 import { keypairFromSeedHex, newSeedHex, openReleased, pubkeyHex } from "@/lib/sealed";
-import { stateName, type Will } from "@/lib/will";
+import { executionStarted, schedule, stateName, type Will } from "@/lib/will";
 
 type Released = Will["released_notes"][number];
 
@@ -32,7 +32,10 @@ export default function HeirPage() {
   if (!will) return <ErrorNote>No will for {owner}.</ErrorNote>;
   const heir = will.heirs.find((h) => h.account_id === me);
   const s = stateName(will.state);
-  const started = s === "Executing" || s === "Completed" || will.execution_round > 0;
+  const started = executionStarted(will.state) || will.execution_round > 0;
+  // Heirs hidden (CLAUDE.md §8): don't list who inherits to visitors before execution. The contract
+  // state itself stays readable on-chain; this is a UI-level limit.
+  const suggested = will.heirs_hidden && !started ? [] : will.heirs.map((h) => h.account_id);
 
   return (
     <div className="space-y-6">
@@ -45,7 +48,7 @@ export default function HeirPage() {
         </p>
       </div>
       <Step n={1} title="Who are you?" done={!!heir}>
-        <ActAs value={me} onChange={setMe} suggested={will.heirs.map((h) => h.account_id)} label="I am" />
+        <ActAs value={me} onChange={setMe} suggested={suggested} label="I am" />
         {me && !heir && <p className="mt-2 text-sm text-danger">{me} is not an heir of this will.</p>}
         {heir && <p className="mt-2 text-sm">Welcome, {heir.name}.</p>}
       </Step>
@@ -53,7 +56,8 @@ export default function HeirPage() {
       {heir && (
         <Step n={3} title="What you receive">
           <p className="mb-3 text-sm text-muted">
-            Assets are released in stages: {will.stages_pct.map((p) => `${p}%`).join(", ")}. If {owner} turns out to be alive, the remaining stages stop.
+            Assets are released in stages: {schedule(will).map((st) => `${st.pct}%`).join(", ")}, with the longest wait after the first. If {owner} turns
+            out to be alive, the remaining stages stop. Private notes come last: only after everything is distributed and a further wait.
           </p>
           <Releases will={will} />
         </Step>
@@ -141,8 +145,8 @@ function NotesStep({ owner, will, heir }: { owner: string; will: Will; heir: str
       {(released ?? []).length === 0 && waiting.length === 0 && <p className="text-sm text-muted">No notes were left for you.</p>}
       {waiting.length > 0 && (
         <p className="text-sm text-muted">
-          {waiting.length} sealed note{waiting.length > 1 ? "s" : ""} ({waiting.map((n) => `“${n.label}”`).join(", ")}) will be released to your key once
-          execution starts. The agent opens them inside its TEE and re-seals them to you.
+          {waiting.length} sealed note{waiting.length > 1 ? "s" : ""} ({waiting.map((n) => `“${n.label}”`).join(", ")}) will be released to your key last:
+          after everything is distributed and a further wait. The agent opens them inside its TEE and re-seals them to you.
         </p>
       )}
       <ul className="mt-3 space-y-3">

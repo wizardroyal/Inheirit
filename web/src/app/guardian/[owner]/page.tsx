@@ -4,10 +4,11 @@ import { useState } from "react";
 import { ActAs } from "@/components/ActAs";
 import { Ladder } from "@/components/Ladder";
 import { ActionButton, Card, ErrorNote, Field, inputCls, Pill } from "@/components/ui";
+import { TelegramLink } from "@/components/TelegramLink";
 import { SignalList } from "@/components/WillParts";
 import { useWill } from "@/lib/hooks";
 import { call } from "@/lib/near";
-import { ago, stateName } from "@/lib/will";
+import { ago, guardianIds, stateName } from "@/lib/will";
 
 async function sha256Hex(file: File): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", await file.arrayBuffer());
@@ -23,7 +24,8 @@ export default function GuardianPage() {
   if (!loaded) return <p>Loading…</p>;
   if (!will) return <ErrorNote>No will for {owner}.</ErrorNote>;
   const s = stateName(will.state);
-  const isGuardian = will.guardians.includes(me);
+  const entry = will.guardians.find((g) => g.account_id === me);
+  const isGuardian = !!entry?.accepted;
   const mine = will.attestations.find((a) => a.guardian === me);
   const voting = s === "GuardianVote";
 
@@ -35,9 +37,26 @@ export default function GuardianPage() {
           You were chosen because {owner} trusts you to tell the truth. Confirm a passing only with real evidence. If you believe they&apos;re alive,
           say so: one “alive” from any guardian stops the process.
         </p>
-        <ActAs value={me} onChange={setMe} suggested={will.guardians} label="I am" />
-        {me && !isGuardian && <ErrorNote>{me} is not a guardian of this will.</ErrorNote>}
+        <ActAs value={me} onChange={setMe} suggested={guardianIds(will)} label="I am" />
+        {me && !entry && <ErrorNote>{me} is not a guardian of this will.</ErrorNote>}
       </div>
+      {entry && !entry.accepted && (
+        <Card title="You've been invited">
+          <p className="text-sm">
+            {owner} asked you to be a guardian. You&apos;ll only be contacted if they go quiet for a long time and a welfare check finds nothing;
+            then you&apos;ll be asked to confirm, with evidence, whether they have passed away. Until enough guardians accept, the will can never
+            start.
+          </p>
+          <div className="mt-3">
+            <ActionButton onClick={() => call(me, "accept_guardian", { owner }).then(refresh)}>I accept the guardian role</ActionButton>
+          </div>
+        </Card>
+      )}
+      {isGuardian && (
+        <Card title="How we reach you">
+          <TelegramLink account={me} purpose="Get welfare checks and vote requests on Telegram (optional)." />
+        </Card>
+      )}
       <div className="grid gap-6 lg:grid-cols-2">
         <Card title="What's known">
           <Ladder will={will} />

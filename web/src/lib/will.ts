@@ -8,20 +8,42 @@ export type WillState =
   | { GuardianVote: { since: number } }
   | { Challenge: { since: number } }
   | { Executing: { stage: number; since: number; stage_started: number } }
+  | { SecretsBuffer: { since: number } }
+  | { SecretsReleased: { since: number } }
   | { Completed: { at: number } };
 
-export type StateName = "Active" | "Quiet" | "WelfareCheck" | "GuardianVote" | "Challenge" | "Executing" | "Completed";
+export type StateName =
+  | "Active"
+  | "Quiet"
+  | "WelfareCheck"
+  | "GuardianVote"
+  | "Challenge"
+  | "Executing"
+  | "SecretsBuffer"
+  | "SecretsReleased"
+  | "Completed";
+
+export interface Stage {
+  pct: number;
+  wait_after: number;
+}
 
 export interface Will {
   owner: string;
   heirs: { account_id: string; name: string; near_share_bps: number; x25519_pubkey: string | null }[];
-  guardians: string[];
+  guardians: { account_id: string; accepted: boolean }[];
   guardian_threshold: number;
   contacts: string[];
-  stages_pct: number[];
-  timings: { quiet_after: number; nudge_period: number; welfare_period: number; vote_period: number; challenge_period: number; stage_interval: number };
+  stages: Stage[];
+  accelerated_stages: Stage[];
+  /** Schedule of the current (or last) execution round; empty before the first. */
+  round_stages: Stage[];
+  timings: { quiet_after: number; nudge_period: number; welfare_period: number; vote_period: number; challenge_period: number; secrets_buffer: number };
   policy_hash: string;
   foreign_chains: Exclude<Chain, "Near">[];
+  lawyer: string | null;
+  heirs_hidden: boolean;
+  accelerated: boolean;
   state: WillState;
   last_alive_at: number;
   created_at: number;
@@ -43,6 +65,20 @@ export interface AgentKey {
   set_at: number;
 }
 
+/** The schedule that applies now: the round's snapshot once execution has started. */
+export function schedule(w: Will): Stage[] {
+  return w.round_stages.length ? w.round_stages : w.stages;
+}
+
+export const guardianIds = (w: Will) => w.guardians.map((g) => g.account_id);
+export const acceptedGuardians = (w: Will) => w.guardians.filter((g) => g.accepted).map((g) => g.account_id);
+export const isArmed = (w: Will) => acceptedGuardians(w).length >= w.guardian_threshold && w.heirs.length > 0;
+
+/** Funds may already have moved (heirs are no longer hidden from then on). */
+export function executionStarted(s: WillState): boolean {
+  return ["Executing", "SecretsBuffer", "SecretsReleased", "Completed"].includes(stateName(s));
+}
+
 export function stateName(s: WillState): StateName {
   return (typeof s === "string" ? s : Object.keys(s)[0]) as StateName;
 }
@@ -61,7 +97,9 @@ export const LADDER: { state: StateName; label: string; detail: string }[] = [
   { state: "WelfareCheck", label: "Welfare check", detail: "Trusted contacts are asked whether they've heard from the owner." },
   { state: "GuardianVote", label: "Guardian vote", detail: "Guardians are asked to confirm, with evidence. One 'alive' stops it." },
   { state: "Challenge", label: "Challenge period", detail: "Quorum reached. The owner is told on every channel; any activity cancels." },
-  { state: "Executing", label: "Releasing in stages", detail: "Assets go out in slices. A sign of life halts the remaining stages." },
+  { state: "Executing", label: "Releasing in stages", detail: "Assets go out in slices, the longest wait after the first. A sign of life halts the rest." },
+  { state: "SecretsBuffer", label: "Waiting before secrets", detail: "Everything is distributed. Sealed notes wait out a buffer; a sign of life still stops them." },
+  { state: "SecretsReleased", label: "Secrets released", detail: "Sealed notes are re-sealed to each heir, who opens them in the browser." },
   { state: "Completed", label: "Completed", detail: "Everything has been released." },
 ];
 
@@ -72,6 +110,7 @@ export function nextStepIn(w: Will, nowS: number): { label: string; seconds: num
   const t = w.timings;
   switch (s) {
     case "Active":
+      if (!isArmed(w)) return null; // an unarmed will never escalates
       return { label: "goes Quiet", seconds: w.last_alive_at + t.quiet_after - nowS };
     case "Quiet":
       return { label: "welfare check", seconds: since! + t.nudge_period - nowS };
@@ -83,8 +122,11 @@ export function nextStepIn(w: Will, nowS: number): { label: string; seconds: num
       return { label: "execution starts", seconds: since! + t.challenge_period - nowS };
     case "Executing": {
       const e = (w.state as { Executing: { stage: number; stage_started: number } }).Executing;
-      return { label: e.stage + 1 < w.stages_pct.length ? `stage ${e.stage + 2}` : "completes", seconds: e.stage_started + t.stage_interval - nowS };
+      const st = schedule(w);
+      return { label: e.stage + 1 < st.length ? `stage ${e.stage + 2}` : "secrets buffer", seconds: e.stage_started + st[e.stage].wait_after - nowS };
     }
+    case "SecretsBuffer":
+      return { label: "secrets released", seconds: since! + t.secrets_buffer - nowS };
     default:
       return null;
   }
@@ -110,6 +152,11 @@ export const SOURCE_LABELS: Record<string, string> = {
   github: "GitHub activity",
   google_calendar: "Google Calendar",
   gmail: "Gmail",
+  telegram: "Telegram replies",
   x: "X posts",
   instagram: "Instagram posts",
+  tiktok: "TikTok posts",
+  facebook: "Facebook posts",
+  whatsapp: "WhatsApp replies",
+  linkedin: "LinkedIn activity",
 };

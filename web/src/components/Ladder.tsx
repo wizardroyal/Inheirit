@@ -1,6 +1,6 @@
 "use client";
 import { useNow } from "@/lib/hooks";
-import { duration, LADDER, nextStepIn, stateName, type Will } from "@/lib/will";
+import { duration, isArmed, LADDER, nextStepIn, schedule, stateName, type Will } from "@/lib/will";
 
 /** The escalation ladder with the will's current rung highlighted and the next automatic step. */
 export function Ladder({ will }: { will: Will }) {
@@ -27,8 +27,12 @@ export function Ladder({ will }: { will: Will }) {
                   {on && r.state === "GuardianVote" && <span className="ml-2 text-xs text-muted">{votes} of {will.guardian_threshold} confirmed</span>}
                   {on && r.state === "Executing" && (
                     <span className="ml-2 text-xs text-muted">
-                      stage {(will.state as { Executing: { stage: number } }).Executing.stage + 1} of {will.stages_pct.length}
+                      stage {(will.state as { Executing: { stage: number } }).Executing.stage + 1} of {schedule(will).length}
+                      {will.accelerated && " (accelerated after a death proof)"}
                     </span>
+                  )}
+                  {on && r.state === "Active" && !isArmed(will) && (
+                    <span className="ml-2 text-xs text-warn">not armed: waiting for guardians to accept</span>
                   )}
                 </div>
                 {on && <div className="text-xs text-muted">{r.detail}</div>}

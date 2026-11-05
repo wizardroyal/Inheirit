@@ -4,7 +4,7 @@ import { agent, type SignalSource } from "@/lib/agent";
 import { explorer } from "@/lib/config";
 import { usePoll } from "@/lib/hooks";
 import { formatNear, signRequest } from "@/lib/near";
-import { ago, SOURCE_LABELS, type Will } from "@/lib/will";
+import { ago, schedule, SOURCE_LABELS, type Will } from "@/lib/will";
 import { ActionButton, ExtLink, Pill, short, SimulatedTag } from "./ui";
 
 const SOURCES: { source: SignalSource; simulated: boolean; weight: number }[] = [
@@ -62,7 +62,7 @@ export function NotificationLog({ owner }: { owner: string }) {
               <span className="text-xs text-muted">{ago(n.at)}</span>
             </div>
             <div className="text-xs text-muted">
-              to {n.to} · {n.channel === "ui" ? "shown in the app" : "email"}
+              to {n.to.join(", ")} · via {n.channels.map((c) => (c === "ui" ? "this app" : c)).join(", ")}
             </div>
             <div className="mt-1 text-sm">{n.body}</div>
           </li>
@@ -104,7 +104,7 @@ export function Releases({ will }: { will: Will }) {
           </tr>
         </thead>
         <tbody>
-          {will.stages_pct.map((pct, stage) => (
+          {schedule(will).map(({ pct }, stage) => (
             <tr key={stage} className="border-t border-line align-top">
               <td className="py-2">
                 {stage + 1} <span className="text-muted">({pct}%)</span>

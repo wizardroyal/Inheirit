@@ -7,8 +7,8 @@ import { Ladder } from "@/components/Ladder";
 import { ActionButton, Card, Details, ExtLink, Pill, short, SimulatedTag } from "@/components/ui";
 import { NotificationLog, Releases, SignalList, WatchStatus } from "@/components/WillParts";
 import { agent, type SignalSource } from "@/lib/agent";
-import { CONTRACT_ID, DEMO_TIMINGS, explorer } from "@/lib/config";
-import { addSealedNote, createCast, createWill, DEMO_NOTE, demoHeirReceive, demoPolicy, fundFromFaucet } from "@/lib/demo";
+import { CONTRACT_ID, DEMO_SCHEDULE, explorer } from "@/lib/config";
+import { acceptAsGuardians, addSealedNote, createCast, createWill, DEMO_NOTE, demoHeirReceive, demoPolicy, fundFromFaucet } from "@/lib/demo";
 import { useKeys, usePoll, useWill } from "@/lib/hooks";
 import type { Cast } from "@/lib/keys";
 import { call, formatNear, signRequest } from "@/lib/near";
@@ -38,7 +38,7 @@ export default function DemoPage() {
         </div>
         <p className="max-w-3xl text-muted">
           Everything here uses throwaway testnet accounts created in your browser from the public faucet. The clock is compressed: a will goes quiet
-          after {DEMO_TIMINGS.quiet_after / 60} minutes of silence instead of weeks. Follow Scenario A (silence doesn&apos;t kill you) or Scenario B (it
+          after {DEMO_SCHEDULE.timings.quiet_after / 60} minutes of silence instead of weeks. Follow Scenario A (silence doesn&apos;t kill you) or Scenario B (it
           actually executes).
         </p>
         <div className="flex flex-wrap gap-2 text-sm">
@@ -161,12 +161,14 @@ function WillPanel({ cast }: { cast: Cast }) {
                 {
                   policy: demoPolicy(cast, await demoHeirReceive()),
                   contacts: [cast.contact],
-                  timings: DEMO_TIMINGS,
+                  schedule: DEMO_SCHEDULE,
                   foreignChains: (["Eth", "Btc"] as const).filter((c) => chains[c]),
                   depositNear: "1",
                 },
                 progress,
               );
+                // Guardians must accept before they count; until then the will is not armed.
+                await acceptAsGuardians(cast.owner, cast.guardians, progress);
                 const foreign = (["Eth", "Btc"] as const).filter((c) => chains[c]);
                 if (foreign.length && (await agent.faucetInfo()).enabled) {
                   progress("Asking the demo faucet to fund the Sepolia and BTC vaults (about 30 s)…");

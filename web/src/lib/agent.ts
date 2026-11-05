@@ -24,16 +24,32 @@ export interface AgentInfo {
   sealedNotes: { x25519_pubkey: string; app_id: string; tee: boolean; enabled: boolean };
 }
 
+/** One record per event, with everyone it was for and every channel it went through (agent §7.3). */
 export interface Notification {
   at: string;
   owner: string;
-  to: string;
-  channel: "ui" | "email";
+  /** The will state entered, or "check" for one outreach attempt while Quiet. */
+  event: string;
+  to: string[];
+  channels: string[];
   subject: string;
   body: string;
 }
 
-export type SignalSource = "near_onchain" | "evm_onchain" | "phone_heartbeat" | "github" | "google_calendar" | "gmail" | "x" | "instagram";
+export type SignalSource =
+  | "near_onchain"
+  | "evm_onchain"
+  | "phone_heartbeat"
+  | "github"
+  | "telegram"
+  | "google_calendar"
+  | "gmail"
+  | "x"
+  | "instagram"
+  | "tiktok"
+  | "facebook"
+  | "whatsapp"
+  | "linkedin";
 export type Observations = Partial<Record<SignalSource, { at: string; trustWeight: number; simulated: boolean }>>;
 export type VaultInfo = Record<"Eth" | "Btc", { address: string; balance: string } | { error: string }>;
 
@@ -55,6 +71,9 @@ export const agent = {
   faucetInfo: () => req<{ enabled: false } | { enabled: true; eth: string; btc: string; eth_wei: string; btc_sats: number }>("/demo/faucet"),
   /** Demo vault faucet (demo mode only): funds the will's empty Sepolia/BTC vaults once. */
   faucet: (signed: SignedRequest) => req<{ ok: boolean; sends: { chain: string; to: string; amount: string; txHash: string }[]; errors: string[] }>("/demo/faucet", { signed }),
+  telegramStatus: (account: string) => req<{ enabled: boolean; bot?: string; linked: boolean }>(`/api/telegram/${encodeURIComponent(account)}`),
+  /** One-time t.me link that binds a Telegram chat to the signing account. */
+  telegramLink: (signed: SignedRequest) => req<{ ok: true; url: string; expires_at: string }>("/api/telegram/link", { signed }),
   /** SIMULATED signal (demo mode only). */
   simulate: (owner: string, source: SignalSource) => req<{ ok: true }>("/demo/signal", { owner, source }),
 };

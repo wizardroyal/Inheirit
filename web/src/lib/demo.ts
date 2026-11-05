@@ -3,7 +3,7 @@
 // and a pre-seeded will with the compressed demo clock. Clearly demo-only.
 import { checkPolicy, nearShareBps, policyHash, type Policy } from "@agent/policy/policy";
 import { agent } from "./agent";
-import { DEMO_TIMINGS } from "./config";
+import { stagesFor, type SchedulePreset } from "@agent/policy/schedule";
 import { keys, type Cast } from "./keys";
 import { call, createFaucetAccount, createSubaccount, nearToYocto, signRequest, view } from "./near";
 import { sealToBase64 } from "./sealed";
@@ -63,7 +63,7 @@ export function demoPolicy(cast: Cast, receive: { eth: string; btc: string }): P
       { asset: "ETH", shares: { bola: 100 } },
       { asset: "BTC", shares: { bola: 100 } },
     ],
-    stages_pct: [10, 30, 60],
+    stages_pct: [10, 20, 30, 40],
     guardians: cast.guardians,
     guardian_threshold: 2,
   });
@@ -74,7 +74,8 @@ export function demoPolicy(cast: Cast, receive: { eth: string; btc: string }): P
 export interface CreateWillOptions {
   policy: Policy;
   contacts: string[];
-  timings: typeof DEMO_TIMINGS;
+  /** Demo clock or real defaults; turns the policy's percentages into per-stage waits. */
+  schedule: SchedulePreset;
   foreignChains: ("Eth" | "Btc")[];
   depositNear: string;
 }
@@ -92,10 +93,13 @@ export async function createWill(owner: string, o: CreateWillOptions, progress: 
         guardians: o.policy.guardians,
         guardian_threshold: o.policy.guardian_threshold,
         contacts: o.contacts,
-        stages_pct: o.policy.stages_pct,
-        timings: o.timings,
+        stages: stagesFor(o.policy.stages_pct, o.schedule),
+        accelerated_stages: o.schedule.accelerated,
+        timings: o.schedule.timings,
         policy_hash: policyHash(o.policy),
         foreign_chains: o.foreignChains,
+        lawyer: o.policy.lawyer ?? null,
+        heirs_hidden: true,
       },
     },
     nearToYocto("0.1"),
@@ -108,6 +112,14 @@ export async function createWill(owner: string, o: CreateWillOptions, progress: 
   await agent.submitPolicy(owner, o.policy);
   progress("Asking the agent to watch for signs of life (signed by the owner)…");
   await agent.registerOwner(await signRequest(owner, "register_owner", {}));
+}
+
+/** Demo only: the cast's guardians (keys in this browser) accept their role, which arms the will. */
+export async function acceptAsGuardians(owner: string, guardians: string[], progress: Progress): Promise<void> {
+  for (const g of guardians) {
+    progress(`${g} accepts the guardian role…`);
+    await call(g, "accept_guardian", { owner });
+  }
 }
 
 /** Seals a note in this browser to the agent's TEE key; only ciphertext goes on-chain. */

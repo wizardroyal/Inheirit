@@ -12,8 +12,5 @@ export const explorer = {
   btcAddress: (a: string) => `https://mempool.space/testnet4/address/${a}`,
 };
 
-/** CLAUDE.md §5.1 demo timings (seconds). */
-export const DEMO_TIMINGS = { quiet_after: 120, nudge_period: 60, welfare_period: 60, vote_period: 300, challenge_period: 120, stage_interval: 60 };
-const DAY = 86_400;
-/** Real-life defaults (quiet_after is fixed here; the adaptive baseline is backlog). */
-export const REAL_TIMINGS = { quiet_after: 30 * DAY, nudge_period: 7 * DAY, welfare_period: 7 * DAY, vote_period: 30 * DAY, challenge_period: 30 * DAY, stage_interval: 30 * DAY };
+// Release schedules and timings (CLAUDE.md §5.5) are shared with the agent: @agent/policy/schedule.
+export { DEMO_SCHEDULE, REAL_SCHEDULE } from "@agent/policy/schedule";

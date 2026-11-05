@@ -6,13 +6,15 @@ import { ActAs, ImportKey } from "@/components/ActAs";
 import { AgentBadge, AiBadge } from "@/components/Attestation";
 import { Ladder } from "@/components/Ladder";
 import { ActionButton, Card, ErrorNote, Field, inputCls, Pill } from "@/components/ui";
+import { TelegramLink } from "@/components/TelegramLink";
 import { NotificationLog, Releases, SignalList, WatchStatus } from "@/components/WillParts";
 import { agent, type DraftResult } from "@/lib/agent";
-import { DEMO_TIMINGS, REAL_TIMINGS } from "@/lib/config";
+import { DEMO_SCHEDULE, REAL_SCHEDULE } from "@/lib/config";
+import { stagesFor, summarize } from "@agent/policy/schedule";
 import { addSealedNote, createWill } from "@/lib/demo";
 import { useKeys, useWill } from "@/lib/hooks";
 import { call, formatNear, nearToYocto, signRequest } from "@/lib/near";
-import { ago, duration, stateName, type Will } from "@/lib/will";
+import { ago, duration, isArmed, schedule, stateName, type Will } from "@/lib/will";
 
 export default function OwnerPage() {
   return (
@@ -109,8 +111,9 @@ function WriteWill({ owner, onCreating, onCreated }: { owner: string; onCreating
             </div>
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" checked={demoClock} onChange={(e) => setDemoClock(e.target.checked)} />
-              Demo clock (quiet after {duration(DEMO_TIMINGS.quiet_after)} instead of {duration(REAL_TIMINGS.quiet_after)})
+              Demo clock (quiet after {duration(DEMO_SCHEDULE.timings.quiet_after)} instead of {duration(REAL_SCHEDULE.timings.quiet_after)})
             </label>
+            <SetupSummary stagesPct={policy.stages_pct} demoClock={demoClock} />
             <ActionButton
               onClick={async () => {
                 setLog([]);
@@ -121,7 +124,7 @@ function WriteWill({ owner, onCreating, onCreated }: { owner: string; onCreating
                   {
                     policy,
                     contacts: contacts.split(",").map((c) => c.trim()).filter(Boolean),
-                    timings: demoClock ? DEMO_TIMINGS : REAL_TIMINGS,
+                    schedule: demoClock ? DEMO_SCHEDULE : REAL_SCHEDULE,
                     foreignChains: [...(assets.has("ETH") ? ["Eth" as const] : []), ...(assets.has("BTC") ? ["Btc" as const] : [])],
                     depositNear: deposit,
                   },
@@ -174,6 +177,9 @@ function Dashboard({ will, refresh }: { will: Will; refresh: () => void }) {
         <Card title="Signs of life the agent watches">
           <SignalList owner={owner} will={will} />
           <WatchSettings owner={owner} />
+          <div className="mt-4">
+            <TelegramLink account={owner} purpose="If you go quiet, the agent can check in on Telegram first. Any reply means you're fine." />
+          </div>
         </Card>
         <Card title="People">
           <dl className="space-y-1 text-sm">
@@ -188,7 +194,8 @@ function Dashboard({ will, refresh }: { will: Will; refresh: () => void }) {
             <div className="flex flex-wrap justify-between gap-2">
               <dt>Guardians</dt>
               <dd className="text-muted">
-                {will.guardian_threshold} of {will.guardians.length}: {will.guardians.join(", ")}
+                {will.guardian_threshold} of {will.guardians.length}:{" "}
+                {will.guardians.map((g) => `${g.account_id}${g.accepted ? "" : " (invited, not yet accepted)"}`).join(", ")}
               </dd>
             </div>
             {will.contacts.length > 0 && (
@@ -198,7 +205,16 @@ function Dashboard({ will, refresh }: { will: Will; refresh: () => void }) {
               </div>
             )}
           </dl>
-          <p className="mt-2 text-xs text-muted">Stages: {will.stages_pct.map((p) => `${p}%`).join(" → ")}. Policy hash {will.policy_hash.slice(0, 16)}…</p>
+          {!isArmed(will) && (
+            <p className="mt-2 text-sm text-warn">
+              Not armed yet: {will.guardian_threshold} guardian{will.guardian_threshold > 1 ? "s" : ""} must accept before your will can ever escalate. Send them
+              their link: /guardian/{owner}
+            </p>
+          )}
+          <p className="mt-2 text-xs text-muted">
+            Stages: {schedule(will).map((st) => `${st.pct}% (then wait ${duration(st.wait_after)})`).join(" → ")}; secrets after a further{" "}
+            {duration(will.timings.secrets_buffer)}. Policy hash {will.policy_hash.slice(0, 16)}…
+          </p>
         </Card>
       </div>
       <div className="space-y-6">
@@ -285,8 +301,9 @@ function SealedNotes({ will, refresh }: { will: Will; refresh: () => void }) {
   return (
     <Card title="Sealed notes" aside={<Pill>{will.sealed_notes.length} of 10</Pill>}>
       <p className="text-sm text-muted">
-        Encrypted in this browser to the agent&apos;s TEE key. Only ciphertext goes on-chain. After execution starts, the agent re-seals each note to
-        its heir&apos;s own key.
+        Encrypted in this browser to the agent&apos;s TEE key. Only ciphertext goes on-chain. Released last, per heir: only after distribution
+        completes and a further wait, the agent re-seals each note to its heir&apos;s own key. Prefer instructions (where the Ledger is, who has the
+        passphrase) over raw keys, and split secrets across notes and people.
       </p>
       <ul className="mt-3 space-y-1 text-sm">
         {will.sealed_notes.map((n) => {
@@ -337,5 +354,18 @@ function SealedNotes({ will, refresh }: { will: Will; refresh: () => void }) {
       )}
       {will.released_notes.length > 0 && <p className="mt-2 text-xs text-muted">Last release {ago(will.released_notes[will.released_notes.length - 1].at)}.</p>}
     </Card>
+  );
+}
+
+/** "If you go quiet: earliest anything moves ≈ X; full distribution ≈ Y; secrets ≈ Z." (CLAUDE.md §8) */
+function SetupSummary({ stagesPct, demoClock }: { stagesPct: number[]; demoClock: boolean }) {
+  const preset = demoClock ? DEMO_SCHEDULE : REAL_SCHEDULE;
+  const sum = summarize(preset.timings, stagesFor(stagesPct, preset));
+  return (
+    <p className="rounded-md border border-line bg-accent-soft p-3 text-sm">
+      If you go quiet: the earliest anything moves is about <b>{duration(sum.earliestMove)}</b>; full distribution takes about{" "}
+      <b>{duration(sum.fullDistribution)}</b>; sealed notes are released after about <b>{duration(sum.secrets)}</b>. Any sign of life before then
+      stops it.
+    </p>
   );
 }
