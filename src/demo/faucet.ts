@@ -31,6 +31,8 @@ export class DemoFaucet {
   readonly btcAddress: string;
   private readonly btcPub: Buffer;
   private queue: Promise<unknown> = Promise.resolve();
+  /** Outpoints this faucet already spent: mempool.space can keep listing them for a while after a broadcast. */
+  private readonly spent = new Set<string>();
 
   constructor(
     private readonly cfg: FaucetConfig,
@@ -43,7 +45,7 @@ export class DemoFaucet {
 
   /** Sends are serialized: one pool key, so concurrent sends would race on nonces and UTXOs. */
   send(chain: "Eth" | "Btc", to: string): Promise<FaucetSend> {
-    const run = () => (chain === "Eth" ? this.sendEth(to) : this.sendBtc(to));
+    const run = () => (chain === "Eth" ? this.sendEth(to) : this.sendBtcRetrying(to));
     const next = this.queue.then(run, run);
     this.queue = next.catch(() => undefined);
     return next;
@@ -60,13 +62,25 @@ export class DemoFaucet {
     return { chain: "Eth", to, amount: this.cfg.ethWei.toString(), txHash: hash };
   }
 
+  /** One retry when the node says an input is already spent (the UTXO list lagged behind a broadcast). */
+  private async sendBtcRetrying(to: string): Promise<FaucetSend> {
+    try {
+      return await this.sendBtc(to);
+    } catch (e) {
+      if (!(e instanceof Error) || !/missingorspent/.test(e.message)) throw e;
+      return this.sendBtc(to);
+    }
+  }
+
   private async sendBtc(to: string): Promise<FaucetSend> {
     const api = this.cfg.btcApi;
     const network = bitcoinjs.networks.testnet;
     const pay = bitcoinjs.payments.p2wpkh({ pubkey: this.btcPub, network });
     const utxoRes = await this.fetchImpl(`${api}/address/${this.btcAddress}/utxo`);
     if (!utxoRes.ok) throw new Error(`mempool UTXO fetch ${utxoRes.status}`);
-    const utxos = ((await utxoRes.json()) as { txid: string; vout: number; value: number }[]).sort((a, b) => b.value - a.value);
+    const utxos = ((await utxoRes.json()) as { txid: string; vout: number; value: number }[])
+      .filter((u) => !this.spent.has(`${u.txid}:${u.vout}`))
+      .sort((a, b) => b.value - a.value);
     const feeRes = await this.fetchImpl(`${api}/v1/fees/recommended`);
     if (!feeRes.ok) throw new Error(`mempool fee fetch ${feeRes.status}`);
     const rate = Math.max(1, Math.ceil(((await feeRes.json()) as { halfHourFee: number }).halfHourFee));
@@ -92,8 +106,12 @@ export class DemoFaucet {
     });
     psbt.finalizeAllInputs();
     const tx = psbt.extractTransaction();
+    const inputs = psbt.txInputs.map((i) => `${Buffer.from(i.hash).reverse().toString("hex")}:${i.index}`);
     const res = await this.fetchImpl(`${api}/tx`, { method: "POST", body: tx.toHex() });
-    if (!res.ok) throw new Error(`BTC broadcast ${res.status}: ${await res.text()}`);
+    const text = res.ok ? "" : await res.text();
+    // A spent input stays spent whatever the cause, so skip it next time either way
+    if (res.ok || /missingorspent/.test(text)) for (const i of inputs) this.spent.add(i);
+    if (!res.ok) throw new Error(`BTC broadcast ${res.status}: ${text}`);
     return { chain: "Btc", to, amount: String(sats), txHash: tx.getId() };
   }
 }
