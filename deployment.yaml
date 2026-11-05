@@ -20,7 +20,7 @@ agent_contract:
   deploy_custom:
     enabled: true
     # Amount to fund the agent contract with in NEAR
-    funding_amount: 10.6  # wasm ~907 KB = ~9.1 NEAR storage + ~1.5 NEAR for redeploys (CLAUDE.md Decision log)
+    funding_amount: 11  # wasm ~933 KB (v2) = ~9.4 NEAR storage + ~1.5 NEAR for redeploys (CLAUDE.md Decision log)
     # If true the key for contract account will be deleted after deployment locking it
     delete_key: false
 
