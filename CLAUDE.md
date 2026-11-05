@@ -881,3 +881,18 @@ DEMO_MODE=true
   - Screenshots came from the same web code run locally against the hosted backend: the verdict explaining the ignored X post, and **the snap-back flash, seen running**.
   - Fixed: at the snap-back, the verdict box lagged a poll behind ("Challenge period…" next to All good). The panel now refetches on every state change and shows "Sign of life recorded…" while the flash is up.
 - 2026-11-05 — [VERIFIED] **`inheirit.vercel.app` is behind Vercel's Security Checkpoint.** curl gets a 403 challenge page, and headless Chromium gets "Failed to verify your browser (Code 21)". Normal browsers pass. Risk: AI judges fetching the site with tools would be blocked. Asked the human to check Vercel → Firewall (Attack Challenge Mode / bot protection). Until then, test the hosted backend by running `web/` locally with `NEXT_PUBLIC_AGENT_URL` set to the TEE URL and `NEXT_PUBLIC_CONTRACT_ID=inheirit.testnet`.
+- 2026-11-05 — [VERIFIED] **Day C on the hosted stack** (web run locally against `inheirit.testnet` + the v2a TEE agent; commit `0fcbda5`).
+  - 3-step onboarding: a browser demo cast → Quick setup → the will was created "not armed" → two guardians accepted on `/guardian` → the owner's checklist said "armed".
+  - `scripts/demo-accelerate.ts` (owner `accela`): the lawyer's death proof in GuardianVote set `accelerated` and the will stayed in GuardianVote; the quorum moved it to Challenge; the challenge period was kept (~128 s of 120); it ran the 10/30/60 accelerated stages, then SecretsBuffer, SecretsReleased and Completed, leaving the vault empty.
+  - Heir claim through the UI (owner `alice.inheirit-xskia2.testnet`): the heir registered a key on `/heir`; the guardians confirmed in `/demo`; the note was released at about 770 s and decrypted in the browser. The heir page suggested no heirs from the will (heirs hidden).
+  - **Not verified:** the AI guide answer. It was still "Working…" after 60 s, versus about 31 s on 2026-10-29.
+- 2026-11-05 — **Vercel challenged the human's IP** (automatic DDoS mitigation, ~90-request spikes).
+  - The app itself does not poll Vercel: it polls the TEE agent and FastNEAR. Vercel only sees page loads and `<Link>` prefetches.
+  - The likely cause was **Claude's own shell loops from this machine** during the deploy check (12:48–12:58Z): about 40 fetches of `/owner`, plus two commands that each fetched `/owner` and up to 30 JS chunks.
+  - **Rule:** never script requests at the deployed site. Test with the local dev server pointed at the hosted backend, and let the human open the hosted URL.
+- 2026-11-05 — [VERIFIED] **Polling reduced** (commit `c0413ea`). Measured on an owner dashboard over 60 s: **103 req/min before → 52 now → about 24** once the agent image has `/api/overview` (the web app falls back to the old routes until then).
+  - The tab is paused while hidden, with exponential backoff to 60 s.
+  - `useWill` polls every 8 s, or every 3 s near a countdown.
+  - A "boost" to 2 s for 20 s follows any transaction or agent write, which keeps the snap-back fast.
+  - Reads within 1.5 s are shared.
+  - **Needs an agent image rebuild** (`/api/overview`).
