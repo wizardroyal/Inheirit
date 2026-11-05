@@ -21,10 +21,15 @@ function will(state: WillState, extra: Partial<WillView> = {}): WillView {
     guardians: [],
     guardian_threshold: 1,
     contacts: [],
-    stages_pct: [100],
-    timings: {},
+    stages: [{ pct: 100, wait_after: 1 }],
+    accelerated_stages: [{ pct: 100, wait_after: 1 }],
+    round_stages: [{ pct: 100, wait_after: 1 }],
+    timings: { quiet_after: 1, nudge_period: 1, welfare_period: 1, vote_period: 1, challenge_period: 1, secrets_buffer: 1 },
     policy_hash: "0".repeat(64),
     foreign_chains: [],
+    lawyer: null,
+    heirs_hidden: true,
+    accelerated: false,
     state,
     last_alive_at: 0,
     execution_round: 0,
@@ -52,7 +57,7 @@ class FakeContract implements Partial<WillContract> {
   }
 }
 
-const EXECUTING: WillState = { Executing: { stage: 0, since: 0, stage_started: 0 } };
+const RELEASED: WillState = { SecretsReleased: { since: 0 } };
 
 describe("sealed note crypto", () => {
   it("re-seals a note from the agent key to the heir key", async () => {
@@ -77,26 +82,26 @@ describe("NoteReleaser", () => {
     return { id, heir: heirAccount, label: "where", ciphertext: b64(await sealTo(text, toHex(agent.publicKey))) };
   }
 
-  it("releases each note to its heir once execution has started", async () => {
+  it("releases each note to its heir once the will reaches SecretsReleased", async () => {
     const c = new FakeContract();
     const r = new NoteReleaser(c as unknown as WillContract, agent, () => {});
-    const n = await r.run(will(EXECUTING, { sealed_notes: [await noteFor()] }));
+    const n = await r.run(will(RELEASED, { sealed_notes: [await noteFor()] }));
     expect(n).toBe(1);
     expect(c.stored).toHaveLength(1);
     expect(c.stored[0]).toMatchObject({ owner: "alice.testnet", noteId: 0, heir: "bola.testnet" });
     expect(await openSealed(Buffer.from(c.stored[0].ciphertext, "base64"), heir)).toBe("secret");
   });
 
-  it("also releases after Completed (an heir may register late)", async () => {
+  it("never releases while funds are moving or before (secrets last)", async () => {
     const c = new FakeContract();
     const r = new NoteReleaser(c as unknown as WillContract, agent, () => {});
-    expect(await r.run(will({ Completed: { at: 1 } }, { sealed_notes: [await noteFor()] }))).toBe(1);
-  });
-
-  it("never releases before execution", async () => {
-    const c = new FakeContract();
-    const r = new NoteReleaser(c as unknown as WillContract, agent, () => {});
-    for (const s of ["Active", { Challenge: { since: 1 } }, { GuardianVote: { since: 1 } }] as WillState[]) {
+    for (const s of [
+      "Active",
+      { Challenge: { since: 1 } },
+      { GuardianVote: { since: 1 } },
+      { Executing: { stage: 0, since: 0, stage_started: 0 } },
+      { SecretsBuffer: { since: 1 } },
+    ] as WillState[]) {
       expect(await r.run(will(s, { sealed_notes: [await noteFor()] }))).toBe(0);
     }
     expect(c.stored).toHaveLength(0);
@@ -105,7 +110,7 @@ describe("NoteReleaser", () => {
   it("skips notes already released and heirs without a key", async () => {
     const c = new FakeContract();
     const r = new NoteReleaser(c as unknown as WillContract, agent, () => {});
-    const w = will(EXECUTING, {
+    const w = will(RELEASED, {
       heirs: [
         { account_id: "bola.testnet", name: "Bola", near_share_bps: 5_000, x25519_pubkey: toHex(heir.publicKey) },
         { account_id: "cara.testnet", name: "Cara", near_share_bps: 5_000, x25519_pubkey: null },
@@ -123,7 +128,7 @@ describe("NoteReleaser", () => {
     const r = new NoteReleaser(c as unknown as WillContract, agent, (m) => logs.push(m));
     const other = await keypairFromSeed(new Uint8Array(32).fill(1));
     const bad = { id: 5, heir: "bola.testnet", label: "x", ciphertext: b64(await sealTo("x", toHex(other.publicKey))) };
-    const w = will(EXECUTING, { sealed_notes: [bad] });
+    const w = will(RELEASED, { sealed_notes: [bad] });
     expect(await r.run(w)).toBe(0);
     expect(await r.run(w)).toBe(0);
     expect(logs.filter((l) => l.includes("note 5"))).toHaveLength(1);
@@ -133,7 +138,7 @@ describe("NoteReleaser", () => {
   it("does nothing when sealed-note work is disabled (no key)", async () => {
     const c = new FakeContract();
     const r = new NoteReleaser(c as unknown as WillContract, null, () => {});
-    expect(await r.run(will(EXECUTING, { sealed_notes: [await noteFor()] }))).toBe(0);
+    expect(await r.run(will(RELEASED, { sealed_notes: [await noteFor()] }))).toBe(0);
   });
 });
 

@@ -3,9 +3,17 @@
 //  2. call advance() when the current period has elapsed (one step per tick);
 //  3. notify the right people when the will enters a new state;
 //  4. hand Executing wills to the executor;
-//  5. release sealed notes to heirs once execution has started.
+//  5. release sealed notes to heirs once the will reaches SecretsReleased (secrets last, §5.5).
 import { type Observation, scoreAlive } from "../liveness/score";
-import { stateName, type StateName, type WillContract, type WillView } from "../near/will-contract";
+import {
+  acceptedGuardians,
+  executionStarted,
+  isArmed,
+  stateName,
+  type StateName,
+  type WillContract,
+  type WillView,
+} from "../near/will-contract";
 import type { SignalAdapter } from "../signals/adapters";
 import type { Notification, OwnerSignalConfig, Store } from "../state/store";
 
@@ -46,19 +54,22 @@ export function isAdvanceDue(will: WillView, nowS: number): boolean {
   const t = will.timings;
   const s = will.state;
   const elapsed = (since: number) => nowS - since;
-  if (s === "Active") return elapsed(will.last_alive_at) >= t.quiet_after;
+  if (s === "Active") return isArmed(will) && elapsed(will.last_alive_at) >= t.quiet_after;
   if ("Quiet" in s) return elapsed(s.Quiet.since) >= t.nudge_period;
   if ("WelfareCheck" in s) return elapsed(s.WelfareCheck.since) >= t.welfare_period;
   if ("GuardianVote" in s) return elapsed(s.GuardianVote.since) >= t.vote_period;
   if ("Challenge" in s) return elapsed(s.Challenge.since) >= t.challenge_period;
   if ("Executing" in s) {
-    if (elapsed(s.Executing.stage_started) < t.stage_interval) return false;
-    const last = will.stages_pct.length - 1;
-    if (s.Executing.stage < last) return true;
+    const stage = s.Executing.stage;
+    if (elapsed(s.Executing.stage_started) < will.round_stages[stage].wait_after) return false;
+    const last = will.round_stages.length - 1;
+    if (stage < last) return true;
     return will.foreign_chains.every((c) =>
       Array.from({ length: last + 1 }, (_, i) => i).every((st) => will.stage_done.some((d) => d.stage === st && d.chain === c)),
     );
   }
+  if ("SecretsBuffer" in s) return elapsed(s.SecretsBuffer.since) >= t.secrets_buffer;
+  if ("SecretsReleased" in s) return will.sealed_notes.every((n) => will.released_notes.some((r) => r.note_id === n.id));
   return false;
 }
 
@@ -72,7 +83,8 @@ export function notificationsFor(state: StateName, will: WillView, cfg: OwnerSig
     case "Quiet":
       return toOwner("Are you there?", "We haven't seen activity from you for a while. Open the heartbeat app or sign any transaction and nothing else happens.");
     case "WelfareCheck":
-      return contacts.map((to) => ({
+      // The welfare chain: guardians, then friends, then the lawyer.
+      return [...acceptedGuardians(will), ...contacts, ...(will.lawyer ? [will.lawyer] : [])].map((to) => ({
         owner,
         to,
         channel: "ui" as const,
@@ -80,7 +92,7 @@ export function notificationsFor(state: StateName, will: WillView, cfg: OwnerSig
         body: `If they're fine, confirm it here: /contact/${owner}`,
       }));
     case "GuardianVote":
-      return will.guardians.map((to) => ({
+      return acceptedGuardians(will).map((to) => ({
         owner,
         to,
         channel: "ui" as const,
@@ -101,6 +113,14 @@ export function notificationsFor(state: StateName, will: WillView, cfg: OwnerSig
         channel: "ui" as const,
         subject: `${owner}'s will is being executed`,
         body: `Assets are being released to you in stages. Your claim page: /heir/${owner}`,
+      }));
+    case "SecretsReleased":
+      return will.heirs.map((h) => ({
+        owner,
+        to: h.account_id,
+        channel: "ui" as const,
+        subject: `Sealed notes from ${owner} are ready`,
+        body: `Distribution is complete. Notes left for you can now be opened on your claim page: /heir/${owner}`,
       }));
     default:
       return [];
@@ -136,7 +156,7 @@ export class Driver {
     if (!ttl || !cfg.watchedSince) return false;
     if (this.now().getTime() - Date.parse(cfg.watchedSince) < ttl) return false;
     const will = await this.deps.contract.getWill(cfg.owner);
-    if (will && stateName(will.state) === "Executing") return false;
+    if (will && executionStarted(will.state) && stateName(will.state) !== "Completed") return false;
     this.deps.store.update((s) => {
       delete s.owners[cfg.owner];
     });
@@ -179,8 +199,8 @@ export class Driver {
     }
 
     if (state === "Executing" && this.deps.executor) await this.deps.executor.run(cfg.owner, will);
-    // After the executor, so a failing note can't hold up money; Completed too, for heirs who register late.
-    if ((state === "Executing" || state === "Completed") && this.deps.notes) await this.deps.notes.run(will);
+    // Secrets last: only once distribution and the buffer are over (the contract enforces it too).
+    if (state === "SecretsReleased" && this.deps.notes) await this.deps.notes.run(will);
   }
 
   private async observe(cfg: OwnerSignalConfig): Promise<Observation[]> {

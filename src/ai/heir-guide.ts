@@ -34,8 +34,8 @@ export function heirFacts(will: WillView, heir: string, policy: Policy | undefin
   const state = stateName(will.state);
   const lines = [
     `Heir: ${h.name} (NEAR account ${heir}). Will owner: ${will.owner}.`,
-    `Will state: ${state}. Ladder: Active → Quiet → WelfareCheck → GuardianVote → Challenge → Executing (stages) → Completed. Any sign of life from the owner before Completed stops it and halts remaining stages.`,
-    `Release stages: ${will.stages_pct.map((p) => `${p}%`).join(", ")}. Chains: NEAR${will.foreign_chains.map((c) => (c === "Eth" ? ", Ethereum Sepolia" : ", Bitcoin testnet4")).join("")}.`,
+    `Will state: ${state}. Ladder: Active → Quiet → WelfareCheck → GuardianVote → Challenge → Executing (stages) → SecretsBuffer → SecretsReleased → Completed. Any sign of life from the owner before Completed stops it and halts remaining stages and unreleased notes. Sealed notes are released only in SecretsReleased, after all funds are distributed and a buffer passes.`,
+    `Release stages: ${(will.round_stages.length ? will.round_stages : will.stages).map((s) => `${s.pct}%`).join(", ")}${will.accelerated ? " (accelerated after a death proof)" : ""}. Chains: NEAR${will.foreign_chains.map((c) => (c === "Eth" ? ", Ethereum Sepolia" : ", Bitcoin testnet4")).join("")}.`,
     `This heir's share of NEAR: ${h.near_share_bps / 100}%.`,
     `Received so far in the current round: ${received.length ? received.map((e) => `stage ${e.stage + 1} ${e.chain} amount ${e.amount} (${e.chain === "Near" ? "yoctoNEAR" : e.chain === "Eth" ? "wei" : "sats"})`).join("; ") : "nothing"}.`,
     `Note key registered: ${h.x25519_pubkey ? "yes" : "no"}. Sealed notes for this heir: ${notesFor.length}; released to their key: ${released.length}.`,

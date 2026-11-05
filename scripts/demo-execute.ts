@@ -5,9 +5,9 @@
 // and the ETH/BTC vaults funded (npx tsx scripts/vault-addresses.ts <owner>).
 //
 // Usage: npx tsx scripts/demo-execute.ts
-import { checkPolicy, nearShareBps, policyHash } from "../src/policy/policy";
+import { checkPolicy } from "../src/policy/policy";
 import { demoHeirAddresses } from "./demo-keys";
-import { call, CONTRACT, ensureSubaccount, NEAR, nearblocks, sleep, stateName, view } from "./lib/near";
+import { acceptGuardians, call, CONTRACT, ensureSubaccount, NEAR, nearblocks, sleep, stateName, view, willConfig } from "./lib/near";
 
 const AGENT = process.env.AGENT_URL || "http://localhost:3000";
 const OWNER_NAME = process.env.DEMO_OWNER || "alice";
@@ -34,36 +34,19 @@ const check = checkPolicy({
     { asset: "ETH", shares: { bola: 100 } },
     { asset: "BTC", shares: { bola: 100 } },
   ],
-  stages_pct: [50, 50],
+  stages_pct: [10, 20, 30, 40],
   guardians: [g1, g2],
   guardian_threshold: 2,
 });
 if (!check.ok) throw new Error(check.errors.join("; "));
 const policy = check.policy;
-const bps = nearShareBps(policy);
 
 type Will = { state: unknown; executions: { round: number; stage: number; chain: string; to: string; amount: string; tx_hash: string }[]; execution_round: number };
 let will = await view<Will | null>("get_will", { owner });
 if (!will) {
-  const r = await call(
-    owner,
-    "create_will",
-    {
-      config: {
-        heirs: policy.heirs.map((h) => ({ account_id: h.near_account, name: h.name, near_share_bps: bps[h.near_account] })),
-        guardians: policy.guardians,
-        guardian_threshold: policy.guardian_threshold,
-        contacts: [],
-        stages_pct: policy.stages_pct,
-        // CLAUDE.md §5.1 demo timings
-        timings: { quiet_after: 120, nudge_period: 60, welfare_period: 60, vote_period: 300, challenge_period: 120, stage_interval: 60 },
-        policy_hash: policyHash(policy),
-        foreign_chains: ["Eth", "Btc"],
-      },
-    },
-    NEAR / 10n,
-  );
+  const r = await call(owner, "create_will", { config: willConfig(policy, ["Eth", "Btc"]) }, NEAR / 10n);
   console.log(`create_will ${nearblocks(r.hash)}`);
+  await acceptGuardians(owner, policy.guardians);
   console.log(`deposit 1 NEAR ${nearblocks((await call(owner, "deposit_near", {}, NEAR)).hash)}`);
 } else if (stateName(will.state) !== "Active") {
   throw new Error(`${owner} already has a will in ${stateName(will.state)}; use another DEMO_OWNER`);

@@ -10,10 +10,10 @@
 //
 // Usage: AGENT_CONTRACT_ID=inheirit-dev.testnet DEMO_OWNER=dora npx tsx scripts/demo-sealed-note.ts
 import sodium from "libsodium-wrappers";
-import { checkPolicy, nearShareBps, policyHash, type Policy } from "../src/policy/policy";
+import { checkPolicy, policyHash, type Policy } from "../src/policy/policy";
 import { keypairFromSeed, openSealed, sealTo, toHex } from "../src/sealed/crypto";
 import { loadKeys, saveKey } from "./demo-keys";
-import { call, CONTRACT, ensureSubaccount, NEAR, nearblocks, sleep, stateName, view } from "./lib/near";
+import { acceptGuardians, call, CONTRACT, ensureSubaccount, NEAR, nearblocks, sleep, stateName, view, willConfig } from "./lib/near";
 
 const AGENT = process.env.AGENT_URL || "http://localhost:3000";
 const OWNER_NAME = process.env.DEMO_OWNER || "dora";
@@ -55,33 +55,17 @@ if (att.status === 200) {
     owner,
     heirs: [{ id: "bola", name: "Bola", near_account: heir }],
     allocations: [{ asset: "NEAR", shares: { bola: 100 } }],
-    stages_pct: [50, 50],
+    stages_pct: [10, 20, 30, 40],
     guardians: [g1, g2],
     guardian_threshold: 2,
   });
   if (!check.ok) throw new Error(check.errors.join("; "));
   policy = check.policy;
 }
-const bps = nearShareBps(policy);
 
 if (await view("get_will", { owner })) throw new Error(`${owner} already has a will; use another DEMO_OWNER`);
-const created = await call(
-  owner,
-  "create_will",
-  {
-    config: {
-      heirs: policy.heirs.map((h) => ({ account_id: h.near_account, name: h.name, near_share_bps: bps[h.near_account] })),
-      guardians: policy.guardians,
-      guardian_threshold: policy.guardian_threshold,
-      contacts: [],
-      stages_pct: policy.stages_pct,
-      timings: { quiet_after: 120, nudge_period: 60, welfare_period: 60, vote_period: 300, challenge_period: 120, stage_interval: 60 },
-      policy_hash: policyHash(policy),
-      foreign_chains: [],
-    },
-  },
-  NEAR / 10n,
-);
+const created = await call(owner, "create_will", { config: willConfig(policy, []) }, NEAR / 10n);
+await acceptGuardians(owner, policy.guardians);
 console.log(`create_will (policy_hash ${policyHash(policy).slice(0, 12)}…) ${nearblocks(created.hash)}`);
 console.log(`deposit 0.2 NEAR ${nearblocks((await call(owner, "deposit_near", {}, NEAR / 5n)).hash)}`);
 
@@ -107,7 +91,7 @@ console.log(`heir registers key ${nearblocks((await call(heir, "register_heir_ke
 await agent("/api/policy", { owner, policy });
 const watching = await agent("/api/owners", { owner });
 if (watching.status !== 200) throw new Error(`agent refused to watch ${owner}: ${JSON.stringify(watching.json)}`);
-console.log("Owner goes silent; the agent escalates (about 6 min to Executing)…");
+console.log("Owner goes silent; the agent escalates. Notes are released last: after all stages and the buffer (about 13 min)…");
 
 const t0 = Date.now();
 let last = "";

@@ -46,6 +46,11 @@ export const PolicySchema = z.object({
   guardians: z.array(z.string().min(2)).min(1).max(10),
   guardian_threshold: z.number().int().min(1),
   contacts: z.array(z.string().min(1)).max(10).default([]),
+  /** May attest a death proof (speeds up the remaining release) and is in the welfare chain. */
+  lawyer: z.string().min(2).optional(),
+  /** Minimal sign-up (CLAUDE.md §8): a display name, optional jurisdiction. Off-chain, hashed. */
+  display_name: z.string().min(1).max(64).optional(),
+  jurisdiction: z.string().min(1).max(64).optional(),
 });
 
 export type Policy = z.infer<typeof PolicySchema>;
@@ -96,6 +101,8 @@ export function checkPolicy(input: unknown): PolicyCheck {
     if (accounts.has(g)) errors.push(`guardians: ${g} is also an heir`);
     if (g === p.owner) errors.push("guardians: the owner cannot be a guardian");
   }
+  if (p.lawyer && accounts.has(p.lawyer)) errors.push(`lawyer: ${p.lawyer} is also an heir`);
+  if (p.lawyer && p.lawyer === p.owner) errors.push("lawyer: the owner cannot be the lawyer");
   return errors.length ? { ok: false, errors } : { ok: true, policy: p };
 }
 
@@ -144,9 +151,15 @@ export function summarizePolicy(p: Policy): string[] {
     lines.push(`${h.name} (${h.near_account}) receives ${parts.length ? parts.join(", ") : "nothing"}.`);
   }
   const stages = p.stages_pct.map((s) => `${s}%`).join(", ");
-  lines.push(`Released in ${p.stages_pct.length} stage${p.stages_pct.length > 1 ? "s" : ""}: ${stages}. Any sign of life between stages stops the rest.`);
-  lines.push(`Guardians: ${p.guardians.join(", ")}. ${p.guardian_threshold} of ${p.guardians.length} must confirm before anything is released.`);
+  lines.push(
+    `Released in ${p.stages_pct.length} stage${p.stages_pct.length > 1 ? "s" : ""}: ${stages}, with the longest wait after the first. Any sign of life between stages stops the rest.`,
+  );
+  lines.push("Sealed notes are released last: only after everything is distributed and a buffer passes.");
+  lines.push(
+    `Guardians: ${p.guardians.join(", ")}. Each must accept the role, and ${p.guardian_threshold} of ${p.guardians.length} must confirm before anything is released.`,
+  );
   if (p.contacts.length) lines.push(`Welfare-check contacts: ${p.contacts.join(", ")}.`);
+  if (p.lawyer) lines.push(`Lawyer: ${p.lawyer}. A death proof from them can speed up the remaining release, never skip it.`);
   for (const c of p.conditions) {
     const name = p.heirs.find((h) => h.id === c.heir)?.name ?? c.heir;
     lines.push(`Condition (shown, not enforced yet): ${c.asset} to ${name} not before ${c.date}${c.note ? ` (${c.note})` : ""}.`);

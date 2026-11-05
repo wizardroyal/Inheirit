@@ -4,6 +4,8 @@ import { Account } from "@near-js/accounts";
 import { KeyPair, type KeyPairString } from "@near-js/crypto";
 import { JsonRpcProvider } from "@near-js/providers";
 import { KeyPairSigner } from "@near-js/signers";
+import { nearShareBps, policyHash, type Policy } from "../../src/policy/policy";
+import { DEMO_SCHEDULE, stagesFor } from "../../src/policy/schedule";
 import { loadKeys, saveKey } from "../demo-keys";
 
 export const CONTRACT = process.env.AGENT_CONTRACT_ID || "inheirit.testnet";
@@ -50,3 +52,26 @@ export async function view<T>(methodName: string, args: Record<string, unknown>)
 }
 
 export const stateName = (s: unknown) => (typeof s === "string" ? s : Object.keys((s as object) ?? {})[0]);
+
+/** The v2 create_will config for a checked policy, on the demo clock (CLAUDE.md §5.5). */
+export function willConfig(policy: Policy, foreignChains: ("Eth" | "Btc")[]) {
+  const bps = nearShareBps(policy);
+  return {
+    heirs: policy.heirs.map((h) => ({ account_id: h.near_account, name: h.name, near_share_bps: bps[h.near_account] })),
+    guardians: policy.guardians,
+    guardian_threshold: policy.guardian_threshold,
+    contacts: [],
+    stages: stagesFor(policy.stages_pct, DEMO_SCHEDULE),
+    accelerated_stages: DEMO_SCHEDULE.accelerated,
+    timings: DEMO_SCHEDULE.timings,
+    policy_hash: policyHash(policy),
+    foreign_chains: foreignChains,
+    lawyer: policy.lawyer ?? null,
+    heirs_hidden: true,
+  };
+}
+
+/** Each guardian accepts its role; only accepted guardians arm the will. */
+export async function acceptGuardians(owner: string, guardians: string[]) {
+  for (const g of guardians) console.log(`  ${g} accepts the guardian role ${nearblocks((await call(g, "accept_guardian", { owner })).hash)}`);
+}

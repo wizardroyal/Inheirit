@@ -12,9 +12,35 @@ export type WillState =
   | { GuardianVote: { since: number } }
   | { Challenge: { since: number } }
   | { Executing: { stage: number; since: number; stage_started: number } }
+  | { SecretsBuffer: { since: number } }
+  | { SecretsReleased: { since: number } }
   | { Completed: { at: number } };
 
-export type StateName = "Active" | "Quiet" | "WelfareCheck" | "GuardianVote" | "Challenge" | "Executing" | "Completed";
+export type StateName =
+  | "Active"
+  | "Quiet"
+  | "WelfareCheck"
+  | "GuardianVote"
+  | "Challenge"
+  | "Executing"
+  | "SecretsBuffer"
+  | "SecretsReleased"
+  | "Completed";
+
+/** One release slice (CLAUDE.md §5.5): `pct` of the snapshot, then `wait_after` s to the next. */
+export interface Stage {
+  pct: number;
+  wait_after: number;
+}
+
+export interface Timings {
+  quiet_after: number;
+  nudge_period: number;
+  welfare_period: number;
+  vote_period: number;
+  challenge_period: number;
+  secrets_buffer: number;
+}
 
 export function stateName(s: WillState): StateName {
   return (typeof s === "string" ? s : Object.keys(s)[0]) as StateName;
@@ -23,13 +49,19 @@ export function stateName(s: WillState): StateName {
 export interface WillView {
   owner: string;
   heirs: { account_id: string; name: string; near_share_bps: number; x25519_pubkey: string | null }[];
-  guardians: string[];
+  guardians: { account_id: string; accepted: boolean }[];
   guardian_threshold: number;
   contacts: string[];
-  stages_pct: number[];
-  timings: Record<string, number>;
+  stages: Stage[];
+  accelerated_stages: Stage[];
+  /** The schedule of the current (or last) execution round; empty before the first. */
+  round_stages: Stage[];
+  timings: Timings;
   policy_hash: string;
   foreign_chains: ForeignChain[];
+  lawyer: string | null;
+  heirs_hidden: boolean;
+  accelerated: boolean;
   state: WillState;
   last_alive_at: number;
   execution_round: number;
@@ -39,6 +71,20 @@ export interface WillView {
   stage_done: { stage: number; chain: Chain }[];
   sealed_notes: { id: number; heir: string; label: string; ciphertext: string }[];
   released_notes: { note_id: number; heir: string }[];
+}
+
+/** States in which funds may already have left the vaults. */
+export function executionStarted(s: WillState): boolean {
+  return ["Executing", "SecretsBuffer", "SecretsReleased", "Completed"].includes(stateName(s));
+}
+
+export function acceptedGuardians(will: Pick<WillView, "guardians">): string[] {
+  return will.guardians.filter((g) => g.accepted).map((g) => g.account_id);
+}
+
+/** Mirrors the contract's armed rule: accepted guardians >= threshold and at least one heir. */
+export function isArmed(will: Pick<WillView, "guardians" | "guardian_threshold" | "heirs">): boolean {
+  return acceptedGuardians(will).length >= will.guardian_threshold && will.heirs.length > 0;
 }
 
 export type SignPurpose = { Release: { stage: number } } | { Withdrawal: { id: number } };

@@ -10,13 +10,27 @@ function will(state: WillState = "Active", extra: Partial<WillView> = {}): WillV
   return {
     owner: "alice.testnet",
     heirs: [{ account_id: "bola.testnet", name: "Bola", near_share_bps: 10000, x25519_pubkey: null }],
-    guardians: ["g1.testnet", "g2.testnet"],
+    guardians: [
+      { account_id: "g1.testnet", accepted: true },
+      { account_id: "g2.testnet", accepted: true },
+    ],
     guardian_threshold: 2,
     contacts: [],
-    stages_pct: [50, 50],
-    timings: { quiet_after: 100, nudge_period: 10, welfare_period: 10, vote_period: 50, challenge_period: 10, stage_interval: 10 },
+    stages: [
+      { pct: 50, wait_after: 30 },
+      { pct: 50, wait_after: 10 },
+    ],
+    accelerated_stages: [{ pct: 100, wait_after: 5 }],
+    round_stages: [
+      { pct: 50, wait_after: 30 },
+      { pct: 50, wait_after: 10 },
+    ],
+    timings: { quiet_after: 100, nudge_period: 10, welfare_period: 10, vote_period: 50, challenge_period: 10, secrets_buffer: 20 },
     policy_hash: "0".repeat(64),
     foreign_chains: ["Eth"],
+    lawyer: null,
+    heirs_hidden: true,
+    accelerated: false,
     state,
     last_alive_at: T0,
     execution_round: 0,
@@ -102,11 +116,28 @@ describe("isAdvanceDue", () => {
     expect(isAdvanceDue(will(), T0 + 100)).toBe(true);
     expect(isAdvanceDue(will({ GuardianVote: { since: T0 } }), T0 + 50)).toBe(true);
   });
-  it("last stage completes only when every foreign stage is done", () => {
+  it("an unarmed will never leaves Active", () => {
+    const unaccepted = will("Active", { guardians: [{ account_id: "g1.testnet", accepted: true }, { account_id: "g2.testnet", accepted: false }] });
+    expect(isAdvanceDue(unaccepted, T0 + 10_000)).toBe(false);
+  });
+  it("each stage waits its own wait_after (the first is the longest)", () => {
+    const stage0: WillState = { Executing: { stage: 0, since: T0, stage_started: T0 } };
+    expect(isAdvanceDue(will(stage0), T0 + 29)).toBe(false);
+    expect(isAdvanceDue(will(stage0), T0 + 30)).toBe(true);
+  });
+  it("the last stage leads to the secrets buffer only when every foreign stage is done", () => {
     const executing: WillState = { Executing: { stage: 1, since: T0, stage_started: T0 } };
     expect(isAdvanceDue(will(executing), T0 + 10)).toBe(false);
     const done = [{ stage: 0, chain: "Eth" as const }, { stage: 1, chain: "Eth" as const }];
     expect(isAdvanceDue(will(executing, { stage_done: done }), T0 + 10)).toBe(true);
+  });
+  it("secrets buffer, then Completed once every note is released", () => {
+    expect(isAdvanceDue(will({ SecretsBuffer: { since: T0 } }), T0 + 19)).toBe(false);
+    expect(isAdvanceDue(will({ SecretsBuffer: { since: T0 } }), T0 + 20)).toBe(true);
+    const note = { id: 0, heir: "bola.testnet", label: "Ledger", ciphertext: "" };
+    const released: WillState = { SecretsReleased: { since: T0 } };
+    expect(isAdvanceDue(will(released, { sealed_notes: [note] }), T0 + 1)).toBe(false);
+    expect(isAdvanceDue(will(released, { sealed_notes: [note], released_notes: [{ note_id: 0, heir: "bola.testnet" }] }), T0 + 1)).toBe(true);
   });
 });
 
@@ -144,6 +175,26 @@ describe("Driver", () => {
     await t.driver.tick();
     expect(t.store.get().notifications.filter((n) => n.subject.startsWith("Guardian vote")).map((n) => n.to)).toEqual(["g1.testnet", "g2.testnet"]);
   });
+  it("asks only accepted guardians to vote", async () => {
+    const t = setup({ WelfareCheck: { since: T0 } }, [], {
+      guardians: [{ account_id: "g1.testnet", accepted: true }, { account_id: "g2.testnet", accepted: true }, { account_id: "g3.testnet", accepted: false }],
+    });
+    t.setNow(T0 + 10);
+    await t.driver.tick();
+    expect(t.store.get().notifications.filter((n) => n.subject.startsWith("Guardian vote")).map((n) => n.to)).toEqual(["g1.testnet", "g2.testnet"]);
+  });
+  it("the welfare check asks guardians, then friends, then the lawyer", async () => {
+    const t = setup({ Quiet: { since: T0 } }, [], { lawyer: "lawyer.testnet" });
+    t.store.update((s) => (s.policies["alice.testnet"] = { contacts: ["friend@example.com"] } as never));
+    t.setNow(T0 + 10);
+    await t.driver.tick();
+    expect(t.store.get().notifications.filter((n) => n.subject.startsWith("Have you heard")).map((n) => n.to)).toEqual([
+      "g1.testnet",
+      "g2.testnet",
+      "friend@example.com",
+      "lawyer.testnet",
+    ]);
+  });
   it("a failing adapter is logged and does not count as silence or activity", async () => {
     const t = setup("Active", [adapter("github", 0.5, () => new Error("rate limited"))]);
     await t.driver.tick();
@@ -154,15 +205,17 @@ describe("Driver", () => {
     const t = setup({ Executing: { stage: 0, since: T0, stage_started: T0 + 45 } });
     await t.driver.tick();
     expect(t.executed).toEqual(["alice.testnet"]);
-    expect(t.noted).toEqual(["Executing"]);
+    expect(t.noted).toEqual([], "secrets last: never while funds are moving");
   });
-  it("releases notes for Completed wills but never before execution", async () => {
-    const done = setup({ Completed: { at: T0 } });
-    await done.driver.tick();
-    expect(done.noted).toEqual(["Completed"]);
-    const challenge = setup({ Challenge: { since: T0 + 40 } });
-    await challenge.driver.tick();
-    expect(challenge.noted).toEqual([]);
+  it("releases notes only in SecretsReleased", async () => {
+    const released = setup({ SecretsReleased: { since: T0 + 40 } });
+    await released.driver.tick();
+    expect(released.noted).toEqual(["SecretsReleased"]);
+    for (const state of [{ Challenge: { since: T0 + 40 } }, { SecretsBuffer: { since: T0 + 40 } }, { Completed: { at: T0 } }] as WillState[]) {
+      const t = setup(state);
+      await t.driver.tick();
+      expect(t.noted).toEqual([]);
+    }
   });
 });
 

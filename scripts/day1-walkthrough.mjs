@@ -1,3 +1,5 @@
+// v1 ONLY: kept as the record of the Day 1 checkpoint. The v2 contract (CLAUDE.md §5.5) rejects this
+// config (stages_pct / stage_interval, no guardian acceptance); use demo-cancel.ts / demo-execute.ts.
 // Day 1 checkpoint (CLAUDE.md §12): on testnet, walk wills through every state from the CLI.
 //   Will A: Active -> Quiet -> WelfareCheck -> GuardianVote -> Challenge -> Executing{0}
 //           -> owner calls i_am_alive -> Active (remaining stage halted, partial execution recorded)

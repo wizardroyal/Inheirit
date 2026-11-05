@@ -1,4 +1,6 @@
-// Releases sealed notes to heirs once a will is Executing (or Completed, for heirs who register late).
+// Releases sealed notes to heirs once a will reaches SecretsReleased: after distribution and the
+// secrets buffer (CLAUDE.md §5.5). The will stays there until every note is out, so heirs who
+// register late still get theirs.
 // The contract enforces the same rules (state, heir match, heir key, once per note); these checks
 // avoid spending gas on calls that would fail.
 import type { WillContract, WillView } from "../near/will-contract";
@@ -20,7 +22,7 @@ export class NoteReleaser {
   async run(will: WillView): Promise<number> {
     if (!this.keypair) return 0;
     const state = stateName(will.state);
-    if (state !== "Executing" && state !== "Completed") return 0;
+    if (state !== "SecretsReleased") return 0;
 
     let released = 0;
     for (const note of will.sealed_notes) {

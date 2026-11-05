@@ -100,8 +100,9 @@ export class StagedExecutor implements Executor {
       if (!paidThisStage.has(addr)) unpaidShares[heir.id] = pct;
     }
 
-    const isLast = stage === will.stages_pct.length - 1;
-    const gross = stageAmount(BigInt(snapshot), will.stages_pct, stage, balance);
+    const pcts = will.round_stages.map((s) => s.pct);
+    const isLast = stage === pcts.length - 1;
+    const gross = stageAmount(BigInt(snapshot), pcts, stage, balance);
     if (Object.keys(unpaidShares).length && gross > 0n) {
       const sent = await vault.sendStage({ owner, round, stage, isLast, gross, unpaidShares, recipients });
       for (const t of sent) {

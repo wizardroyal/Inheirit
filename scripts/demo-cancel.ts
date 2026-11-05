@@ -6,9 +6,9 @@
 // Usage: AGENT_URL=http://localhost:3000 DEMO_OWNER=carol npx tsx scripts/demo-cancel.ts
 import { KeyPairSigner } from "@near-js/signers";
 import { randomBytes } from "node:crypto";
-import { checkPolicy, nearShareBps, policyHash } from "../src/policy/policy";
+import { checkPolicy } from "../src/policy/policy";
 import { loadKeys } from "./demo-keys";
-import { call, CONTRACT, ensureSubaccount, NEAR, nearblocks, sleep, stateName, view } from "./lib/near";
+import { acceptGuardians, call, CONTRACT, ensureSubaccount, NEAR, nearblocks, sleep, stateName, view, willConfig } from "./lib/near";
 
 const AGENT = process.env.AGENT_URL || "http://localhost:3000";
 const OWNER_NAME = process.env.DEMO_OWNER || "carol";
@@ -38,7 +38,7 @@ const check = checkPolicy({
   owner,
   heirs: [{ id: "bola", name: "Bola", near_account: heir }],
   allocations: [{ asset: "NEAR", shares: { bola: 100 } }],
-  stages_pct: [10, 30, 60],
+  stages_pct: [10, 20, 30, 40],
   guardians: [g1, g2],
   guardian_threshold: 2,
 });
@@ -47,24 +47,9 @@ const policy = check.policy;
 
 type Will = { state: unknown; near_balance: string; executions: unknown[] };
 if (await view("get_will", { owner })) throw new Error(`${owner} already has a will; use another DEMO_OWNER`);
-const created = await call(
-  owner,
-  "create_will",
-  {
-    config: {
-      heirs: [{ account_id: heir, name: "Bola", near_share_bps: nearShareBps(policy)[heir] }],
-      guardians: policy.guardians,
-      guardian_threshold: policy.guardian_threshold,
-      contacts: [],
-      stages_pct: policy.stages_pct,
-      timings: { quiet_after: 120, nudge_period: 60, welfare_period: 60, vote_period: 300, challenge_period: 120, stage_interval: 60 },
-      policy_hash: policyHash(policy),
-      foreign_chains: [],
-    },
-  },
-  NEAR / 10n,
-);
+const created = await call(owner, "create_will", { config: willConfig(policy, []) }, NEAR / 10n);
 console.log(`create_will ${nearblocks(created.hash)}`);
+await acceptGuardians(owner, policy.guardians);
 console.log(`deposit 0.5 NEAR ${nearblocks((await call(owner, "deposit_near", {}, NEAR / 2n)).hash)}`);
 await agentPost("/api/policy", { owner, policy });
 await agentPost("/api/owners", { signed: await signed(owner, "register_owner", {}) });
