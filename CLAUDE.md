@@ -1102,3 +1102,4 @@ INTENTS_MAX_USD_TOTAL=25
   - [VERIFIED] The NEAR AI TDX check still passes from inside the TEE: gateway and model TDX quotes `UpToDate`, report_data binds signer and nonce, NVIDIA GPU attestation passes.
   - **v2g shipped** in place (approved before the reboot). The agent `4808c109…` registered with the same sealed-notes key `ae74cf06…` and was funded by the new TEE sponsor; `paid-outside.testnet` was untouched. An unsigned `/api/owners` now gets 401. `bc3becbf…` is retired, so `02cc55b9…` is the only approved hash.
 
+- 2026-11-06 — [VERIFIED] **Regression on v2g** (hosted): `demo-cancel.ts`, owner `regressd.inheirit-fund-0am6d3.testnet`, passed. Challenge at 273 s, a lone SIMULATED X post ignored, signed heartbeat → Active, vault untouched. (The first try, `regressc`, failed on a transient "Transaction has expired" from the RPC at `create_will`, before any will existed.)
