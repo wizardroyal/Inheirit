@@ -1036,3 +1036,18 @@ INTENTS_MAX_USD_TOTAL=25
     - `scripts/mainnet-payout.ts` and `scripts/demo-payout.ts`.
   - Tests: 179 vitest (22 new). Fixed while testing: batch ids collided when two batches were made in the same millisecond, so a retry overwrote the refunded batch.
 - 2026-11-06 — [VERIFIED] **v2e live in the TEE** (in-place, no env change). Agent `9c364c97…` registered with the same sealed-notes key. `/api/intents/tokens` serves live 1Click prices from inside the TEE. `b075a4d2…` is retired; `fb1bd5d1…` is the only approved hash.
+- 2026-11-06 — [VERIFIED] **Payout scenario on the hosted stack** (`scripts/demo-payout.ts`, owner `payo1.inheirit-fund-0am6d3.testnet`, v2e TEE agent, SIMULATED 1Click).
+  - Setup: two heirs at 50/50, 1 NEAR, stable value.
+  - `/api/payouts` revealed no heirs before the release.
+  - Ada chose ETH on Base before the release. Tobi chose SOL on Solana only after stage 2.
+  - The slices worth $0.19 and $0.37 accumulated below the $1 minimum.
+  - Result:
+
+    | Heir | Batch | Value | Paid as | Status |
+    |---|---|---|---|---|
+    | Ada | stages 1+2+3 | $1.12 | USDC on Base (stable mode overrode ETH) | SUCCESS |
+    | Ada | stage 4 | $0.75 | USDC on Base, sent when the release ended | SUCCESS |
+    | Tobi | stages 1+2+3 | $1.12 | USDC on Solana | SUCCESS |
+    | Tobi | stage 4 | $0.75 | USDC on Solana | SUCCESS |
+
+  - Heir page checked in a browser against the hosted agent: the payout choice was saved through the UI; no page errors; no horizontal scroll at 390 px.
