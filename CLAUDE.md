@@ -1086,3 +1086,4 @@ INTENTS_MAX_USD_TOTAL=25
   - Fix: 3 NEAR from the demo funder `inheirit-fund-0am6d3.testnet` to the sponsor (tx `E5dncSfT92549y1RKBXp7zBwtNrECV93iB32tHjB8kXJ`), then v2f redeployed. The agent `ff3dff59…` registered with the same sealed-notes key, and an unsigned `/demo/signal` now returns 401. `bc3becbf…` is the only approved hash.
   - Prevention: `tee-agent.ts upgrade|env|start` check that the sponsor has ≥ 1 NEAR first.
   - Diagnostic helper (no route in the tool yet): `GET cloud-api.phala.network/api/v1/cvms/<uuid>/composition` shows the container state. It said `Restarting (1)`.
+- 2026-11-06 — [VERIFIED] **Regression on v2f** (hosted). `demo-cancel.ts`, owner `regressb.inheirit-fund-0am6d3.testnet`, passed: the owner-signed SIMULATED X post was ignored on its own, and the signed heartbeat cancelled Challenge → Active with the vault untouched. `next build` passes for the web app.
