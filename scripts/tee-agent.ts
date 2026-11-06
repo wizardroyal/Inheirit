@@ -11,6 +11,7 @@
 //   npx tsx scripts/tee-agent.ts retire <compose_hash>   remove an old version's approved measurements
 //   npx tsx scripts/tee-agent.ts status      CVM status, app_id, compose hash, agent registration
 //   npx tsx scripts/tee-agent.ts stop|start  pause billing; app_id and the sealed-notes key survive
+import "dotenv/config";
 import { execSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
@@ -211,7 +212,7 @@ async function requireSponsorHasNoContractKey(key: string) {
 
 async function requireSponsorFunds(minNear = 1) {
   const id = teeSponsor().id;
-  if (!id) return;
+  if (!id) throw new Error("No TEE sponsor in .env (TEE_SPONSOR_ACCOUNT_ID); refusing to reboot the agent without checking its funding");
   const r = await rpc({ request_type: "view_account", finality: "final", account_id: id });
   const amount = Number(BigInt((r.result?.amount as string) ?? "0") / 10n ** 20n) / 1e4;
   if (amount < minNear) throw new Error(`Sponsor ${id} has ${amount} NEAR; a reboot needs 0.5 for the new agent account. Top it up to at least ${minNear} NEAR first.`);

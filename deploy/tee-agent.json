@@ -94,7 +94,13 @@
       "compose_hash": "bc3becbf7c70bc1a512f6b7ad9326e3f693ea4b5bb41d4ac6fba3c07769cde8a",
       "image": "unwizarding/inheirit-agent@sha256:68467a10576cfef35b50a325a04e05354faec3d2a937bcf3bca7e4a94edd2ac5",
       "at": "2026-11-06T10:52:22.618Z",
-      "note": "v2f image (re-deployed after the sponsor top-up); live, only approved hash"
+      "note": "v2f image (re-deployed after the sponsor top-up); retired 2026-11-06 (v2g)"
+    },
+    {
+      "compose_hash": "02cc55b90732eaa871b06521bd2a6991dfc8fe19e53462d6a3256576e1dc7b0c",
+      "image": "unwizarding/inheirit-agent@sha256:b86d5af598c9aec1561e61ab3576bdadca7cdb2ff0ae91337e37ffa32057f55d",
+      "at": "2026-11-06T13:20:16.943Z",
+      "note": "v2g: second-audit fixes (signed owner routes, BTC signature cap, stale txs, owner withdrawals); first boot with the separate TEE sponsor tee-sponsor.inheirit-fund-0am6d3.testnet; live, only approved hash"
     }
   ]
 }

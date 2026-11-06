@@ -14,7 +14,7 @@ services:
       TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME}
     platform: linux/amd64
     # Pinned by digest: the compose hash (and so the approved measurements) covers this line
-    image: unwizarding/inheirit-agent@sha256:68467a10576cfef35b50a325a04e05354faec3d2a937bcf3bca7e4a94edd2ac5
+    image: unwizarding/inheirit-agent@sha256:b86d5af598c9aec1561e61ab3576bdadca7cdb2ff0ae91337e37ffa32057f55d
     container_name: shade-agent-app
     ports:
       - 3000:3000

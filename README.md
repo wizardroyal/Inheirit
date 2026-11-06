@@ -155,7 +155,7 @@ See [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md). In short:
 ```bash
 npm ci                                  # agent (repo root)
 cp .env.example .env                    # AGENT_CONTRACT_ID, SPONSOR_*, NEARAI_API_KEY, DEMO_MODE=true (TELEGRAM_* optional)
-npm test                                # agent tests (179)
+npm test                                # agent tests (206)
 npm run dev                             # agent on :3000
 cd web && npm ci && cp .env.example .env.local && npm run dev -- -p 3100   # web on :3100
 ```
