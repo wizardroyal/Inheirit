@@ -65,7 +65,13 @@
       "compose_hash": "88deb635cd6d35520dd42d9e646e6f87373723cc4ce2484e8902c636857bb03e",
       "image": "unwizarding/inheirit-agent@sha256:6d412c1a189b230fb721e0354cc6455c95baf28fa349ea78d2e01c81ad8a063e",
       "at": "2026-11-05T14:25:00.000Z",
-      "note": "v2c image (audit fixes: private Telegram chats, flags-only watching, verdict); live, only approved hash"
+      "note": "v2c image (audit fixes: private Telegram chats, flags-only watching, verdict); retired 2026-11-06"
+    },
+    {
+      "compose_hash": "b075a4d2d603a4221991734e7de59c74280691a4387b2d926f89c3f9d7666355",
+      "image": "unwizarding/inheirit-agent@sha256:97e7966997cc559e79fac8d55080930d4ad87c2b07b6709db68d03527c77c28e",
+      "at": "2026-11-06T08:47:30.994Z",
+      "note": "v2d image (Telegram repeats once per silence); live, only approved hash"
     }
   ]
 }
