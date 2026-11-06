@@ -273,9 +273,13 @@ export class PayoutEngine {
     }
     if (b.status === "PENDING_DEPOSIT" && b.depositAddress && !b.depositTx) {
       if (b.quoteDeadline && Date.parse(b.quoteDeadline) <= nowMs) {
-        b.status = "FAILED";
-        b.error = "The quote expired before the deposit";
-        return this.save(b);
+        // Nothing was sent to this address, so the quote is simply dropped and taken again (§9A.3);
+        // it doesn't count toward the batch's attempts.
+        b.status = "QUOTING";
+        b.depositAddress = b.quoteDeadline = b.expectedOut = b.expectedOutUsd = b.minAmountOut = undefined;
+        b.note = "The quote expired before the deposit; quoting again";
+        this.save(b);
+        return this.advance(b);
       }
       // Marked SENDING before the send and the hash saved right after, so a deposit is never sent twice.
       b.status = "SENDING";

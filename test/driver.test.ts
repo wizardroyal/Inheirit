@@ -221,7 +221,7 @@ describe("Driver", () => {
     const t = setup({ Executing: { stage: 0, since: T0, stage_started: T0 + 45 } });
     await t.driver.tick();
     expect(t.executed).toEqual(["alice.testnet"]);
-    expect(t.noted).toEqual([], "secrets last: never while funds are moving");
+    expect(t.noted, "secrets last: never while funds are moving").toEqual([]);
   });
   it("releases notes only in SecretsReleased", async () => {
     const released = setup({ SecretsReleased: { since: T0 + 40 } });

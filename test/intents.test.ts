@@ -259,6 +259,21 @@ describe("universal payout (SIMULATED)", () => {
     expect(t.batches()[0].status).toBe("PROCESSING");
   });
 
+  it("a quote that expired before the deposit is taken again, not counted as a failed attempt", async () => {
+    const t = setup();
+    t.prefer("ada.testnet", "base", BASE_USDC, ADA_BASE);
+    const w = will(executing, [exec(0, "Near", "ada.testnet", NEAR)]);
+    await t.engine.run(w);
+    const old = t.batches()[0].depositAddress;
+    t.store.update((s) => Object.assign(s.payouts["alice.testnet"][0], { status: "PENDING_DEPOSIT", depositTx: undefined, quoteDeadline: new Date(0).toISOString() }));
+    await t.engine.run(w);
+    const b = t.batches()[0];
+    expect(t.batches()).toHaveLength(1);
+    expect(b.status).not.toBe("FAILED");
+    expect(b.attempts).toBe(0);
+    expect(b.depositAddress).not.toBe(old);
+    expect(b.depositTx).toBeDefined();
+  });
   it("small slices accumulate below the minimum, and go out once the release is over", async () => {
     const t = setup({ minUsd: 5 });
     t.prefer("ada.testnet", "base", BASE_USDC, ADA_BASE);

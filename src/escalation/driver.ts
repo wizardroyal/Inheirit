@@ -23,6 +23,8 @@ const CHAIN_CLOCK_MARGIN_S = 5;
 
 export interface Executor {
   run(owner: string, will: WillView): Promise<void>;
+  /** Owner withdrawals from foreign vaults, while Active. */
+  withdraw?(owner: string, will: WillView): Promise<void>;
 }
 
 export interface NoteReleaser {
@@ -204,6 +206,7 @@ export class Driver {
     if (typeof will.state !== "string" && "Quiet" in will.state) await this.runChecks(cfg, will, will.state.Quiet.since, nowS);
 
     if (state === "Executing" && this.deps.executor) await this.deps.executor.run(cfg.owner, will);
+    if (state === "Active" && will.pending_withdrawals.some((w) => w.chain !== "Near")) await this.deps.executor?.withdraw?.(cfg.owner, will);
     // Secrets last: only once distribution and the buffer are over (the contract enforces it too).
     if (state === "SecretsReleased" && this.deps.notes) await this.deps.notes.run(will);
     // Onward payouts over NEAR Intents (§J.3) for every slice released so far, including after a halt.

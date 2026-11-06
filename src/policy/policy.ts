@@ -105,6 +105,9 @@ export function checkPolicy(input: unknown): PolicyCheck {
   for (const c of p.conditions) {
     if (!ids.has(c.heir)) errors.push(`conditions: unknown heir "${c.heir}"`);
   }
+  // The contract caps heirs × stages at 40 (the accelerated schedule has 3 stages), so every
+  // release round's records fit on-chain.
+  if (p.heirs.length * Math.max(p.stages_pct.length, 3) > 40) errors.push(`heirs × stages: ${p.heirs.length} heirs × ${p.stages_pct.length} stages is more than 40 slices; use fewer stages`);
   const stageSum = p.stages_pct.reduce((s, v) => s + v, 0);
   if (stageSum !== 100) errors.push(`stages_pct: sums to ${stageSum}, not 100`);
   if (p.guardian_threshold > p.guardians.length) errors.push("guardian_threshold: more than the number of guardians");

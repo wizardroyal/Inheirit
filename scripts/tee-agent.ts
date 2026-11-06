@@ -15,7 +15,7 @@ import { execSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { Account } from "@near-js/accounts";
-import type { KeyPairString } from "@near-js/crypto";
+import { KeyPair, type KeyPairString } from "@near-js/crypto";
 import { JsonRpcProvider } from "@near-js/providers";
 import { KeyPairSigner } from "@near-js/signers";
 import { rpcEndpoints } from "../src/config";
@@ -181,16 +181,39 @@ async function approve() {
  * the sponsor can't, the agent exits and docker restarts it forever (2026-11-06: hosted demo down for
  * ~40 min). Refuse to upgrade, stop or start without enough in the sponsor.
  */
-async function requireSponsorFunds(minNear = 1) {
-  const id = process.env.SPONSOR_ACCOUNT_ID;
-  if (!id) return;
+/**
+ * The account that funds each new agent account inside the TEE. It is a separate account
+ * (TEE_SPONSOR_* in .env, sent to the CVM as SPONSOR_*) with no key on the will contract: the key
+ * goes into the TEE, and code there must never hold a key that can redeploy or drain the contract
+ * (audit 2026-11-06). Falls back to SPONSOR_* only for older setups; pushEnv checks it either way.
+ */
+function teeSponsor(): { id?: string; key?: string } {
+  return { id: process.env.TEE_SPONSOR_ACCOUNT_ID || process.env.SPONSOR_ACCOUNT_ID, key: process.env.TEE_SPONSOR_PRIVATE_KEY || process.env.SPONSOR_PRIVATE_KEY };
+}
+
+async function rpc(params: unknown): Promise<{ result?: { [k: string]: unknown }; error?: unknown }> {
   const url = rpcEndpoints(process.env.NEAR_RPC_URL || "https://test.rpc.fastnear.com")[0];
-  const res = await fetch(url.url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...url.headers },
-    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "query", params: { request_type: "view_account", finality: "final", account_id: id } }),
-  });
-  const amount = Number(BigInt((await res.json()).result?.amount ?? "0") / 10n ** 20n) / 1e4;
+  const res = await fetch(url.url, { method: "POST", headers: { "Content-Type": "application/json", ...url.headers }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "query", params }) });
+  return res.json();
+}
+
+/** Refuses a TEE sponsor key that is also an access key on the will contract account. */
+async function requireSponsorHasNoContractKey(key: string) {
+  const contract = process.env.AGENT_CONTRACT_ID;
+  if (!contract) throw new Error("AGENT_CONTRACT_ID is not set");
+  const publicKey = KeyPair.fromString(key as KeyPairString).getPublicKey().toString();
+  const r = await rpc({ request_type: "view_access_key", finality: "final", account_id: contract, public_key: publicKey });
+  const missing = !!r.error || (typeof r.result?.error === "string" && /does not exist/.test(r.result.error as string));
+  if (!missing) {
+    throw new Error(`The TEE sponsor key is an access key on ${contract}; code in the TEE could redeploy or drain the contract. Set TEE_SPONSOR_ACCOUNT_ID / TEE_SPONSOR_PRIVATE_KEY to an account with no rights on it.`);
+  }
+}
+
+async function requireSponsorFunds(minNear = 1) {
+  const id = teeSponsor().id;
+  if (!id) return;
+  const r = await rpc({ request_type: "view_account", finality: "final", account_id: id });
+  const amount = Number(BigInt((r.result?.amount as string) ?? "0") / 10n ** 20n) / 1e4;
   if (amount < minNear) throw new Error(`Sponsor ${id} has ${amount} NEAR; a reboot needs 0.5 for the new agent account. Top it up to at least ${minNear} NEAR first.`);
   console.log(`sponsor ${id}: ${amount} NEAR`);
 }
@@ -230,7 +253,12 @@ async function upgrade() {
 async function encryptedDotenv(client: any, record: Record): Promise<{ envs: { key: string; value: string }[]; encryptedEnv: string }> {
   const { parseEnvVars } = await cli("phala-deploy.js");
   const { encryptEnvVars } = await phalaCloud();
-  const envs = (parseEnvVars(fs.readFileSync("./.env", "utf8")) as { key: string; value: string }[]).filter((e) => ENV_KEYS.includes(e.key));
+  const sponsor = teeSponsor();
+  if (!sponsor.id || !sponsor.key) throw new Error("No TEE sponsor in .env (TEE_SPONSOR_ACCOUNT_ID / TEE_SPONSOR_PRIVATE_KEY)");
+  await requireSponsorHasNoContractKey(sponsor.key);
+  const envs = (parseEnvVars(fs.readFileSync("./.env", "utf8")) as { key: string; value: string }[])
+    .filter((e) => ENV_KEYS.includes(e.key))
+    .map((e) => (e.key === "SPONSOR_ACCOUNT_ID" ? { ...e, value: sponsor.id! } : e.key === "SPONSOR_PRIVATE_KEY" ? { ...e, value: sponsor.key! } : e));
   // Newer API versions nest the key under kms_info; fall back to asking the KMS for the app's key.
   const info = await client.getCvmInfo({ id: record.vm_uuid });
   let envPubkey: string | undefined = info.encrypted_env_pubkey ?? info.kms_info?.encrypted_env_pubkey ?? undefined;

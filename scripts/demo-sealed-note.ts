@@ -13,7 +13,7 @@ import sodium from "libsodium-wrappers";
 import { checkPolicy, policyHash, type Policy } from "../src/policy/policy";
 import { keypairFromSeed, openSealed, sealTo, toHex } from "../src/sealed/crypto";
 import { loadKeys, saveKey } from "./demo-keys";
-import { acceptGuardians, call, CONTRACT, ensureSubaccount, NEAR, nearblocks, sleep, stateName, view, willConfig } from "./lib/near";
+import { acceptGuardians, call, CONTRACT, ensureSubaccount, NEAR, nearblocks, signedRequest, sleep, stateName, view, willConfig } from "./lib/near";
 
 const AGENT = process.env.AGENT_URL || "http://localhost:3000";
 const OWNER_NAME = process.env.DEMO_OWNER || "dora";
@@ -40,7 +40,7 @@ let fromEnglish = false;
 const att = await agent("/api/attestation/ai");
 if (att.status === 200) {
   console.log(`NEAR AI model ${att.json.model} attested: ${att.json.ok} (${att.json.ok ? "all checks pass" : att.json.error})`);
-  const draft = await agent("/api/policy/draft", { owner, text: english });
+  const draft = await agent("/api/policy/draft", { signed: await signedRequest(owner, "draft_policy", { text: english }) });
   if (draft.status !== 200 || !draft.json.ok) throw new Error(`policy draft failed: ${JSON.stringify(draft.json.errors ?? draft.json)}`);
   console.log(`Will in English: "${english}"`);
   console.log(`Response signature verified: ${draft.json.ai.signature.ok} (signer ${draft.json.ai.signature.signingAddress})`);
@@ -89,7 +89,7 @@ console.log(`heir registers key ${nearblocks((await call(heir, "register_heir_ke
 
 // 4. Silence → execution
 await agent("/api/policy", { owner, policy });
-const watching = await agent("/api/owners", { owner });
+const watching = await agent("/api/owners", { signed: await signedRequest(owner, "register_owner", {}) });
 if (watching.status !== 200) throw new Error(`agent refused to watch ${owner}: ${JSON.stringify(watching.json)}`);
 console.log("Owner goes silent; the agent escalates. Notes are released last: after all stages and the buffer (about 13 min)…");
 

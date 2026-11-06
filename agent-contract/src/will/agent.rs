@@ -167,6 +167,18 @@ impl Contract {
         require_ref(&to, "to");
         require_ref(&amount, "amount");
         require_ref(&tx_hash, "tx_hash");
+        // At most two foreign chains × MAX_HEIR_STAGE_SLICES per round, so the NEAR slices that
+        // `advance` records always fit and a misbehaving agent can't freeze the release.
+        let round = will.execution_round;
+        let foreign = will
+            .executions
+            .iter()
+            .filter(|e| e.round == round && e.chain != Chain::Near)
+            .count();
+        require!(
+            foreign < 2 * MAX_HEIR_STAGE_SLICES,
+            "Foreign execution record limit for this round reached"
+        );
         // Allowed after a halt too: a tx signed just before the owner returned can still land,
         // and the history should show it.
         let rec = ExecutionRecord {

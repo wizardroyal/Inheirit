@@ -75,3 +75,12 @@ export function willConfig(policy: Policy, foreignChains: ("Eth" | "Btc")[]) {
 export async function acceptGuardians(owner: string, guardians: string[]) {
   for (const g of guardians) console.log(`  ${g} accepts the guardian role ${nearblocks((await call(g, "accept_guardian", { owner })).hash)}`);
 }
+
+/** NEP-413 request signed with a demo account's key, as the web app sends it (every agent write is signed). */
+export async function signedRequest(accountId: string, action: string, data?: unknown) {
+  const { randomBytes } = await import("node:crypto");
+  const message = JSON.stringify({ action, owner: accountId, issued_at: Date.now(), data });
+  const nonce = randomBytes(32);
+  const s = await KeyPairSigner.fromSecretKey(loadKeys()[accountId] as KeyPairString).signNep413Message(message, accountId, CONTRACT, nonce);
+  return { account_id: accountId, public_key: s.publicKey.toString(), signature: Buffer.from(s.signature).toString("base64"), nonce: nonce.toString("base64"), message };
+}

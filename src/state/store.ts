@@ -40,6 +40,22 @@ export interface PendingTx {
   hash: string;
   /** What this tx pays: heir id -> [address, amount in smallest units]. */
   pays: Record<string, [string, string]>;
+  /** BTC only: the outpoints this tx spends, to tell when another tx spent them and this one is dead. */
+  inputs?: { txid: string; vout: number }[];
+  /** EVM only: when this tx was first seen dead (unknown, and its nonce used by another tx). */
+  deadSince?: string;
+}
+
+/**
+ * A BTC stage tx being signed (one MPC signature per input, ~1 min each). The contract caps
+ * signatures per (stage, chain), so signatures already obtained are kept across crashes and
+ * timeouts instead of being requested again.
+ */
+export interface BtcSigning {
+  inputs: { txid: string; vout: number; value: number }[];
+  outputs: { address: string; value: number }[];
+  pays: Record<string, [string, string]>;
+  sigs: { r: string; s: string; v: number }[];
 }
 
 /** Where an heir wants to receive their inheritance (§J.3). */
@@ -113,6 +129,8 @@ export interface AgentState {
    * instead of signing a second one: `${owner}:${round}:${stage}:${chain}` -> pending tx.
    */
   pendingTxs: Record<string, PendingTx>;
+  /** BTC stage txs part-way through signing: same key as pendingTxs. */
+  btcSigning: Record<string, BtcSigning>;
   /** Last will state the driver notified about: owner -> state name. */
   notifiedState: Record<string, string>;
   notifications: Notification[];
@@ -149,6 +167,7 @@ const EMPTY: AgentState = {
   evmNonces: {},
   snapshots: {},
   pendingTxs: {},
+  btcSigning: {},
   notifiedState: {},
   notifications: [],
   telegramLinks: {},

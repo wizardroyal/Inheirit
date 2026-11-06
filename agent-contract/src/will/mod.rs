@@ -34,6 +34,11 @@ pub const MAX_PENDING_WITHDRAWALS: usize = 5;
 pub const MAX_SIGNATURES_PER_STAGE_CHAIN: u8 = 16;
 pub const MAX_SIGNATURES_PER_WITHDRAWAL: u8 = 16;
 pub const MAX_EXECUTION_RECORDS: usize = 200;
+/// heirs × stages (of the longer schedule) per will. One round then records at most
+/// 40 × 3 chains = 120 transfers, so a round always fits under MAX_EXECUTION_RECORDS.
+pub const MAX_HEIR_STAGE_SLICES: usize = 40;
+/// Only the most recent halts are kept (each false alarm adds one; the contract pays their storage).
+pub const MAX_HALT_RECORDS: usize = 20;
 /// The lawyer plus every guardian.
 pub const MAX_DEATH_PROOFS: usize = MAX_GUARDIANS + 1;
 pub const MAX_REF_CHARS: usize = 128; // addresses and tx hashes
@@ -454,6 +459,11 @@ impl WillConfig {
 
         validate_stages(&self.stages, "Stages");
         validate_stages(&self.accelerated_stages, "Accelerated stages");
+        require!(
+            self.heirs.len() * self.stages.len().max(self.accelerated_stages.len())
+                <= MAX_HEIR_STAGE_SLICES,
+            "Too many heirs × stages (at most 40 slices per chain)"
+        );
 
         let t = &self.timings;
         require!(
@@ -707,6 +717,9 @@ impl Will {
                 "execution_halted",
                 serde_json::json!({ "owner": self.owner, "halt": halt }),
             );
+            if self.halted.len() >= MAX_HALT_RECORDS {
+                self.halted.remove(0);
+            }
             self.halted.push(halt);
         }
         self.attestations.clear();
@@ -717,7 +730,16 @@ impl Will {
         }
     }
 
+    /// Called inside `advance` for NEAR slices, so it must not fail for a valid will: when the list
+    /// is full, records of earlier rounds (already paid, kept only as history) make room. A single
+    /// round can't fill it (MAX_HEIR_STAGE_SLICES).
     fn record_execution(&mut self, rec: ExecutionRecord) {
+        if self.executions.len() >= MAX_EXECUTION_RECORDS {
+            let round = self.execution_round;
+            if let Some(i) = self.executions.iter().position(|e| e.round < round) {
+                self.executions.remove(i);
+            }
+        }
         require!(
             self.executions.len() < MAX_EXECUTION_RECORDS,
             "Execution record limit reached"

@@ -14,7 +14,7 @@ import { checkPolicy, policyHash, type Policy } from "./policy/policy";
 import { SIMULATED_SOURCES } from "./signals/adapters";
 import type { SignalSource } from "./liveness/score";
 import { explainLiveness } from "./liveness/verdict";
-import type { OwnerSignalConfig, Store } from "./state/store";
+import type { Notification, OwnerSignalConfig, Store } from "./state/store";
 import type { TelegramBot } from "./telegram/bot";
 import { type OneClickClient, quoteRequest, usdValue } from "./intents/oneclick";
 import { checkPayoutPref, MIN_PAYOUT_USD, ORIGIN_ASSET, payoutTokens, pendingSlices, slicesFor } from "./intents/payout";
@@ -49,8 +49,14 @@ export interface ApiDeps {
   };
 }
 
+// States in which heirs may be named (§5.5 heirs hidden).
+const REVEALED = ["Executing", "SecretsBuffer", "SecretsReleased", "Completed"];
+const maskEmail = (e: string) => {
+  const [user, domain = ""] = e.split("@");
+  return `${user.slice(0, 1)}…@${domain}`;
+};
+
 const DraftText = z.object({ text: z.string().min(10).max(4000) });
-const DraftRequest = DraftText.extend({ owner: z.string().min(2) });
 
 const GuideRequest = z.object({
   owner: z.string().min(2),
@@ -63,7 +69,6 @@ const OwnerFields = z.object({
   github: z.string().regex(/^[A-Za-z0-9-]{1,39}$/).optional(),
   email: z.string().email().optional(),
 });
-const OwnerConfig = OwnerFields.extend({ owner: z.string().min(2) });
 
 const PayoutChoice = z.object({
   owner: z.string().min(2),
@@ -120,39 +125,55 @@ export function api(deps: ApiDeps): Hono {
   }
   const tooMany = (waitMs: number) => ({ error: "Too many requests; try again later", retry_after_s: Math.ceil(waitMs / 1000) });
 
+  // Notification records are public (the owner's dashboards read them unsigned), so recipients are
+  // masked: email addresses are shortened, and heirs are named only while the will is in a state
+  // where heirs are revealed (§5.5 heirs hidden); after a halt they are hidden again.
+  function publicNotifications(list: Notification[], will: WillView | null): Notification[] {
+    const revealed = !!will && REVEALED.includes(stateName(will.state));
+    const heirs = new Set(will?.heirs.map((h) => h.account_id) ?? []);
+    const mask = (to: string) => (to.includes("@") ? maskEmail(to) : heirs.has(to) && !revealed ? "an heir" : to);
+    return list.map((n) => ({ ...n, to: [...new Set(n.to.map(mask))] }));
+  }
+
   app.get("/", (c) => c.json({ message: "Inheirit will agent is running", demoMode: deps.demoMode }));
   app.get("/api/agent-info", async (c) => c.json(await deps.agentInfo()));
 
-  // Body is either an owner-signed request ({ signed }) or, in demo mode only, plain fields.
-  // Returns the owner and the payload fields, or a response to send back.
-  async function ownerRequest<T extends z.ZodTypeAny>(body: unknown, action: SignedAction, fields: T, plain: z.ZodTypeAny) {
+  // Every request that changes a will's data or spends our credit is NEP-413 signed by the account it
+  // acts for, demo mode included: the hosted demo runs in demo mode, so an unsigned path there would
+  // let a stranger act for any owner. Returns the signer and the payload fields, or a response.
+  async function ownerRequest<T extends z.ZodTypeAny>(body: unknown, action: SignedAction, fields: T, unsignedError = "This request must be signed by the account (NEP-413)") {
     const signed = (body as { signed?: unknown } | null)?.signed;
-    if (signed) {
-      let v: Verified;
-      try {
-        v = await deps.auth.verify(signed, action);
-      } catch (e) {
-        const msg = e instanceof AuthError || e instanceof z.ZodError ? e.message : `could not check the signature: ${String(e)}`;
-        return { error: { status: 401 as const, body: { error: msg } } };
-      }
-      const data = fields.safeParse(v.data ?? {});
-      if (!data.success) return { error: { status: 400 as const, body: { error: data.error.issues } } };
-      return { owner: v.owner, data: data.data as z.infer<T>, signed: true };
+    if (!signed) return { error: { status: 401 as const, body: { error: unsignedError } } };
+    let v: Verified;
+    try {
+      v = await deps.auth.verify(signed, action);
+    } catch (e) {
+      const msg = e instanceof AuthError || e instanceof z.ZodError ? e.message : `could not check the signature: ${String(e)}`;
+      return { error: { status: 401 as const, body: { error: msg } } };
     }
-    if (!deps.demoMode) return { error: { status: 403 as const, body: { error: "This request needs an owner signature (NEP-413) outside demo mode" } } };
-    const data = plain.safeParse(body);
+    const data = fields.safeParse(v.data ?? {});
     if (!data.success) return { error: { status: 400 as const, body: { error: data.error.issues } } };
-    const { owner, ...rest } = data.data as { owner: string };
-    return { owner, data: rest as z.infer<T>, signed: false };
+    return { owner: v.owner, data: data.data as z.infer<T>, signed: true };
   }
 
-  // Which public identities to watch for an owner. Anyone could claim a GitHub handle for someone
-  // else's will and keep it "alive", so it must be signed by the owner (unsigned only in demo mode).
+  // Which public identities to watch for an owner. Anyone could claim a busy EVM address or GitHub
+  // handle for someone else's will and keep it "alive" forever, so it is always owner-signed, demo
+  // mode included (the hosted demo runs in demo mode).
   app.post("/api/owners", async (c) => {
-    const r = await ownerRequest(await c.req.json(), "register_owner", OwnerFields, OwnerConfig);
+    const r = await ownerRequest(await c.req.json(), "register_owner", OwnerFields, "Watching settings must be signed by the owner");
     if (r.error) return c.json(r.error.body, r.error.status);
     const { evm_address, github, email } = r.data;
     if (!(await contract.getWill(r.owner))) return c.json({ error: `No will for ${r.owner}` }, 404);
+    // The release itself must not count as a sign of life: the will's own ETH vault (its nonce rises
+    // with every slice) and an heir's receive address are refused.
+    if (evm_address) {
+      const a = evm_address.toLowerCase();
+      const eth = deps.vaults.find((v) => v.chain === "Eth");
+      const vault = eth ? (await eth.address(r.owner).catch(() => "")).toLowerCase() : "";
+      const heirs = (store.get().policies[r.owner]?.heirs ?? []).map((h) => h.receive?.eth?.toLowerCase());
+      if (a === vault) return c.json({ error: "That is this will's own vault address; give an address you use yourself" }, 400);
+      if (heirs.includes(a)) return c.json({ error: "That is an heir's receive address; give an address you use yourself" }, 400);
+    }
     const watchedSince = new Date().toISOString();
     store.update((s) => (s.owners[r.owner] = { owner: r.owner, evmAddress: evm_address, github, email, watchedSince }));
     return c.json({ ok: true, signed: r.signed, watching: store.get().owners[r.owner] });
@@ -161,9 +182,7 @@ export function api(deps: ApiDeps): Hono {
   // Heartbeat app ping: a real, strong signal, because it is signed by a key on the owner's account
   // (a full-access key, or a device key limited to the will contract).
   app.post("/api/heartbeat", async (c) => {
-    const body = (await c.req.json()) as { signed?: unknown };
-    if (!body?.signed) return c.json({ error: "A heartbeat must be signed by the owner" }, 401);
-    const r = await ownerRequest(body, "heartbeat", z.object({}).passthrough(), z.never());
+    const r = await ownerRequest(await c.req.json(), "heartbeat", z.object({}).passthrough(), "A heartbeat must be signed by the owner");
     if (r.error) return c.json(r.error.body, r.error.status);
     if (!(await contract.getWill(r.owner))) return c.json({ error: `No will for ${r.owner}` }, 404);
     const at = new Date().toISOString();
@@ -205,7 +224,7 @@ export function api(deps: ApiDeps): Hono {
             }
           : null,
         signals,
-        notifications: s.notifications.filter((n) => n.owner === owner).slice(-30),
+        notifications: publicNotifications(s.notifications.filter((n) => n.owner === owner).slice(-30), will),
         telegram: deps.telegram ? { enabled: true, bot: deps.telegram.username, linked: deps.telegram.isLinked(owner) } : { enabled: false, linked: false },
       };
     });
@@ -219,10 +238,10 @@ export function api(deps: ApiDeps): Hono {
   });
 
   // Plain-English will → validated draft + summary for the owner to approve. It spends our NEAR AI
-  // credit and carries will content, so it must be owner-signed (unsigned only in demo mode).
+  // credit and carries will content, so it must be owner-signed.
   app.post("/api/policy/draft", async (c) => {
     if (!deps.ai) return c.json({ error: "NEAR AI is not configured (NEARAI_API_KEY)" }, 503);
-    const r = await ownerRequest(await c.req.json(), "draft_policy", DraftText, DraftRequest);
+    const r = await ownerRequest(await c.req.json(), "draft_policy", DraftText);
     if (r.error) return c.json(r.error.body, r.error.status);
     const wait = limiters.draft.take(r.owner);
     if (wait) return c.json(tooMany(wait), 429);
@@ -237,9 +256,7 @@ export function api(deps: ApiDeps): Hono {
   // only that heir's own claim facts.
   app.post("/api/heir/guide", async (c) => {
     if (!deps.ai) return c.json({ error: "NEAR AI is not configured (NEARAI_API_KEY)" }, 503);
-    const body = (await c.req.json()) as { signed?: unknown };
-    if (!body?.signed) return c.json({ error: "The guide needs a request signed by the heir" }, 401);
-    const r = await ownerRequest(body, "heir_guide", GuideRequest, z.never());
+    const r = await ownerRequest(await c.req.json(), "heir_guide", GuideRequest, "The guide needs a request signed by the heir");
     if (r.error) return c.json(r.error.body, r.error.status);
     const heir = r.owner;
     const will = await contract.getWill(r.data.owner);
@@ -299,19 +316,18 @@ export function api(deps: ApiDeps): Hono {
     });
   });
 
-  app.get("/api/notifications", (c) => {
+  app.get("/api/notifications", async (c) => {
     const owner = c.req.query("owner");
-    const all = store.get().notifications;
-    return c.json(owner ? all.filter((n) => n.owner === owner) : all);
+    if (!owner) return c.json({ error: "owner is required" }, 400);
+    const will = await cached(`will:${owner}`, 5_000, () => contract.getWill(owner)).catch(() => null);
+    return c.json(publicNotifications(store.get().notifications.filter((n) => n.owner === owner), will));
   });
 
   // Telegram link (§7.7): a one-time t.me deep link for the signing account (owner, guardian or friend).
   // Always signed: a chat linked to someone else's account could keep their will "alive".
   app.post("/api/telegram/link", async (c) => {
     if (!deps.telegram) return c.json({ error: "Telegram is not configured on this agent" }, 503);
-    const body = (await c.req.json()) as { signed?: unknown };
-    if (!body?.signed) return c.json({ error: "Linking Telegram must be signed by the account" }, 401);
-    const r = await ownerRequest(body, "telegram_link", z.object({}).passthrough(), z.never());
+    const r = await ownerRequest(await c.req.json(), "telegram_link", z.object({}).passthrough(), "Linking Telegram must be signed by the account");
     if (r.error) return c.json(r.error.body, r.error.status);
     return c.json({ ok: true, account: r.owner, ...deps.telegram.issueLink(r.owner) });
   });
@@ -333,9 +349,7 @@ export function api(deps: ApiDeps): Hono {
   // An heir's payout choice (§J.3). Signed by the heir: it decides where their inheritance goes.
   app.post("/api/heir/payout", async (c) => {
     if (!deps.intents) return c.json({ error: "NEAR Intents is not configured on this agent" }, 503);
-    const body = (await c.req.json()) as { signed?: unknown };
-    if (!body?.signed) return c.json({ error: "A payout choice must be signed by the heir" }, 401);
-    const r = await ownerRequest(body, "payout_pref", PayoutChoice, z.never());
+    const r = await ownerRequest(await c.req.json(), "payout_pref", PayoutChoice, "A payout choice must be signed by the heir");
     if (r.error) return c.json(r.error.body, r.error.status);
     const heir = r.owner;
     const will = await contract.getWill(r.data.owner);
@@ -379,7 +393,7 @@ export function api(deps: ApiDeps): Hono {
     const policy = s.policies[owner];
     // Heirs stay hidden (§8): only while the release is under way or done. After a halt the will is
     // back to Active and heirs are hidden again (break-it 2026-11-06).
-    const revealed = ["Executing", "SecretsBuffer", "SecretsReleased", "Completed"].includes(stateName(will.state));
+    const revealed = REVEALED.includes(stateName(will.state));
     const base = { enabled: !!deps.intents, simulated: deps.intents?.simulated ?? true, value_mode: policy?.payout_value_mode ?? "as_is", min_usd: MIN_PAYOUT_USD };
     const slices = slicesFor(will, policy);
     if (!slices.length || !deps.intents || !revealed) return c.json({ ...base, started: false, heirs: {} });
@@ -469,9 +483,7 @@ export function api(deps: ApiDeps): Hono {
   // Tops up an Active demo will's empty Sepolia/BTC vaults once. Owner-signed and capped per day.
   app.post("/demo/faucet", async (c) => {
     if (!deps.demoMode || !deps.faucet) return c.json({ error: "The demo faucet is not enabled" }, 403);
-    const body = (await c.req.json()) as { signed?: unknown };
-    if (!body?.signed) return c.json({ error: "The faucet needs a request signed by the will's owner" }, 401);
-    const r = await ownerRequest(body, "demo_faucet", z.object({}).passthrough(), z.never());
+    const r = await ownerRequest(await c.req.json(), "demo_faucet", z.object({}).passthrough(), "The faucet needs a request signed by the will's owner");
     if (r.error) return c.json(r.error.body, r.error.status);
     const owner = r.owner;
     // Each chain is funded at most once per will; a chain whose send failed can be retried.
@@ -506,9 +518,7 @@ export function api(deps: ApiDeps): Hono {
     if (!deps.demoMode) return c.json({ error: "Simulated signals are available only in demo mode" }, 403);
     // Signed by the owner: a SIMULATED Gmail or Calendar signal (0.7) counts alone, so an unsigned
     // route would let anyone keep any demo will from ever executing (break-it 2026-11-06).
-    const body = (await c.req.json()) as { signed?: unknown };
-    if (!body?.signed) return c.json({ error: "A simulated signal must be signed by the owner" }, 401);
-    const r = await ownerRequest(body, "demo_signal", DemoSignalFields, z.never());
+    const r = await ownerRequest(await c.req.json(), "demo_signal", DemoSignalFields, "A simulated signal must be signed by the owner");
     if (r.error) return c.json(r.error.body, r.error.status);
     const { owner } = r;
     const { source, at } = r.data;

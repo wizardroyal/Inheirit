@@ -36,6 +36,8 @@ export interface ChainVault {
   balance(owner: string): Promise<bigint>;
   /** Builds, gets signed (via the contract's gated request_signature), and broadcasts the stage. */
   sendStage(job: StageJob): Promise<SentTransfer[]>;
+  /** Sends an owner's pending withdrawal (signed with the Withdrawal purpose); returns the tx hash. */
+  sendWithdrawal?(owner: string, w: { id: number; to: string; amount: string }): Promise<string>;
 }
 
 export class StagedExecutor implements Executor {
@@ -45,6 +47,27 @@ export class StagedExecutor implements Executor {
     private readonly store: Store,
     private readonly log: (msg: string) => void = (m) => console.log(m),
   ) {}
+
+  /**
+   * The owner's pending withdrawals from foreign vaults (§5.2; principle 6: the owner never loses
+   * control while alive). The contract signs them only while the will is Active and only for a
+   * matching request on the same chain; NEAR withdrawals are paid by the contract itself.
+   */
+  async withdraw(owner: string, will: WillView): Promise<void> {
+    if (stateName(will.state) !== "Active") return;
+    for (const w of will.pending_withdrawals) {
+      if (w.chain === "Near") continue;
+      const vault = this.vaults.find((v) => v.chain === w.chain);
+      if (!vault?.sendWithdrawal) continue;
+      try {
+        const tx = await vault.sendWithdrawal(owner, w);
+        await this.contract.completeWithdrawal(owner, w.id, tx);
+        this.log(`[executor] ${owner}: withdrawal ${w.id} sent on ${w.chain} (${tx})`);
+      } catch (e) {
+        this.log(`[executor] ${owner} withdrawal ${w.id} on ${w.chain}: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    }
+  }
 
   async run(owner: string, will: WillView): Promise<void> {
     if (stateName(will.state) !== "Executing" || typeof will.state === "string" || !("Executing" in will.state)) return;

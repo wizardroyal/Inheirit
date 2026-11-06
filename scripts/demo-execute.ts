@@ -7,7 +7,7 @@
 // Usage: npx tsx scripts/demo-execute.ts
 import { checkPolicy } from "../src/policy/policy";
 import { demoHeirAddresses } from "./demo-keys";
-import { acceptGuardians, call, CONTRACT, ensureSubaccount, NEAR, nearblocks, sleep, stateName, view, willConfig } from "./lib/near";
+import { acceptGuardians, call, CONTRACT, ensureSubaccount, NEAR, nearblocks, signedRequest, sleep, stateName, view, willConfig } from "./lib/near";
 
 const AGENT = process.env.AGENT_URL || "http://localhost:3000";
 const OWNER_NAME = process.env.DEMO_OWNER || "alice";
@@ -53,7 +53,7 @@ if (!will) {
 }
 
 await agentPost("/api/policy", { owner, policy });
-await agentPost("/api/owners", { owner });
+await agentPost("/api/owners", { signed: await signedRequest(owner, "register_owner", {}) });
 const vaults = await (await fetch(`${AGENT}/api/vaults/${owner}`)).json();
 console.log(`agent is watching ${owner}; vaults ${JSON.stringify(vaults)}`);
 console.log("Owner goes silent. The agent escalates: Quiet -> WelfareCheck -> GuardianVote (about 4 min)…");

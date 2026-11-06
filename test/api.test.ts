@@ -78,9 +78,11 @@ describe("demo-only routes", () => {
   it("only simulated sources can be written", async () => {
     expect((await setup(true).post("/demo/signal", sim({ source: "near_onchain" }))).status).toBe(400);
   });
-  it("unsigned owner registration works only in demo mode", async () => {
-    expect((await setup(false).post("/api/owners", { owner: "alice.testnet" })).status).toBe(403);
-    expect((await setup(true).post("/api/owners", { owner: "alice.testnet", github: "alice" })).status).toBe(200);
+  it("owner registration is never unsigned, even in demo mode (a stranger's busy EVM address would keep the will alive)", async () => {
+    expect((await setup(false).post("/api/owners", { owner: "alice.testnet" })).status).toBe(401);
+    const t = setup(true);
+    expect((await t.post("/api/owners", { owner: "alice.testnet", evm_address: "0x" + "b".repeat(40) })).status).toBe(401);
+    expect(t.store.get().owners["alice.testnet"]).toBeUndefined();
   });
 });
 
@@ -90,6 +92,17 @@ describe("owner-signed routes", () => {
     const res = await t.post("/api/owners", { signed: { owner: "alice.testnet", action: "register_owner", data: { github: "alice" } } });
     expect(await res.json()).toMatchObject({ ok: true, signed: true });
     expect(t.store.get().owners["alice.testnet"]).toMatchObject({ owner: "alice.testnet", github: "alice", watchedSince: expect.any(String) });
+  });
+  it("refuses the will's own vault or an heir's receive address as the owner's EVM address", async () => {
+    const vault = "0x" + "c".repeat(40);
+    const heirEth = "0x" + "d".repeat(40);
+    const vaults = [{ chain: "Eth", address: async () => vault, balance: async () => 0n }] as unknown as ApiDeps["vaults"];
+    const t = setup(false, HASH, undefined, { vaults });
+    t.store.update((s) => (s.policies["alice.testnet"] = { ...parsed.policy, heirs: [{ ...parsed.policy.heirs[0], receive: { eth: heirEth } }] }));
+    const reg = (evm_address: string) => t.post("/api/owners", { signed: { owner: "alice.testnet", action: "register_owner", data: { evm_address } } });
+    expect((await reg(vault.toUpperCase().replace("0X", "0x"))).status).toBe(400);
+    expect((await reg(heirEth)).status).toBe(400);
+    expect((await reg("0x" + "e".repeat(40))).status).toBe(200);
   });
   it("refuses a bad signature", async () => {
     const res = await setup(true).post("/api/owners", { signed: { owner: "alice.testnet", action: "register_owner", bad: true } });
@@ -185,6 +198,17 @@ describe("GET /api/overview/:owner", () => {
     expect(body.signals.verdict.headline).toMatch(/^Alive\./);
     expect(body.notifications.map((n: { owner: string }) => n.owner)).toEqual(["alice.testnet"]);
     expect(body.telegram).toEqual({ enabled: false, linked: false });
+  });
+  it("masks notification recipients: emails shortened, heirs hidden before release, no list of every owner", async () => {
+    const t = setup(true);
+    t.store.update((s) =>
+      s.notifications.push({ at: "2026-11-05T00:00:00Z", owner: "alice.testnet", event: "Executing", to: ["bola.testnet", "friend@example.com", "g1.testnet"], channels: ["ui"], subject: "s", body: "b" }),
+    );
+    const notes = await (await t.app.request("/api/notifications?owner=alice.testnet")).json();
+    expect(notes[0].to).toEqual(["an heir", "f…@example.com", "g1.testnet"]);
+    const overview = await (await t.app.request("/api/overview/alice.testnet")).text();
+    expect(overview).not.toMatch(/bola\.testnet|friend@/);
+    expect((await t.app.request("/api/notifications")).status).toBe(400);
   });
   it("reports which sources are watched as flags, never the owner's addresses or handles", async () => {
     const t = setup(true);

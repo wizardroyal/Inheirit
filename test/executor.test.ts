@@ -69,6 +69,11 @@ class FakeVault implements ChainVault {
   async balance() {
     return this.bal;
   }
+  withdrawals: number[] = [];
+  async sendWithdrawal(_owner: string, w: { id: number }) {
+    this.withdrawals.push(w.id);
+    return `0xw${w.id}`;
+  }
   async sendStage(job: StageJob): Promise<SentTransfer[]> {
     if (job.stage === this.failStage) throw new Error("rpc down");
     this.jobs.push(job);
@@ -80,9 +85,13 @@ class FakeVault implements ChainVault {
   }
 }
 
-class FakeContract implements Pick<WillContract, "recordExecution" | "markStageDone"> {
+class FakeContract implements Pick<WillContract, "recordExecution" | "markStageDone" | "completeWithdrawal"> {
   records: string[] = [];
   done: string[] = [];
+  completed: string[] = [];
+  async completeWithdrawal(_o: string, id: number, tx: string) {
+    this.completed.push(`${id}:${tx}`);
+  }
   async recordExecution(_o: string, stage: number, chain: string, to: string, amount: string) {
     this.records.push(`${stage}:${chain}:${to}:${amount}`);
   }
@@ -102,6 +111,19 @@ function setup(balance = 1000n) {
 }
 
 describe("StagedExecutor", () => {
+  it("sends the owner's pending foreign withdrawals while Active, and only then", async () => {
+    const t = setup();
+    const pending_withdrawals = [
+      { id: 3, chain: "Eth" as const, to: ETH1, amount: "5", signatures: 0 },
+      { id: 4, chain: "Near" as const, to: "alice.testnet", amount: "5", signatures: 0 },
+    ];
+    await t.ex.withdraw("alice.testnet", will(0, { pending_withdrawals }));
+    expect(t.vault.withdrawals).toEqual([]); // Executing: the contract would refuse the signature anyway
+    await t.ex.withdraw("alice.testnet", will(0, { state: "Active", pending_withdrawals }));
+    expect(t.vault.withdrawals).toEqual([3]); // NEAR withdrawals are paid by the contract
+    expect(t.contract.completed).toEqual(["3:0xw3"]);
+  });
+
   it("releases stage 0 by policy shares and marks it done", async () => {
     const t = setup();
     await t.ex.run("alice.testnet", will(0));

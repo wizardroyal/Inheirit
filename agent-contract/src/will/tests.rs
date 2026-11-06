@@ -1481,3 +1481,87 @@ fn remove_guardian_while_escalating_rejected() {
     t.to_quiet();
     t.as_(OWNER).remove_guardian(acc(G3));
 }
+
+// ---------------------------------------------------------------- record caps (audit 2026-11-06)
+
+#[test]
+#[should_panic(expected = "Too many heirs × stages")]
+fn too_many_heirs_times_stages_rejected() {
+    create_invalid(|c| {
+        c.heirs = (0..5)
+            .map(|i| HeirInput {
+                account_id: acc(&format!("heir{}.testnet", i)),
+                name: format!("Heir {}", i),
+                near_share_bps: 2000,
+            })
+            .collect();
+        c.stages = stages(&[10; 10], &[60; 10]); // 5 × 10 = 50 slices
+    });
+}
+
+fn record_foreign(t: &mut T, n: usize) {
+    for i in 0..n {
+        let chain = if i % 2 == 0 { Chain::Eth } else { Chain::Btc };
+        t.as_(AGENT).record_execution(
+            acc(OWNER),
+            0,
+            chain,
+            format!("to{}", i),
+            "1".into(),
+            format!("tx{}", i),
+        );
+    }
+}
+
+#[test]
+#[should_panic(expected = "Foreign execution record limit for this round reached")]
+fn agent_foreign_records_capped_per_round() {
+    let mut t = T::with_will();
+    t.to_executing();
+    record_foreign(&mut t, 2 * MAX_HEIR_STAGE_SLICES + 1);
+}
+
+#[test]
+fn full_record_list_drops_earlier_rounds_instead_of_freezing_advance() {
+    let mut t = T::with_will();
+    for _ in 0..3 {
+        t.to_executing();
+        record_foreign(&mut t, 2 * MAX_HEIR_STAGE_SLICES);
+        t.wait(1);
+        t.as_(OWNER).i_am_alive();
+        t.pay(OWNER, NearToken::from_near(1)).deposit_near();
+    }
+    t.to_executing(); // round 4: stage 0's NEAR slices must still be recorded
+    let w = t.will();
+    assert!(w.executions.len() <= MAX_EXECUTION_RECORDS);
+    let current: Vec<_> = w
+        .executions
+        .iter()
+        .filter(|e| e.round == w.execution_round)
+        .collect();
+    assert_eq!(current.len(), 2, "both heirs' NEAR slices recorded");
+    record_foreign(&mut t, 2 * MAX_HEIR_STAGE_SLICES);
+    t.wait(60);
+    assert!(t.advance(), "stage 1 still releases");
+    let w = t.will();
+    assert_eq!(
+        w.executions
+            .iter()
+            .filter(|e| e.round == w.execution_round)
+            .count(),
+        2 + 2 * MAX_HEIR_STAGE_SLICES + 2
+    );
+}
+
+#[test]
+fn halt_records_keep_only_the_latest() {
+    let mut t = T::with_will();
+    for _ in 0..(MAX_HALT_RECORDS + 3) {
+        t.to_executing();
+        t.wait(1);
+        t.as_(OWNER).i_am_alive();
+    }
+    let w = t.will();
+    assert_eq!(w.halted.len(), MAX_HALT_RECORDS);
+    assert_eq!(w.halted.last().unwrap().round, w.execution_round);
+}

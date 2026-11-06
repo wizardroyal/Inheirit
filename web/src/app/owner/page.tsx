@@ -248,6 +248,16 @@ function Dashboard({ will, refresh }: { will: Will; refresh: () => void }) {
           {will.foreign_chains.length > 0 && (
             <p className="mt-2 text-xs text-muted">Foreign vaults: {will.foreign_chains.join(", ")} (see the demo panel for addresses and balances).</p>
           )}
+          {active && will.foreign_chains.length > 0 && <ForeignWithdraw owner={owner} will={will} refresh={refresh} />}
+          {will.pending_withdrawals.length > 0 && (
+            <ul className="mt-2 space-y-1 text-xs text-muted">
+              {will.pending_withdrawals.map((w) => (
+                <li key={w.id}>
+                  Withdrawal {w.id} on {w.chain === "Eth" ? "Sepolia" : w.chain === "Btc" ? "Bitcoin testnet" : "NEAR"} to {w.to}: waiting for the agent to send it
+                </li>
+              ))}
+            </ul>
+          )}
         </Card>
         <SealedNotes will={will} refresh={refresh} />
         <Card title="Released so far">
@@ -288,6 +298,44 @@ function NearVaultActions({ owner, refresh }: { owner: string; refresh: () => vo
         Withdraw to me
       </ActionButton>
     </div>
+  );
+}
+
+/** Decimal string → smallest units (wei or sats), without floating point. */
+function toUnits(value: string, decimals: number): bigint {
+  const [whole, frac = ""] = value.trim().split(".");
+  if (!/^\d+$/.test(whole || "0") || !/^\d*$/.test(frac) || frac.length > decimals) throw new Error(`"${value}" is not an amount`);
+  return BigInt(whole || "0") * 10n ** BigInt(decimals) + BigInt(frac.padEnd(decimals, "0") || "0");
+}
+
+// The owner can always take coins back out while alive (principle 6): the contract queues the request
+// and the agent sends it from the vault, signed for this withdrawal only.
+function ForeignWithdraw({ owner, will, refresh }: { owner: string; will: Will; refresh: () => void }) {
+  const [chain, setChain] = useState(will.foreign_chains[0]);
+  const [to, setTo] = useState("");
+  const [amount, setAmount] = useState("");
+  const unit = chain === "Eth" ? "ETH" : "BTC";
+  return (
+    <details className="mt-3 text-sm">
+      <summary className="cursor-pointer text-muted hover:text-ink">Withdraw from a foreign vault</summary>
+      <div className="mt-2 flex flex-wrap items-start gap-2">
+        <select className={`${inputCls} w-28`} value={chain} onChange={(e) => setChain(e.target.value as typeof chain)}>
+          {will.foreign_chains.map((c) => (
+            <option key={c} value={c}>
+              {c === "Eth" ? "Sepolia ETH" : "Bitcoin testnet"}
+            </option>
+          ))}
+        </select>
+        <input className={`${inputCls} w-28`} placeholder={`amount (${unit})`} value={amount} onChange={(e) => setAmount(e.target.value)} />
+        <input className={`${inputCls} min-w-0 flex-1`} placeholder={chain === "Eth" ? "0x… your address" : "tb1… your address"} value={to} onChange={(e) => setTo(e.target.value.trim())} />
+        <ActionButton
+          tone="quiet"
+          onClick={() => call(owner, "request_withdrawal", { chain, to, amount: toUnits(amount, chain === "Eth" ? 18 : 8).toString() }, 0n, 100n).then(refresh)}
+        >
+          Withdraw
+        </ActionButton>
+      </div>
+    </details>
   );
 }
 
