@@ -51,6 +51,11 @@ export const PolicySchema = z.object({
   /** Minimal sign-up (CLAUDE.md §8): a display name, optional jurisdiction. Off-chain, hashed. */
   display_name: z.string().min(1).max(64).optional(),
   jurisdiction: z.string().min(1).max(64).optional(),
+  /**
+   * §J.4: "stable" converts each released slice to a USD stablecoin on the heir's chosen chain (NEAR
+   * Intents). Optional, so policies without it keep their hash.
+   */
+  payout_value_mode: z.enum(["as_is", "stable"]).optional(),
 });
 
 export type Policy = z.infer<typeof PolicySchema>;
@@ -159,6 +164,8 @@ export function summarizePolicy(p: Policy): string[] {
     `Guardians: ${p.guardians.join(", ")}. Each must accept the role, and ${p.guardian_threshold} of ${p.guardians.length} must confirm before anything is released.`,
   );
   if (p.contacts.length) lines.push(`Welfare-check contacts: ${p.contacts.join(", ")}.`);
+  if (p.payout_value_mode === "stable")
+    lines.push("Stable value: each slice is converted to US dollar stablecoins (USDC) as it is released, on the chain each heir chooses.");
   if (p.lawyer) lines.push(`Lawyer: ${p.lawyer}. A death proof from them can speed up the remaining release, never skip it.`);
   for (const c of p.conditions) {
     const name = p.heirs.find((h) => h.id === c.heir)?.name ?? c.heir;

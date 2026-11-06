@@ -5,6 +5,7 @@ import { ActAs } from "@/components/ActAs";
 import { AiBadge } from "@/components/Attestation";
 import { ActionButton, Card, ErrorNote, inputCls, Pill } from "@/components/ui";
 import { Releases } from "@/components/WillParts";
+import { HeirPayoutList, IntentsSimTag, PayoutChoice } from "@/components/Payouts";
 import { useKeys, usePoll, useWill } from "@/lib/hooks";
 import { keys } from "@/lib/keys";
 import { agent } from "@/lib/agent";
@@ -62,9 +63,35 @@ export default function HeirPage() {
           <Releases will={will} />
         </Step>
       )}
+      {heir && <PayoutStep owner={owner} heir={heir.account_id} />}
       {heir && <NotesStep owner={owner} will={will} heir={heir.account_id} />}
       {heir && <GuideChat owner={owner} heir={heir.account_id} />}
     </div>
+  );
+}
+
+function PayoutStep({ owner, heir }: { owner: string; heir: string }) {
+  const { data, refresh } = usePoll(() => agent.payouts(owner, heir), 6000, [owner, heir]);
+  const mine = data?.heirs[heir];
+  return (
+    <Step n={4} title="How you'd like to receive it" done={!!mine?.pref}>
+      <p className="mb-3 text-sm text-muted">
+        Receive your inheritance in what you actually use: USDC on Base, SOL on Solana, NEAR, and more. Each slice goes on through NEAR Intents to the
+        asset and chain you choose{data?.value_mode === "stable" ? `; ${owner} chose stable value, so it arrives as US dollars (USDC) on that chain` : ""}.
+        {data?.simulated && (
+          <>
+            {" "}
+            <IntentsSimTag /> on testnet: NEAR Intents has no testnet, so the swap is simulated with live prices.
+          </>
+        )}
+      </p>
+      <PayoutChoice owner={owner} heir={heir} current={mine?.pref ?? null} onSaved={refresh} />
+      {mine && (
+        <div className="mt-4">
+          <HeirPayoutList p={mine} minUsd={data!.min_usd} mine />
+        </div>
+      )}
+    </Step>
   );
 }
 
@@ -141,7 +168,7 @@ function NotesStep({ owner, will, heir }: { owner: string; will: Will; heir: str
   const [opened, setOpened] = useState<Record<number, string>>({});
   const waiting = will.sealed_notes.filter((n) => n.heir === heir && !(released ?? []).some((r) => r.note_id === n.id));
   return (
-    <Step n={4} title="Private notes left for you">
+    <Step n={5} title="Private notes left for you">
       {(released ?? []).length === 0 && waiting.length === 0 && <p className="text-sm text-muted">No notes were left for you.</p>}
       {waiting.length > 0 && (
         <p className="text-sm text-muted">

@@ -42,6 +42,56 @@ export interface PendingTx {
   pays: Record<string, [string, string]>;
 }
 
+/** Where an heir wants to receive their inheritance (§J.3). */
+export interface PayoutPref {
+  blockchain: string;
+  assetId: string;
+  symbol: string;
+  address: string;
+  setAt: string;
+}
+
+/** One onward payout of an heir's released slices through 1Click (§J.2). */
+export interface PayoutBatch {
+  id: string;
+  owner: string;
+  heir: string;
+  /** The vault the slices came from. */
+  chain: "Near" | "Eth" | "Btc";
+  originAssetId: string;
+  originSymbol: string;
+  /** Slice keys `${round}:${stage}:${chain}` this batch pays. */
+  slices: string[];
+  amount: string;
+  amountUsd: number;
+  destAssetId: string;
+  destSymbol: string;
+  destChain: string;
+  recipient: string;
+  /** Converted to a stablecoin (owner's stable-value setting). */
+  stable: boolean;
+  /** "direct": same asset and chain as the vault, no swap. */
+  mode: "intents" | "direct";
+  simulated: boolean;
+  /** QUOTING / WAITING_ROUTE (ours), then 1Click's statuses. */
+  status: string;
+  attempts: number;
+  nextTryAt?: string;
+  depositAddress?: string;
+  quoteDeadline?: string;
+  expectedOut?: string;
+  expectedOutUsd?: string;
+  minAmountOut?: string;
+  depositTx?: string;
+  receivedOut?: string;
+  originTx?: { hash: string; explorerUrl: string };
+  destinationTx?: { hash: string; explorerUrl: string };
+  note?: string;
+  error?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface AgentState {
   owners: Record<string, OwnerSignalConfig>;
   policies: Record<string, Policy>;
@@ -79,6 +129,10 @@ export interface AgentState {
    * check and welfare messages are not sent to phones again (§7.3 known noise).
    */
   telegramSent: Record<string, { lastAliveAt: number; events: string[] }>;
+  /** Heirs' payout choices (§J.3): owner -> heir account -> where they want to receive. */
+  payoutPrefs: Record<string, Record<string, PayoutPref>>;
+  /** Onward payouts through NEAR Intents (§J.3): owner -> batches. */
+  payouts: Record<string, PayoutBatch[]>;
   /** Demo faucet top-ups already sent: owner -> sends (one funding per will). */
   faucetSends: Record<string, { chain: "Eth" | "Btc"; to: string; amount: string; txHash: string }[]>;
 }
@@ -100,6 +154,8 @@ const EMPTY: AgentState = {
   telegramOffset: 0,
   checks: {},
   telegramSent: {},
+  payoutPrefs: {},
+  payouts: {},
   faucetSends: {},
 };
 

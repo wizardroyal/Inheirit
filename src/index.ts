@@ -1,4 +1,6 @@
 // Load .env before any other module reads process.env (no-op in the TEE, where there is no .env file)
+import { HttpOneClickClient, SimulatedOneClickClient } from "./intents/oneclick";
+import { PayoutEngine, simulatedSender } from "./intents/payout";
 import "dotenv/config";
 import { serve } from "@hono/node-server";
 import { ShadeClient } from "@neardefi/shade-agent-js";
@@ -153,7 +155,19 @@ if (telegram) {
   console.log("[telegram] TELEGRAM_BOT_TOKEN / TELEGRAM_BOT_USERNAME not set; Telegram checks off");
 }
 
+// NEAR Intents (§J): NEAR Intents has no testnet, so the agent's onward payouts and fund-from-anywhere
+// quotes use the SIMULATED 1Click client, priced from the live public /v0/tokens list. Real mainnet
+// payouts only run from the local, approval-gated scripts/mainnet-payout.ts.
+const intents = new SimulatedOneClickClient(new HttpOneClickClient(undefined, config.oneclickBaseUrl()));
+const payouts = new PayoutEngine({
+  store,
+  client: intents,
+  sender: simulatedSender,
+  refundTo: async (owner, chain) => (chain === "Near" ? agentContractId : vaults.find((v) => v.chain === chain)!.address(owner)),
+});
+
 const driver = new Driver({
+  payouts,
   contract,
   adapters,
   store,
@@ -211,6 +225,7 @@ const faucet =
     : undefined;
 
 const app = api({
+  intents,
   faucet,
   telegram,
   ai,

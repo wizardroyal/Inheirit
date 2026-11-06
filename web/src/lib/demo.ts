@@ -53,7 +53,7 @@ export async function demoHeirReceive(): Promise<{ eth: string; btc: string }> {
   return f.enabled ? { eth: f.eth, btc: f.btc } : DEMO_HEIR_RECEIVE;
 }
 
-export function demoPolicy(cast: Cast, receive: { eth: string; btc: string }): Policy {
+export function demoPolicy(cast: Cast, receive: { eth: string; btc: string }, opts: { stable?: boolean } = {}): Policy {
   const check = checkPolicy({
     version: 1,
     owner: cast.owner,
@@ -66,6 +66,7 @@ export function demoPolicy(cast: Cast, receive: { eth: string; btc: string }): P
     stages_pct: [10, 20, 30, 40],
     guardians: cast.guardians,
     guardian_threshold: 2,
+    ...(opts.stable ? { payout_value_mode: "stable" } : {}),
   });
   if (!check.ok) throw new Error(check.errors.join("; "));
   return check.policy;

@@ -6,6 +6,7 @@ import { AgentBadge } from "@/components/Attestation";
 import { Ladder } from "@/components/Ladder";
 import { ActionButton, Card, Details, ExtLink, Pill, short, SimulatedTag } from "@/components/ui";
 import { SignsOfLife } from "@/components/SignsOfLife";
+import { FundAnywhere, PayoutsPanel } from "@/components/Payouts";
 import { NotificationLog, Releases, SignalList, WatchStatus } from "@/components/WillParts";
 import { agent, type SignalSource } from "@/lib/agent";
 import { CONTRACT_ID, DEMO_SCHEDULE, explorer } from "@/lib/config";
@@ -124,6 +125,7 @@ function WillPanel({ cast }: { cast: Cast }) {
   const { data: will, loaded, refresh } = useWill(cast.owner);
   const [chains, setChains] = useState<{ Eth: boolean; Btc: boolean }>({ Eth: true, Btc: true });
   const [withNote, setWithNote] = useState(true);
+  const [stable, setStable] = useState(false);
   // Keep the setup view until every step has finished, even after the will shows up on-chain
   const [creating, setCreating] = useState(false);
   const [log, setLog] = useState<string[]>([]);
@@ -150,6 +152,10 @@ function WillPanel({ cast }: { cast: Cast }) {
             <input type="checkbox" checked={withNote} onChange={(e) => setWithNote(e.target.checked)} />
             Seal a note for Bola
           </label>
+          <label className="flex items-center gap-2" title="NEAR Intents converts each released slice to USDC on the chain Bola chooses">
+            <input type="checkbox" checked={stable} onChange={(e) => setStable(e.target.checked)} />
+            Stable value (slices paid to Bola in USDC)
+          </label>
         </div>
         <div className="mt-3">
           <ActionButton
@@ -161,7 +167,7 @@ function WillPanel({ cast }: { cast: Cast }) {
                 await createWill(
                 cast.owner,
                 {
-                  policy: demoPolicy(cast, await demoHeirReceive()),
+                  policy: demoPolicy(cast, await demoHeirReceive(), { stable }),
                   contacts: [cast.contact],
                   schedule: DEMO_SCHEDULE,
                   foreignChains: (["Eth", "Btc"] as const).filter((c) => chains[c]),
@@ -279,6 +285,21 @@ function WillPanel({ cast }: { cast: Cast }) {
         <Card title="Released so far">
           <Releases will={will} />
         </Card>
+        <Card
+          title="Onward payouts (NEAR Intents)"
+          aside={
+            <Link href={`/heir/${cast.owner}`} className="text-sm text-accent underline">
+              Bola chooses here
+            </Link>
+          }
+        >
+          <PayoutsPanel owner={cast.owner} />
+        </Card>
+        {s === "Active" && (
+          <Card title="Fund from another chain (NEAR Intents)">
+            <FundAnywhere owner={cast.owner} vaults={["Near", ...will.foreign_chains]} />
+          </Card>
+        )}
         <Card
           title="What happened"
           aside={

@@ -16,6 +16,8 @@ import type { SignalSource } from "./liveness/score";
 import { explainLiveness } from "./liveness/verdict";
 import type { OwnerSignalConfig, Store } from "./state/store";
 import type { TelegramBot } from "./telegram/bot";
+import { type OneClickClient, quoteRequest, usdValue } from "./intents/oneclick";
+import { checkPayoutPref, MIN_PAYOUT_USD, ORIGIN_ASSET, payoutTokens, pendingSlices, slicesFor } from "./intents/payout";
 
 export interface ApiDeps {
   contract: WillContract;
@@ -34,6 +36,8 @@ export interface ApiDeps {
   };
   /** Telegram check bot; absent when TELEGRAM_BOT_TOKEN / TELEGRAM_BOT_USERNAME aren't set. */
   telegram?: Pick<TelegramBot, "issueLink" | "isLinked" | "username">;
+  /** NEAR Intents 1Click client (SIMULATED on testnet, §J.7); absent = Intents routes off. */
+  intents?: OneClickClient;
   /** Override the default rate limits (tests). */
   limiters?: { draft: RateLimiter; guide: RateLimiter; faucet: RateLimiter };
   /** Absent when NEARAI_API_KEY isn't configured. */
@@ -59,6 +63,27 @@ const OwnerFields = z.object({
   email: z.string().email().optional(),
 });
 const OwnerConfig = OwnerFields.extend({ owner: z.string().min(2) });
+
+const PayoutChoice = z.object({
+  owner: z.string().min(2),
+  blockchain: z.string().min(2).max(16),
+  asset_id: z.string().min(3).max(200),
+  address: z.string().min(2).max(128),
+});
+
+const FundQuote = z.object({
+  owner: z.string().min(2),
+  vault: z.enum(["Near", "Eth", "Btc"]),
+  origin_asset: z.string().min(3).max(200),
+  /** Decimal amount of the origin asset, e.g. "25". */
+  amount: z.string().regex(/^\d{1,12}(\.\d{1,18})?$/),
+});
+
+/** "1.5" with 6 decimals -> 1500000n. */
+function parseUnits(amount: string, decimals: number): bigint {
+  const [whole, frac = ""] = amount.split(".");
+  return BigInt(whole) * 10n ** BigInt(decimals) + BigInt((frac + "0".repeat(decimals)).slice(0, decimals) || "0");
+}
 
 const DemoSignal = z.object({
   owner: z.string().min(2),
@@ -293,6 +318,129 @@ export function api(deps: ApiDeps): Hono {
   app.get("/api/telegram/:account", (c) => {
     if (!deps.telegram) return c.json({ enabled: false, linked: false });
     return c.json({ enabled: true, bot: deps.telegram.username, linked: deps.telegram.isLinked(c.req.param("account")) });
+  });
+
+  // ---- NEAR Intents (§J). The agent's client is SIMULATED (NEAR Intents has no testnet). ----
+
+  // Tokens heirs can choose to receive, with live prices (public 1Click token list).
+  app.get("/api/intents/tokens", async (c) => {
+    if (!deps.intents) return c.json({ enabled: false, tokens: [] });
+    const tokens = await cached("intents:tokens", 60_000, () => deps.intents!.tokens());
+    return c.json({ enabled: true, simulated: deps.intents.simulated, tokens: payoutTokens(tokens) });
+  });
+
+  // An heir's payout choice (§J.3). Signed by the heir: it decides where their inheritance goes.
+  app.post("/api/heir/payout", async (c) => {
+    if (!deps.intents) return c.json({ error: "NEAR Intents is not configured on this agent" }, 503);
+    const body = (await c.req.json()) as { signed?: unknown };
+    if (!body?.signed) return c.json({ error: "A payout choice must be signed by the heir" }, 401);
+    const r = await ownerRequest(body, "payout_pref", PayoutChoice, z.never());
+    if (r.error) return c.json(r.error.body, r.error.status);
+    const heir = r.owner;
+    const will = await contract.getWill(r.data.owner);
+    if (!will) return c.json({ error: `No will for ${r.data.owner}` }, 404);
+    if (!will.heirs.some((h) => h.account_id === heir)) return c.json({ error: `${heir} is not an heir of this will` }, 403);
+    const tokens = await cached("intents:tokens", 60_000, () => deps.intents!.tokens());
+    const pref = { blockchain: r.data.blockchain, assetId: r.data.asset_id, address: r.data.address.trim() };
+    const bad = checkPayoutPref(tokens, pref);
+    if (bad) return c.json({ error: bad }, 400);
+    // Route probe (§J.2): only accept a choice that quotes, for about $10 from the NEAR vault.
+    const near = tokens.find((t) => t.assetId === ORIGIN_ASSET.Near.assetId);
+    if (near && pref.assetId !== near.assetId) {
+      try {
+        await deps.intents.quote(
+          quoteRequest({
+            dry: true,
+            originAsset: near.assetId,
+            destinationAsset: pref.assetId,
+            amount: parseUnits((10 / near.price).toFixed(6), near.decimals).toString(),
+            refundTo: will.owner,
+            recipient: pref.address,
+            waitMs: 3000,
+          }),
+        );
+      } catch (e) {
+        return c.json({ error: `No route to that asset right now: ${e instanceof Error ? e.message : String(e)}` }, 409);
+      }
+    }
+    const symbol = tokens.find((t) => t.assetId === pref.assetId)!.symbol;
+    store.update((s) => ((s.payoutPrefs[will.owner] ??= {})[heir] = { ...pref, symbol, setAt: new Date().toISOString() }));
+    return c.json({ ok: true, simulated: deps.intents.simulated, pref: store.get().payoutPrefs[will.owner][heir] });
+  });
+
+  // Onward payouts per heir. Before any slice is released this reveals nothing: heirs stay hidden
+  // (§8), so who set a payout choice is not shown until the release has started.
+  app.get("/api/payouts/:owner", async (c) => {
+    const owner = c.req.param("owner");
+    const will = await cached(`will:${owner}`, 5_000, () => contract.getWill(owner));
+    if (!will) return c.json({ error: `No will for ${owner}` }, 404);
+    const s = store.get();
+    const policy = s.policies[owner];
+    const base = { enabled: !!deps.intents, simulated: deps.intents?.simulated ?? true, value_mode: policy?.payout_value_mode ?? "as_is", min_usd: MIN_PAYOUT_USD };
+    const slices = slicesFor(will, policy);
+    if (!slices.length || !deps.intents) return c.json({ ...base, started: false, heirs: {} });
+    const tokens = await cached("intents:tokens", 60_000, () => deps.intents!.tokens());
+    const batches = s.payouts[owner] ?? [];
+    const only = c.req.query("heir");
+    const heirs: Record<string, unknown> = {};
+    for (const heir of new Set(slices.map((x) => x.heir))) {
+      if (only && heir !== only) continue;
+      const waiting = pendingSlices(slices, batches, heir).map((x) => {
+        const t = tokens.find((k) => k.assetId === ORIGIN_ASSET[x.chain].assetId);
+        return { key: x.key, chain: x.chain, symbol: ORIGIN_ASSET[x.chain].symbol, amount: x.amount.toString(), usd: t ? Number(usdValue(x.amount, t).toFixed(2)) : null, exhausted: x.exhausted };
+      });
+      heirs[heir] = { pref: s.payoutPrefs[owner]?.[heir] ?? null, batches: batches.filter((b) => b.heir === heir), waiting };
+    }
+    return c.json({ ...base, started: true, heirs });
+  });
+
+  // Fund your will from anywhere (§J.5): a quote that delivers into the will's vault from any
+  // supported asset. SIMULATED here: testnet vaults can't receive through NEAR Intents.
+  app.post("/api/intents/fund-quote", async (c) => {
+    if (!deps.intents) return c.json({ error: "NEAR Intents is not configured on this agent" }, 503);
+    const parsed = FundQuote.safeParse(await c.req.json());
+    if (!parsed.success) return c.json({ error: parsed.error.issues }, 400);
+    const { owner, vault, origin_asset, amount } = parsed.data;
+    if (!(await contract.getWill(owner))) return c.json({ error: `No will for ${owner}` }, 404);
+    const tokens = await cached("intents:tokens", 60_000, () => deps.intents!.tokens());
+    const origin = tokens.find((t) => t.assetId === origin_asset);
+    if (!origin) return c.json({ error: "Unknown asset" }, 400);
+    const units = parseUnits(amount, origin.decimals);
+    const usd = usdValue(units, origin);
+    if (usd > 10_000) return c.json({ error: "Keep demo amounts under $10,000" }, 400);
+    const recipient = vault === "Near" ? owner : await deps.vaults.find((v) => v.chain === vault)!.address(owner);
+    try {
+      const q = await deps.intents.quote(
+        quoteRequest({ dry: false, originAsset: origin.assetId, destinationAsset: ORIGIN_ASSET[vault].assetId, amount: units.toString(), refundTo: "your-wallet", recipient }),
+      );
+      return c.json({ simulated: deps.intents.simulated, vault, recipient, origin: { symbol: origin.symbol, blockchain: origin.blockchain }, quote: q.quote });
+    } catch (e) {
+      return c.json({ error: e instanceof Error ? e.message : String(e) }, 409);
+    }
+  });
+
+  // SIMULATED only: "I've sent it" for a fund-from-anywhere quote (a real deposit comes from the user's wallet).
+  app.post("/api/intents/fund-sent", async (c) => {
+    if (!deps.intents?.simulated) return c.json({ error: "Only the SIMULATED client takes this" }, 400);
+    const { deposit_address } = (await c.req.json()) as { deposit_address?: string };
+    if (!deposit_address) return c.json({ error: "deposit_address required" }, 400);
+    try {
+      await deps.intents.submitDeposit("SIMULATED-user-deposit", deposit_address);
+      return c.json({ ok: true });
+    } catch (e) {
+      return c.json({ error: e instanceof Error ? e.message : String(e) }, 404);
+    }
+  });
+
+  app.get("/api/intents/status", async (c) => {
+    if (!deps.intents) return c.json({ error: "NEAR Intents is not configured on this agent" }, 503);
+    const addr = c.req.query("depositAddress");
+    if (!addr) return c.json({ error: "depositAddress required" }, 400);
+    try {
+      return c.json({ simulated: deps.intents.simulated, ...(await deps.intents.status(addr)) });
+    } catch (e) {
+      return c.json({ error: e instanceof Error ? e.message : String(e) }, 404);
+    }
   });
 
   // Demo vault faucet: pool addresses (the demo heir receives at the same addresses, so coins cycle).

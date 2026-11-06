@@ -32,6 +32,8 @@ export const config = {
   // Telegram check bot (CLAUDE.md §7.7); off unless both are set.
   telegramToken: () => process.env.TELEGRAM_BOT_TOKEN || undefined,
   telegramUsername: () => (process.env.TELEGRAM_BOT_USERNAME || "").replace(/^@/, "") || undefined,
+  // NEAR Intents 1Click (§J). The agent only reads its public token list; it never moves mainnet funds.
+  oneclickBaseUrl: () => process.env.ONECLICK_BASE_URL || "https://1click.chaindefuser.com",
 };
 
 export interface RpcEndpoint {

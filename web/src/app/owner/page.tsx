@@ -7,6 +7,7 @@ import { AgentBadge, AiBadge } from "@/components/Attestation";
 import { Ladder } from "@/components/Ladder";
 import { ActionButton, Card, ErrorNote, Field, inputCls, Pill } from "@/components/ui";
 import { QuickSetup, StrengthChecklist } from "@/components/Onboarding";
+import { FundAnywhere, PayoutsPanel } from "@/components/Payouts";
 import { SignsOfLife } from "@/components/SignsOfLife";
 import { NotificationLog, Releases, SignalList, WatchStatus } from "@/components/WillParts";
 import { agent, type DraftResult } from "@/lib/agent";
@@ -252,6 +253,14 @@ function Dashboard({ will, refresh }: { will: Will; refresh: () => void }) {
         <Card title="Released so far">
           <Releases will={will} />
         </Card>
+        <Card title="Onward payouts (NEAR Intents)">
+          <PayoutsPanel owner={owner} />
+        </Card>
+        {active && (
+          <Card title="Fund from another chain (NEAR Intents)">
+            <FundAnywhere owner={owner} vaults={["Near", ...will.foreign_chains]} />
+          </Card>
+        )}
         <Card title="Notifications">
           <NotificationLog owner={owner} />
         </Card>

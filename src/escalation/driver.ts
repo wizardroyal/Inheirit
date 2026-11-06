@@ -37,6 +37,8 @@ export interface DriverDeps {
   notes?: NoteReleaser;
   /** Telegram check bot; absent when not configured. */
   telegram?: Pick<TelegramBot, "notify" | "isLinked">;
+  /** Onward payouts through NEAR Intents (SIMULATED 1Click on testnet). */
+  payouts?: { run(will: WillView): Promise<void> };
   now?: () => Date;
   log?: (msg: string) => void;
   /**
@@ -204,6 +206,14 @@ export class Driver {
     if (state === "Executing" && this.deps.executor) await this.deps.executor.run(cfg.owner, will);
     // Secrets last: only once distribution and the buffer are over (the contract enforces it too).
     if (state === "SecretsReleased" && this.deps.notes) await this.deps.notes.run(will);
+    // Onward payouts over NEAR Intents (§J.3) for every slice released so far, including after a halt.
+    if (will.executions.length && this.deps.payouts) {
+      try {
+        await this.deps.payouts.run(will);
+      } catch (e) {
+        this.log(`[payout] ${cfg.owner}: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    }
   }
 
   /**

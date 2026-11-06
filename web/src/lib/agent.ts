@@ -81,6 +81,37 @@ export interface Overview {
   telegram: TelegramStatus;
 }
 
+/** NEAR Intents (agent §J). The agent's 1Click client is SIMULATED: NEAR Intents has no testnet. */
+export interface IntentsToken {
+  assetId: string;
+  decimals: number;
+  blockchain: string;
+  symbol: string;
+  price: number;
+}
+export type PayoutBatch = import("@agent/state/store").PayoutBatch;
+export type PayoutPref = import("@agent/state/store").PayoutPref;
+export interface HeirPayouts {
+  pref: PayoutPref | null;
+  batches: PayoutBatch[];
+  waiting: { key: string; chain: string; symbol: string; amount: string; usd: number | null; exhausted: boolean }[];
+}
+export interface Payouts {
+  enabled: boolean;
+  simulated: boolean;
+  started: boolean;
+  value_mode: "as_is" | "stable";
+  min_usd: number;
+  heirs: Record<string, HeirPayouts>;
+}
+export interface FundQuote {
+  simulated: boolean;
+  vault: string;
+  recipient: string;
+  origin: { symbol: string; blockchain: string };
+  quote: { depositAddress?: string; amountInFormatted: string; amountInUsd: string; amountOutFormatted: string; amountOutUsd: string; deadline?: string; timeEstimate: number };
+}
+
 export const agent = {
   /** One request for everything the owner/demo panels show. Falls back to the separate routes for agents without it. */
   overview: async (owner: string): Promise<Overview> => {
@@ -116,6 +147,13 @@ export const agent = {
   telegramStatus: (account: string) => req<{ enabled: boolean; bot?: string; linked: boolean }>(`/api/telegram/${encodeURIComponent(account)}`),
   /** One-time t.me link that binds a Telegram chat to the signing account. */
   telegramLink: (signed: SignedRequest) => req<{ ok: true; url: string; expires_at: string }>("/api/telegram/link", { signed }),
+  intentsTokens: () => req<{ enabled: boolean; simulated?: boolean; tokens: IntentsToken[] }>("/api/intents/tokens"),
+  payouts: (owner: string, heir?: string) => req<Payouts>(`/api/payouts/${encodeURIComponent(owner)}${heir ? `?heir=${encodeURIComponent(heir)}` : ""}`),
+  /** The heir's own payout choice, signed by the heir. */
+  setPayout: (signed: SignedRequest) => req<{ ok: true; simulated: boolean; pref: PayoutPref }>("/api/heir/payout", { signed }),
+  fundQuote: (owner: string, vault: "Near" | "Eth" | "Btc", origin_asset: string, amount: string) => req<FundQuote>("/api/intents/fund-quote", { owner, vault, origin_asset, amount }),
+  fundSent: (deposit_address: string) => req<{ ok: true }>("/api/intents/fund-sent", { deposit_address }),
+  intentsStatus: (depositAddress: string) => send<{ simulated: boolean; status: string }>(`/api/intents/status?depositAddress=${encodeURIComponent(depositAddress)}`),
   /** SIMULATED signal (demo mode only). */
   simulate: (owner: string, source: SignalSource) => req<{ ok: true }>("/demo/signal", { owner, source }),
 };

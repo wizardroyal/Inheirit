@@ -12,7 +12,7 @@ import { useOverview } from "@/lib/hooks";
 import { signRequest } from "@/lib/near";
 import { acceptedGuardians, isArmed, type Will } from "@/lib/will";
 import { TelegramLink } from "./TelegramLink";
-import { ActionButton, Card, ErrorNote, Field, inputCls, Pill } from "./ui";
+import { ActionButton, Card, ErrorNote, Field, inputCls, Pill, SimulatedTag } from "./ui";
 
 const ACCOUNT = /^[a-z0-9._-]{2,64}$/;
 
@@ -52,6 +52,7 @@ export function QuickSetup({
   const [assets, setAssets] = useState({ ETH: false, BTC: false });
   const [deposit, setDeposit] = useState("0.5");
   const [demoClock, setDemoClock] = useState(true);
+  const [stable, setStable] = useState(false);
   const [log, setLog] = useState<string[]>([]);
 
   const guardianList = list(guardians);
@@ -79,6 +80,7 @@ export function QuickSetup({
     ...(lawyer.trim() ? { lawyer: lawyer.trim() } : {}),
     ...(name.trim() ? { display_name: name.trim() } : {}),
     ...(jurisdiction.trim() ? { jurisdiction: jurisdiction.trim() } : {}),
+    ...(stable ? { payout_value_mode: "stable" } : {}),
   });
   const errors = [
     ...(name.trim() ? [] : ["Your display name is required"]),
@@ -182,6 +184,14 @@ export function QuickSetup({
             <input type="checkbox" checked={assets.BTC} onChange={(e) => setAssets({ ...assets, BTC: e.target.checked })} /> BTC testnet4 vault
           </label>
         </div>
+        <label className="mt-3 flex items-start gap-2 text-sm">
+          <input type="checkbox" className="mt-1" checked={stable} onChange={(e) => setStable(e.target.checked)} />
+          <span>
+            <b>Stable value for heirs</b> (NEAR Intents): your will releases in stages over months. This converts each slice to US dollars (USDC) as
+            it&apos;s released, on whatever chain each heir chooses, so heirs aren&apos;t exposed to price swings, and selling gradually avoids selling
+            everything at once. <SimulatedTag /> on testnet.
+          </span>
+        </label>
         <div className="mt-3 max-w-xs">
           <Field label="NEAR to put in the vault now">
             <input className={inputCls} value={deposit} onChange={(e) => setDeposit(e.target.value)} />

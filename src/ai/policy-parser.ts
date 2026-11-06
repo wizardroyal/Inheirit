@@ -56,6 +56,7 @@ export function systemPrompt(owner: string): string {
     "- Heir ids are short lowercase ids (h1, h2, ...). Shares are whole-number percentages per asset that sum to 100. Assets are NEAR, ETH and BTC only.",
     "- stages_pct are whole-number percentages that sum to 100. If the text gives no stages, use [10, 20, 30, 40].",
     "- lawyer is a NEAR account, only if the text names one. display_name and jurisdiction only if stated.",
+    "- payout_value_mode: \"stable\" only if the text asks for heirs to receive dollars, stablecoins, USDC or a stable value; otherwise omit it.",
     "- guardian_threshold is how many guardians must confirm. If not stated, use a majority.",
     "- conditions: only 'not_before' date conditions, written as YYYY-MM-DD.",
     "- If the text is ambiguous, still return your best JSON; a separate validator will report problems to the owner.",
