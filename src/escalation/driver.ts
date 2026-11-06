@@ -128,6 +128,9 @@ export function notificationsFor(state: StateName, will: WillView, cfg: OwnerSig
   }
 }
 
+/** Events whose Telegram message goes out every time, even during the same silence. */
+const REPEATABLE_ON_TELEGRAM = new Set(["Challenge", "Executing", "SecretsReleased"]);
+
 /** Outreach while Quiet, in this order, spaced evenly across nudge_period (§7.3). */
 export const CHECK_STEPS = ["heartbeat", "email", "telegram", "dm"] as const;
 
@@ -194,19 +197,36 @@ export class Driver {
     if (store.get().notifiedState[cfg.owner] !== state) {
       const contacts = store.get().policies[cfg.owner]?.contacts ?? [];
       store.update((s) => (s.notifiedState[cfg.owner] = state));
-      for (const m of notificationsFor(state, will, cfg, contacts)) await this.deliver(cfg.owner, m);
+      for (const m of notificationsFor(state, will, cfg, contacts)) await this.deliver(cfg.owner, m, will.last_alive_at);
     }
-    if (typeof will.state !== "string" && "Quiet" in will.state) await this.runChecks(cfg, will.state.Quiet.since, will.timings.nudge_period, nowS);
+    if (typeof will.state !== "string" && "Quiet" in will.state) await this.runChecks(cfg, will, will.state.Quiet.since, nowS);
 
     if (state === "Executing" && this.deps.executor) await this.deps.executor.run(cfg.owner, will);
     // Secrets last: only once distribution and the buffer are over (the contract enforces it too).
     if (state === "SecretsReleased" && this.deps.notes) await this.deps.notes.run(will);
   }
 
+  /**
+   * Whether this Telegram message is new for the current silence, and marks it sent. Repeats of the
+   * check and welfare/vote messages after an expired vote (same last_alive_at) stay in the app only.
+   * The challenge alarm and heir notices are always sent.
+   */
+  private firstTelegramThisSilence(owner: string, event: string, lastAliveAt: number): boolean {
+    if (!REPEATABLE_ON_TELEGRAM.has(event)) {
+      const prev = this.deps.store.get().telegramSent[owner];
+      const events = prev?.lastAliveAt === lastAliveAt ? prev.events : [];
+      if (events.includes(event)) return false;
+      this.deps.store.update((s) => (s.telegramSent[owner] = { lastAliveAt, events: [...events, event] }));
+    }
+    return true;
+  }
+
   /** Records one notification and sends it on Telegram to every recipient with a linked chat. */
-  private async deliver(owner: string, m: Message, channels: string[] = ["ui"]): Promise<void> {
+  private async deliver(owner: string, m: Message, lastAliveAt: number, channels: string[] = ["ui"]): Promise<void> {
     const out = [...channels];
-    if (this.deps.telegram) {
+    if (this.deps.telegram && m.to.some((a) => this.deps.telegram!.isLinked(a)) && !this.firstTelegramThisSilence(owner, m.event, lastAliveAt)) {
+      out.push("telegram (already sent during this silence)");
+    } else if (this.deps.telegram) {
       let sent = 0;
       for (const to of m.to) {
         try {
@@ -229,8 +249,9 @@ export class Driver {
   }
 
   /** Sends the Quiet checks that are due: step i at since + i/4 of the nudge period. */
-  private async runChecks(cfg: OwnerSignalConfig, since: number, nudgePeriod: number, nowS: number): Promise<void> {
+  private async runChecks(cfg: OwnerSignalConfig, will: WillView, since: number, nowS: number): Promise<void> {
     const owner = cfg.owner;
+    const nudgePeriod = will.timings.nudge_period;
     const prev = this.deps.store.get().checks[owner];
     const done = prev?.since === since ? [...prev.done] : [];
     for (const [i, step] of CHECK_STEPS.entries()) {
@@ -242,6 +263,10 @@ export class Driver {
       else if (step === "email" && cfg.email)
         this.record(owner, { ...check("Check: email"), to: [cfg.email], body: `${CHECK_TEXT} (Email delivery isn't set up in this build; shown in the app instead.)` }, ["ui"]);
       else if (step === "telegram" && this.deps.telegram?.isLinked(owner)) {
+        if (!this.firstTelegramThisSilence(owner, "check", will.last_alive_at)) {
+          this.record(owner, check("Check: Telegram (not resent: already asked during this silence)"), ["ui"]);
+          continue;
+        }
         try {
           await this.deps.telegram.notify(owner, CHECK_TEXT);
           this.record(owner, check("Check: Telegram"), ["telegram"]);

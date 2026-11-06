@@ -258,6 +258,41 @@ describe("Telegram delivery", () => {
     const tg = t.store.get().notifications.find((n) => n.subject === "Check: Telegram");
     expect(tg?.channels).toEqual(["telegram"]);
   });
+  it("does not re-send the Telegram check after an expired vote restarts the ladder (same silence)", async () => {
+    const t = withBot(["alice.testnet"]);
+    t.setNow(T0 + 80);
+    await t.driver.tick();
+    expect(t.sent).toHaveLength(1);
+    // Vote expired -> Active with the same last_alive_at -> Quiet again later.
+    t.contract.w.state = { Quiet: { since: T0 + 500 } };
+    t.setNow(T0 + 530);
+    await t.driver.tick();
+    expect(t.sent).toHaveLength(1);
+    expect(t.store.get().notifications.some((n) => n.subject.startsWith("Check: Telegram (not resent"))).toBe(true);
+    // A new sign of life starts a new silence: the next check goes out again.
+    t.contract.w.last_alive_at = T0 + 600;
+    t.contract.w.state = { Quiet: { since: T0 + 900 } };
+    t.setNow(T0 + 930);
+    await t.driver.tick();
+    expect(t.sent).toHaveLength(2);
+  });
+  it("re-sends the challenge alarm but not a repeat guardian vote in the same silence", async () => {
+    const t = withBot(["g1.testnet", "alice.testnet"]);
+    for (const [i, state] of ([{ GuardianVote: { since: T0 } }, "Active", { GuardianVote: { since: T0 + 400 } }] as WillState[]).entries()) {
+      t.contract.w.state = state;
+      t.setNow(T0 + 10 + i * 400);
+      await t.driver.tick();
+    }
+    expect(t.sent.filter(([a]) => a === "g1.testnet")).toHaveLength(1);
+    const votes = t.store.get().notifications.filter((n) => n.event === "GuardianVote");
+    expect(votes.map((n) => n.channels)).toEqual([["ui", "telegram"], ["ui", "telegram (already sent during this silence)"]]);
+    for (const [i, state] of ([{ Challenge: { since: T0 + 900 } }, "Active", { Challenge: { since: T0 + 1300 } }] as WillState[]).entries()) {
+      t.contract.w.state = state;
+      t.setNow(T0 + 910 + i * 400);
+      await t.driver.tick();
+    }
+    expect(t.sent.filter(([a, text]) => a === "alice.testnet" && text.startsWith("Your will executes"))).toHaveLength(2);
+  });
   it("adds telegram to an event's channels when a recipient is linked", async () => {
     const t = withBot(["g1.testnet"]);
     t.contract.w.state = { GuardianVote: { since: T0 } };

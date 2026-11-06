@@ -73,6 +73,12 @@ export interface AgentState {
   telegramOffset: number;
   /** Quiet-state checks already sent: owner -> { quiet since (s), channels done }. */
   checks: Record<string, { since: number; done: string[] }>;
+  /**
+   * Telegram messages already sent during the owner's current silence: owner -> { last_alive_at (s),
+   * events }. An expired guardian vote restarts the ladder with the same last_alive_at; the repeat
+   * check and welfare messages are not sent to phones again (§7.3 known noise).
+   */
+  telegramSent: Record<string, { lastAliveAt: number; events: string[] }>;
   /** Demo faucet top-ups already sent: owner -> sends (one funding per will). */
   faucetSends: Record<string, { chain: "Eth" | "Btc"; to: string; amount: string; txHash: string }[]>;
 }
@@ -93,6 +99,7 @@ const EMPTY: AgentState = {
   telegramReplies: {},
   telegramOffset: 0,
   checks: {},
+  telegramSent: {},
   faucetSends: {},
 };
 

@@ -126,8 +126,8 @@ See [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md). In short:
 - **Key persistence.** The sealed-notes key is tied to one Phala app; the agent is upgraded in place and never re-created. Losing that app means owners must re-seal their notes.
 - **Not built yet:**
   - enforcing policy `conditions` (e.g. "not before 2031"), which are parsed and shown;
-  - an adaptive "your normal" baseline: the quiet threshold is a fixed setting per will;
-  - a cap on repeated checks after an expired guardian vote, which restarts the ladder at once in the demo timings.
+  - an adaptive "your normal" baseline: the quiet threshold is a fixed setting per will.
+- **Expired guardian votes restart the ladder.** If guardians don't vote, the will returns to Active without a new sign of life, so the ladder starts again at once (about every 7 minutes in the demo timings). The repeat checks and welfare messages appear in the app, but Telegram sends each of them only once per silence. The challenge alarm is always sent.
 - **Browser-held demo keys.** The demo creates testnet accounts whose keys live in your browser's storage. Wallet connection is on the roadmap.
 
 ## Roadmap
