@@ -1,0 +1,10 @@
+import path from "node:path";
+const ks = await import(path.join(process.argv[2], "dist/src/utils/keystore.js"));
+const key = await ks.getPhalaKey();
+const get = async (p: string) => JSON.parse((await (await fetch(`https://cloud-api.phala.network/api/v1/cvms/e3685437-e716-493a-ac4e-3717a72e7fdd${p}`, { headers: { "X-API-Key": key } })).text()).replace(/[\u0000-\u001f]/g, " "));
+const c = await get("/composition");
+console.log(JSON.stringify(c.containers?.map((x: any) => ({ image: x.image.slice(-20), state: x.state, status: x.status }))));
+const s = await get("/stats");
+console.log("load", s.sysinfo?.loadavg_one, "uptime", s.sysinfo?.uptime, "mem used", s.sysinfo?.used_memory);
+const st = await get("/state");
+console.log(st.status, st.boot_progress, st.boot_error, JSON.stringify(st.events?.slice(-4).map((e: any) => e.body)));

@@ -176,7 +176,27 @@ async function approve() {
  * In-place upgrade (§7.5): same CVM, same app_id, same sealed-notes key. Only the compose hash changes
  * (OS measurements and the key-provider digest stay), so the new hash is approved before the reboot.
  */
+/**
+ * Every reboot gives the TEE agent a new implicit account, which the sponsor funds with 0.5 NEAR. If
+ * the sponsor can't, the agent exits and docker restarts it forever (2026-11-06: hosted demo down for
+ * ~40 min). Refuse to upgrade, stop or start without enough in the sponsor.
+ */
+async function requireSponsorFunds(minNear = 1) {
+  const id = process.env.SPONSOR_ACCOUNT_ID;
+  if (!id) return;
+  const url = rpcEndpoints(process.env.NEAR_RPC_URL || "https://test.rpc.fastnear.com")[0];
+  const res = await fetch(url.url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...url.headers },
+    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "query", params: { request_type: "view_account", finality: "final", account_id: id } }),
+  });
+  const amount = Number(BigInt((await res.json()).result?.amount ?? "0") / 10n ** 20n) / 1e4;
+  if (amount < minNear) throw new Error(`Sponsor ${id} has ${amount} NEAR; a reboot needs 0.5 for the new agent account. Top it up to at least ${minNear} NEAR first.`);
+  console.log(`sponsor ${id}: ${amount} NEAR`);
+}
+
 async function upgrade() {
+  await requireSponsorFunds();
   const record = readRecord();
   const compose = fs.readFileSync(COMPOSE, "utf8");
   if (compose.includes("IMAGE_DIGEST")) throw new Error(`${COMPOSE} still has the IMAGE_DIGEST placeholder`);
@@ -277,11 +297,11 @@ const run = {
   provision,
   approve,
   upgrade,
-  env: pushEnv,
+  env: async () => (await requireSponsorFunds(), pushEnv()),
   retire: () => retire(process.argv[3]),
   status,
   stop: () => power("stopCvm"),
-  start: () => power("startCvm"),
+  start: async () => (await requireSponsorFunds(), power("startCvm")),
 }[cmd ?? ""];
 if (!run) {
   console.log("usage: npx tsx scripts/tee-agent.ts provision|approve|upgrade|env|retire <hash>|status|stop|start");

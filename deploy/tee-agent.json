@@ -77,7 +77,24 @@
       "compose_hash": "fb1bd5d1350a34f079269348de93531c36b593f85cd3b6d30514473936e4a8d8",
       "image": "unwizarding/inheirit-agent@sha256:86712d856a20f18eb70292db6d9570883ac7a81ec20b6de1612b0c78056a26ea",
       "at": "2026-11-06T09:41:26.905Z",
-      "note": "v2e image (NEAR Intents: SIMULATED payouts, stable value, fund from anywhere); live, only approved hash"
+      "note": "v2e image (NEAR Intents: SIMULATED payouts, stable value, fund from anywhere); retired 2026-11-06"
+    },
+    {
+      "compose_hash": "bc3becbf7c70bc1a512f6b7ad9326e3f693ea4b5bb41d4ac6fba3c07769cde8a",
+      "image": "unwizarding/inheirit-agent@sha256:68467a10576cfef35b50a325a04e05354faec3d2a937bcf3bca7e4a94edd2ac5",
+      "at": "2026-11-06T10:07:37.517Z",
+      "note": "v2f image (break-it fixes: signed simulated signals, BTC/ETH dust, Intents hardening); live, only approved hash"
+    },
+    {
+      "compose_hash": "fb1bd5d1350a34f079269348de93531c36b593f85cd3b6d30514473936e4a8d8",
+      "image": "unwizarding/inheirit-agent@sha256:86712d856a20f18eb70292db6d9570883ac7a81ec20b6de1612b0c78056a26ea",
+      "at": "2026-11-06T10:39:47.346Z"
+    },
+    {
+      "compose_hash": "bc3becbf7c70bc1a512f6b7ad9326e3f693ea4b5bb41d4ac6fba3c07769cde8a",
+      "image": "unwizarding/inheirit-agent@sha256:68467a10576cfef35b50a325a04e05354faec3d2a937bcf3bca7e4a94edd2ac5",
+      "at": "2026-11-06T10:52:22.618Z",
+      "note": "v2f image (re-deployed after the sponsor top-up); live, only approved hash"
     }
   ]
 }
