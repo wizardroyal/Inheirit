@@ -60,17 +60,23 @@ describe("POST /api/policy", () => {
 });
 
 describe("demo-only routes", () => {
+  const sim = (data: Record<string, string>, owner = "alice.testnet") => ({ signed: { owner, action: "demo_signal", data } });
   it("simulated signals are refused outside demo mode", async () => {
-    expect((await setup(false).post("/demo/signal", { owner: "alice.testnet", source: "x" })).status).toBe(403);
+    expect((await setup(false).post("/demo/signal", sim({ source: "x" }))).status).toBe(403);
   });
-  it("records a SIMULATED signal in demo mode", async () => {
+  it("records a SIMULATED signal in demo mode, signed by the owner", async () => {
     const t = setup(true);
-    const res = await t.post("/demo/signal", { owner: "alice.testnet", source: "x", at: "2026-11-01T00:00:00Z" });
+    const res = await t.post("/demo/signal", sim({ source: "x", at: "2026-11-01T00:00:00Z" }));
     expect(await res.json()).toMatchObject({ ok: true, simulated: true });
     expect(t.store.get().simulated["alice.testnet"]).toEqual({ x: "2026-11-01T00:00:00Z" });
   });
+  it("an unsigned simulated signal is refused, so strangers can't keep a will alive", async () => {
+    const t = setup(true);
+    expect((await t.post("/demo/signal", { owner: "alice.testnet", source: "gmail" })).status).toBe(401);
+    expect(t.store.get().simulated["alice.testnet"]).toBeUndefined();
+  });
   it("only simulated sources can be written", async () => {
-    expect((await setup(true).post("/demo/signal", { owner: "alice.testnet", source: "near_onchain" })).status).toBe(400);
+    expect((await setup(true).post("/demo/signal", sim({ source: "near_onchain" }))).status).toBe(400);
   });
   it("unsigned owner registration works only in demo mode", async () => {
     expect((await setup(false).post("/api/owners", { owner: "alice.testnet" })).status).toBe(403);

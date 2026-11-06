@@ -155,5 +155,6 @@ export const agent = {
   fundSent: (deposit_address: string) => req<{ ok: true }>("/api/intents/fund-sent", { deposit_address }),
   intentsStatus: (depositAddress: string) => send<{ simulated: boolean; status: string }>(`/api/intents/status?depositAddress=${encodeURIComponent(depositAddress)}`),
   /** SIMULATED signal (demo mode only). */
-  simulate: (owner: string, source: SignalSource) => req<{ ok: true }>("/demo/signal", { owner, source }),
+  /** Signed by the owner (an unsigned route would let anyone keep any demo will alive). */
+  simulate: (signed: SignedRequest) => req<{ ok: true }>("/demo/signal", { signed }),
 };

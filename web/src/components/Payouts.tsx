@@ -40,10 +40,12 @@ export function PayoutChoice({ owner, heir, current, onSaved }: { owner: string;
   const { data } = useTokens();
   const tokens = data?.tokens ?? [];
   // Before the release starts the agent doesn't reveal heirs' choices, so this browser remembers its own.
-  const saved = current ?? readLocal(owner, heir);
+  // The agent shows addresses masked; this browser's own copy has the full one.
+  const local = readLocal(owner, heir);
+  const saved = current ? (local && local.assetId === current.assetId ? { ...current, address: local.address } : current) : local;
   const [chain, setChain] = useState(saved?.blockchain ?? "base");
   const [assetId, setAssetId] = useState(saved?.assetId ?? "");
-  const [address, setAddress] = useState(saved?.address ?? "");
+  const [address, setAddress] = useState(saved?.address.includes("…") ? "" : (saved?.address ?? ""));
   const [editing, setEditing] = useState(!saved);
   const chains = useMemo(() => [...new Set(tokens.map((t) => t.blockchain))].sort((a, b) => chainLabel(a).localeCompare(chainLabel(b))), [tokens]);
   const onChain = tokens.filter((t) => t.blockchain === chain).sort((a, b) => a.symbol.localeCompare(b.symbol));

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { splitByShares, stageAmount } from "../src/executor/amounts";
+import { dustSafeTargets, splitByShares, stageAmount } from "../src/executor/amounts";
 
 describe("stageAmount", () => {
   const stages = [10, 30, 60];
@@ -54,5 +54,27 @@ describe("stageTargets", () => {
   });
   it("last stage refuses when fees exceed the balance", () => {
     expect(() => stageTargets({ isLast: true, gross: 10n, unpaidShares: { h1: 100 } }, 50n)).toThrow(/does not cover fees/);
+  });
+});
+
+describe("dustSafeTargets (Bitcoin)", () => {
+  const fee = (n: number) => BigInt(100 + 31 * n);
+  it("defers a non-last slice below dust instead of failing the stage", () => {
+    const t = dustSafeTargets({ isLast: false, gross: 2000n, unpaidShares: { a: 80, b: 20 } }, fee, 546n);
+    expect([...t]).toEqual([["a", 1600n]]);
+  });
+  it("the final sweep gives dust-sized shares to heirs whose share clears dust", () => {
+    const t = dustSafeTargets({ isLast: true, gross: 3000n, unpaidShares: { a: 90, b: 10 } }, fee, 546n);
+    expect([...t]).toEqual([["a", 3000n - fee(1)]]);
+  });
+  it("a vault holding only dust pays nobody, so the stage can complete", () => {
+    expect(dustSafeTargets({ isLast: true, gross: 700n, unpaidShares: { a: 50, b: 50 } }, fee, 546n).size).toBe(0);
+  });
+  it("still refuses (and retries) when a real balance can't cover fees right now", () => {
+    expect(() => dustSafeTargets({ isLast: true, gross: 1500n, unpaidShares: { a: 100 } }, () => 1200n, 546n)).toThrow(/does not cover fees/);
+  });
+  it("leaves normal stages unchanged", () => {
+    const t = dustSafeTargets({ isLast: false, gross: 20000n, unpaidShares: { a: 50, b: 50 } }, fee, 546n);
+    expect([...t]).toEqual([["a", 10000n], ["b", 10000n]]);
   });
 });

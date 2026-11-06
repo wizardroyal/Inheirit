@@ -134,6 +134,10 @@ describe("1Click helpers", () => {
 });
 
 describe("slices", () => {
+  it("a duplicated execution record is one slice, so it is never paid onward twice", () => {
+    const e = exec(0, "Near", "ada.testnet", NEAR);
+    expect(slicesFor(will("Executing" as never, [e, { ...e }]), POLICY)).toHaveLength(1);
+  });
   it("maps NEAR records by account and foreign records by the heir's receive address", () => {
     const s = slicesFor(will("Executing" as never, [exec(0, "Near", "ada.testnet", NEAR), exec(0, "Eth", ADA_ETH_TESTNET.toUpperCase().replace("0X", "0x"), 10n ** 15n), exec(0, "Eth", "0xunknown", 1n)]), POLICY);
     expect(s.map((x) => [x.heir, x.key])).toEqual([
@@ -199,12 +203,60 @@ describe("universal payout (SIMULATED)", () => {
     expect(t.batches()[0].note).toMatch(/No stablecoin/);
   });
 
-  it("same asset and chain as the vault: direct transfer, no 1Click", async () => {
+  it("same asset, chain and address the slice already went to: direct, no 1Click", async () => {
     const t = setup();
-    t.prefer("ada.testnet", "near", "nep141:wrap.near", "ada.near", "wNEAR");
+    t.prefer("ada.testnet", "near", "nep141:wrap.near", "ada.testnet", "wNEAR");
     await t.engine.run(will(executing, [exec(0, "Near", "ada.testnet", NEAR)]));
     expect(t.batches()[0]).toMatchObject({ mode: "direct", status: "SUCCESS" });
     expect(t.batches()[0].depositAddress).toBeUndefined();
+  });
+
+  it("same asset but another address is really sent on, never marked delivered for free", async () => {
+    const t = setup();
+    t.prefer("ada.testnet", "near", "nep141:wrap.near", "ada.near", "wNEAR");
+    await t.engine.run(will(executing, [exec(0, "Near", "ada.testnet", NEAR)]));
+    expect(t.batches()[0]).toMatchObject({ mode: "intents", recipient: "ada.near" });
+    expect(t.batches()[0].depositTx).toBeDefined();
+  });
+
+  it("transient 1Click errors back off and never strand the slices", async () => {
+    let down = true;
+    const sim = new SimulatedOneClickClient();
+    const client: OneClickClient = {
+      simulated: true,
+      tokens: () => sim.tokens(),
+      quote: async (r) => {
+        if (down) throw new Error("1Click /v0/quote: 502 Bad Gateway");
+        return sim.quote(r);
+      },
+      submitDeposit: (a, b) => sim.submitDeposit(a, b),
+      status: (a) => sim.status(a),
+    };
+    const t = setup({ client });
+    t.prefer("ada.testnet", "base", BASE_USDC, ADA_BASE);
+    const w = will(executing, [exec(0, "Near", "ada.testnet", NEAR)]);
+    for (let i = 0; i < 12; i++) {
+      await t.engine.run(w);
+      t.advance(400_000);
+    }
+    expect(t.batches()).toHaveLength(1);
+    expect(t.batches()[0]).toMatchObject({ status: "QUOTING", attempts: 0, retries: 12 });
+    down = false;
+    await t.engine.run(w);
+    expect(t.batches()[0].status).toBe("PROCESSING");
+  });
+
+  it("a SIMULATED deposit forgotten in a restart is quoted again, not counted as a failure", async () => {
+    const t = setup();
+    t.prefer("ada.testnet", "base", BASE_USDC, ADA_BASE);
+    const w = will(executing, [exec(0, "Near", "ada.testnet", NEAR)]);
+    await t.engine.run(w);
+    const fresh = new SimulatedOneClickClient();
+    const restarted = new PayoutEngine({ store: t.store, client: fresh, sender: simulatedSender, refundTo: async () => "r", log: () => {} });
+    await restarted.run(w);
+    expect(t.batches()).toHaveLength(1);
+    await restarted.run(w);
+    expect(t.batches()[0].status).toBe("PROCESSING");
   });
 
   it("small slices accumulate below the minimum, and go out once the release is over", async () => {
@@ -267,13 +319,17 @@ describe("universal payout (SIMULATED)", () => {
     expect(t.batches()[0].error).toBe("slippage");
   });
 
-  it("an expired, unsent quote is dropped and the slices are quoted again", async () => {
-    const t = setup({ sender: { simulated: true, send: async () => { throw new Error("rpc down"); } } });
+  it("a send that fails midway is never retried blindly by a real sender", async () => {
+    let sends = 0;
+    const t = setup({ sender: { simulated: false, send: async () => (sends++, Promise.reject(new Error("rpc timeout"))) } });
     t.prefer("ada.testnet", "base", BASE_USDC, ADA_BASE);
     const w = will(executing, [exec(0, "Near", "ada.testnet", NEAR)]);
     await t.engine.run(w);
-    expect(t.batches()[0]).toMatchObject({ status: "QUOTING", attempts: 1 });
-    expect(t.batches()[0].depositAddress).toBeUndefined();
+    await t.engine.run(w);
+    await t.engine.run(w);
+    expect(sends).toBe(1);
+    expect(t.batches()[0]).toMatchObject({ status: "SENDING" });
+    expect(t.batches()[0].error).toMatch(/check the vault/);
   });
 });
 
@@ -285,10 +341,10 @@ describe("Intents API", () => {
       return { owner: m.owner, action, issuedAt: 0, data: m.data };
     },
   };
-  function setupApi(executions: WillView["executions"] = []) {
+  function setupApi(executions: WillView["executions"] = [], state?: WillState) {
     const store = new Store(null);
     store.update((s) => (s.policies["alice.testnet"] = POLICY));
-    const w = will(executions.length ? ({ Executing: { stage: 0, since: 0, stage_started: 0 } } as WillState) : "Active", executions);
+    const w = will(state ?? (executions.length ? ({ Executing: { stage: 0, since: 0, stage_started: 0 } } as WillState) : "Active"), executions);
     const contract = { getWill: async (o: string) => (o === "alice.testnet" ? w : null) } as never;
     const app = api({ contract, store, vaults: [], demoMode: true, agentInfo: async () => ({}), auth: verifier, intents: new SimulatedOneClickClient() });
     const post = (path: string, body: unknown) => app.request(path, { method: "POST", body: JSON.stringify(body), headers: { "Content-Type": "application/json" } });
@@ -319,6 +375,21 @@ describe("Intents API", () => {
     expect(body.started).toBe(true);
     expect(body.heirs["tobi.testnet"]).toMatchObject({ pref: null, batches: [] });
     expect(body.heirs["tobi.testnet"].waiting[0]).toMatchObject({ key: "1:0:Near", symbol: "NEAR" });
+  });
+
+  it("masks payout addresses, and hides heirs again after a halt", async () => {
+    const t = setupApi([exec(0, "Near", "ada.testnet", NEAR)]);
+    await t.post("/api/heir/payout", choice("ada.testnet", { blockchain: "base", asset_id: BASE_USDC, address: ADA_BASE }));
+    const body = await (await t.app.request("/api/payouts/alice.testnet")).json();
+    expect(body.heirs["ada.testnet"].pref.address).toBe("0x1111…1111");
+    const halted = setupApi([exec(0, "Near", "ada.testnet", NEAR)], "Active");
+    expect(await (await halted.app.request("/api/payouts/alice.testnet")).json()).toMatchObject({ started: false, heirs: {} });
+  });
+
+  it("fund from anywhere refuses a zero amount and a vault the agent doesn't have", async () => {
+    const t = setupApi();
+    expect((await t.post("/api/intents/fund-quote", { owner: "alice.testnet", vault: "Near", origin_asset: BASE_USDC, amount: "0" })).status).toBe(400);
+    expect((await t.post("/api/intents/fund-quote", { owner: "alice.testnet", vault: "Eth", origin_asset: BASE_USDC, amount: "1" })).status).toBe(400);
   });
 
   it("fund from anywhere: quotes into the vault, then a SIMULATED deposit reaches SUCCESS", async () => {

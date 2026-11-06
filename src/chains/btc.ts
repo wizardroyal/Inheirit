@@ -4,7 +4,7 @@
 import * as bitcoin from "bitcoinjs-lib";
 import { chainAdapters, contracts, utils, type MPCSignature } from "chainsig.js";
 import coinSelect from "coinselect";
-import { stageTargets } from "../executor/amounts";
+import { dustSafeTargets } from "../executor/amounts";
 import type { ChainVault, SentTransfer, StageJob } from "../executor/executor";
 import type { WillContract } from "../near/will-contract";
 import type { Store } from "../state/store";
@@ -93,12 +93,12 @@ export class BtcVault implements ChainVault {
       if (job.isLast) {
         // Sweep: every UTXO in, one output per heir, no change.
         inputs = utxos;
-        const nOut = Object.keys(job.unpaidShares).length;
-        const fee = BigInt(Math.ceil((VB_OVERHEAD + VB_INPUT * inputs.length + VB_OUTPUT * nOut) * rate));
-        targets = stageTargets(job, fee);
+        const feeFor = (nOut: number) => BigInt(Math.ceil((VB_OVERHEAD + VB_INPUT * inputs.length + VB_OUTPUT * nOut) * rate));
+        targets = dustSafeTargets(job, feeFor, BigInt(DUST_SATS));
         outputs = [...targets].map(([id, v]) => ({ address: job.recipients[id], value: Number(v) }));
       } else {
-        targets = stageTargets(job, 0n);
+        targets = dustSafeTargets(job, () => 0n, BigInt(DUST_SATS));
+        if (!targets.size) return []; // every slice is below dust: deferred to the final sweep
         const sel = coinSelect(
           utxos.map((u) => ({ txId: u.txid, vout: u.vout, value: u.value, script })),
           [...targets].map(([id, v]) => ({ address: job.recipients[id], value: Number(v) })),
@@ -108,6 +108,7 @@ export class BtcVault implements ChainVault {
         inputs = sel.inputs.map((i) => ({ txid: i.txId, vout: i.vout, value: i.value }));
         outputs = sel.outputs.map((o) => ({ address: o.address ?? address, value: o.value! })); // no address = change
       }
+      if (!outputs.length) return []; // only dust left in the vault
       for (const o of outputs) {
         if (o.value < DUST_SATS) throw new Error(`output of ${o.value} sats to ${o.address} is below dust`);
       }

@@ -13,6 +13,8 @@ const { toRSV, uint8ArrayToHex } = utils.cryptography;
 // A transfer is not always 21000 gas: Sepolia charges ~207k for the first value transfer to an empty
 // account (new-account state surcharge). So estimate per recipient and keep a margin.
 const GAS_MARGIN_PCT = 120n;
+/** Below this (0.0001 ETH), a last-stage leftover that can't pay its gas is left in the vault. */
+const DUST_WEI = 10n ** 14n;
 const ALREADY_SENT = /already known|nonce too low|known transaction|replacement transaction underpriced/i;
 
 export class EvmVault implements ChainVault {
@@ -56,6 +58,9 @@ export class EvmVault implements ChainVault {
       gasFor[heirId] = (estimate * GAS_MARGIN_PCT) / 100n;
     }
     const totalFees = Object.values(gasFor).reduce((sum, g) => sum + g * maxFeePerGas, 0n);
+    // A leftover too small to pay its own gas would otherwise block the last stage (and so the
+    // secrets) forever. A real balance keeps retrying, so a gas spike never drops a slice.
+    if (job.isLast && job.gross <= totalFees && job.gross < DUST_WEI) return [];
     const targets = stageTargets(job, totalFees);
     const sent: SentTransfer[] = [];
 

@@ -7,7 +7,7 @@ import { serialize } from "borsh";
 import { createHash } from "node:crypto";
 import { z } from "zod";
 
-export type SignedAction = "heartbeat" | "register_owner" | "draft_policy" | "heir_guide" | "demo_faucet" | "telegram_link" | "payout_pref";
+export type SignedAction = "heartbeat" | "register_owner" | "draft_policy" | "heir_guide" | "demo_faucet" | "telegram_link" | "payout_pref" | "demo_signal";
 
 export const SignedRequest = z.object({
   account_id: z.string().min(2),
@@ -22,7 +22,7 @@ export const SignedRequest = z.object({
 export type SignedRequest = z.infer<typeof SignedRequest>;
 
 const Message = z.object({
-  action: z.enum(["heartbeat", "register_owner", "draft_policy", "heir_guide", "demo_faucet", "telegram_link", "payout_pref"]),
+  action: z.enum(["heartbeat", "register_owner", "draft_policy", "heir_guide", "demo_faucet", "telegram_link", "payout_pref", "demo_signal"]),
   owner: z.string().min(2),
   issued_at: z.number().int(),
   data: z.unknown().optional(),
@@ -91,6 +91,8 @@ export class Nep413Verifier {
 
     this.prune(now);
     if (this.seen.has(req.nonce)) throw new AuthError("nonce already used");
+    // Claimed before the key lookup, so two concurrent replays of one request can't both pass.
+    this.seen.set(req.nonce, now);
 
     const permission = await this.deps.accessKey(req.account_id, req.public_key);
     if (!permission) throw new AuthError(`key is not on ${req.account_id}`);
@@ -99,7 +101,6 @@ export class Nep413Verifier {
       if (!(deviceKey && expected === "heartbeat")) throw new AuthError("this action needs a full-access key");
     }
 
-    this.seen.set(req.nonce, now);
     return { owner: msg.owner, action: msg.action, issuedAt: msg.issued_at, data: msg.data };
   }
 

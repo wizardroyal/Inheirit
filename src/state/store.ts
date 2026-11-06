@@ -73,9 +73,12 @@ export interface PayoutBatch {
   /** "direct": same asset and chain as the vault, no swap. */
   mode: "intents" | "direct";
   simulated: boolean;
-  /** QUOTING / WAITING_ROUTE (ours), then 1Click's statuses. */
+  /** QUOTING / WAITING_ROUTE / SENDING (ours), then 1Click's statuses. */
   status: string;
+  /** Routes that weren't available ("waiting for a route"). */
   attempts: number;
+  /** Transient errors before a deposit; they only back off, never give up. */
+  retries?: number;
   nextTryAt?: string;
   depositAddress?: string;
   quoteDeadline?: string;

@@ -10,7 +10,7 @@ function base() {
     owner: "alice.testnet",
     heirs: [
       { id: "h1", name: "Bola", near_account: "bola.testnet", receive: { eth: ETH1, btc: BTC1 } },
-      { id: "h2", name: "Charity Fund", near_account: "charity.testnet", receive: { eth: ETH1 } },
+      { id: "h2", name: "Charity Fund", near_account: "charity.testnet", receive: { eth: "0x2222222222222222222222222222222222222222" } },
     ],
     allocations: [
       { asset: "NEAR", shares: { h1: 80, h2: 20 } },
@@ -41,6 +41,9 @@ describe("checkPolicy", () => {
   });
   it("rejects an unknown heir in allocations", () => {
     expect(errorsOf((p) => (p.allocations[1].shares = { h9: 100 }))).toContain('allocations.ETH: unknown heir "h9"');
+  });
+  it("rejects two heirs sharing a receive address (records couldn't tell them apart)", () => {
+    expect(errorsOf((p) => (p.heirs[1].receive.eth = p.heirs[0].receive.eth!.toUpperCase().replace("0X", "0x")))).toContain("heirs: two heirs share a receive.eth address");
   });
   it("requires a receive address for a foreign-chain share", () => {
     expect(errorsOf((p) => (p.allocations[2].shares = { h2: 100 }))).toContain("heirs.h2: needs receive.btc for a BTC share");

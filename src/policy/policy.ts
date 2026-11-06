@@ -78,6 +78,13 @@ export function checkPolicy(input: unknown): PolicyCheck {
   const accounts = new Set(p.heirs.map((h) => h.near_account));
   if (accounts.size !== p.heirs.length) errors.push("heirs: duplicate near_account");
 
+  // Foreign execution records name only the receive address, so two heirs sharing one would be
+  // indistinguishable (one would look already paid). Break-it 2026-11-06.
+  for (const chain of ["eth", "btc"] as const) {
+    const addrs = p.heirs.map((h) => h.receive[chain]?.toLowerCase()).filter(Boolean);
+    if (new Set(addrs).size !== addrs.length) errors.push(`heirs: two heirs share a receive.${chain} address`);
+  }
+
   const seenAssets = new Set<Asset>();
   for (const a of p.allocations) {
     if (seenAssets.has(a.asset)) errors.push(`allocations: ${a.asset} listed twice`);

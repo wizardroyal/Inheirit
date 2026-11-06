@@ -66,12 +66,19 @@ export interface Slice {
   heir: string;
   chain: Chain;
   amount: bigint;
+  /** Where the vault actually sent it (heir's NEAR account, or their receive address). */
+  to: string;
 }
 
 /** Released slices per heir, from the on-chain execution records. Foreign records name the receive address. */
 export function slicesFor(will: WillView, policy: Policy | undefined): Slice[] {
   const out: Slice[] = [];
+  const seen = new Set<string>();
   for (const e of will.executions) {
+    // A record written twice (e.g. a retried record_execution after an RPC timeout) is one slice.
+    const id = `${e.round}:${e.stage}:${e.chain}:${e.to}:${e.amount}:${e.tx_hash}`;
+    if (seen.has(id)) continue;
+    seen.add(id);
     let heir: string | undefined;
     if (e.chain === "Near") heir = e.to;
     else {
@@ -79,7 +86,7 @@ export function slicesFor(will: WillView, policy: Policy | undefined): Slice[] {
       heir = h?.near_account;
     }
     if (!heir || BigInt(e.amount) === 0n) continue;
-    out.push({ key: `${e.round}:${e.stage}:${e.chain}`, heir, chain: e.chain, amount: BigInt(e.amount) });
+    out.push({ key: `${e.round}:${e.stage}:${e.chain}`, heir, chain: e.chain, amount: BigInt(e.amount), to: e.to });
   }
   return out;
 }
@@ -168,7 +175,7 @@ export class PayoutEngine {
     owner: string,
     heir: string,
     chain: Chain,
-    group: { key: string }[],
+    group: { key: string; to: string }[],
     amount: bigint,
     usd: number,
     pref: PayoutPref,
@@ -195,7 +202,10 @@ export class PayoutEngine {
       destChain: pref.blockchain,
       recipient: pref.address,
       stable: !!stableToken,
-      mode: (dest?.assetId ?? pref.assetId) === origin.assetId ? "direct" : "intents",
+      // "direct" only when the slice already went to the very address the heir chose; otherwise it
+      // must really be sent on, even in the same asset (break-it 2026-11-06).
+      mode:
+        (dest?.assetId ?? pref.assetId) === origin.assetId && group.every((g) => g.to.toLowerCase() === pref.address.toLowerCase()) ? "direct" : "intents",
       simulated: this.deps.client.simulated,
       status: "QUOTING",
       attempts: 0,
@@ -247,13 +257,29 @@ export class PayoutEngine {
         return this.save(b);
       }
     }
+    if (b.status === "SENDING" && b.depositAddress && !b.depositTx) {
+      // A send was started but its hash never saved (a crash in between). Never send blindly again.
+      if (this.deps.sender.simulated) b.status = "PENDING_DEPOSIT";
+      else {
+        const st = await this.deps.client.status(b.depositAddress);
+        if (st.status === "PENDING_DEPOSIT") {
+          b.error = "A deposit may or may not have been sent before a restart; check the vault before retrying";
+          return this.save(b);
+        }
+        b.depositTx = "(sent before a restart; hash not recorded)";
+        b.status = st.status;
+      }
+      this.save(b);
+    }
     if (b.status === "PENDING_DEPOSIT" && b.depositAddress && !b.depositTx) {
       if (b.quoteDeadline && Date.parse(b.quoteDeadline) <= nowMs) {
         b.status = "FAILED";
         b.error = "The quote expired before the deposit";
         return this.save(b);
       }
-      // The tx hash is saved before anything else, so a deposit is never sent twice.
+      // Marked SENDING before the send and the hash saved right after, so a deposit is never sent twice.
+      b.status = "SENDING";
+      this.save(b);
       b.depositTx = await this.deps.sender.send(b);
       this.save(b);
       await this.deps.client.submitDeposit(b.depositTx, b.depositAddress);
@@ -277,15 +303,18 @@ export class PayoutEngine {
     const msg = e instanceof Error ? e.message : String(e);
     this.log(`[payout] ${b.owner} → ${b.heir}: ${msg}`);
     b.error = msg;
-    if (!b.depositTx) {
-      // Nothing was deposited: try again with a fresh quote, up to MAX_ATTEMPTS times.
-      b.attempts++;
+    if (!b.depositTx && b.status !== "SENDING") {
+      // Nothing was deposited: a transient error (network, 5xx). Back off and re-quote; it never
+      // counts toward giving up, so an outage can't strand the slices (break-it 2026-11-06).
+      b.retries = (b.retries ?? 0) + 1;
       b.depositAddress = undefined;
-      b.status = b.attempts >= MAX_ATTEMPTS ? "FAILED" : "QUOTING";
-      b.nextTryAt = new Date(this.now().getTime() + 60_000).toISOString();
+      b.status = "QUOTING";
+      b.nextTryAt = new Date(this.now().getTime() + BACKOFF_S[Math.min(b.retries - 1, BACKOFF_S.length - 1)] * 1000).toISOString();
     } else if (b.simulated && /unknown deposit address/.test(msg)) {
-      // The SIMULATED client restarted and forgot the deposit; nothing real was sent, so free the slices.
-      b.status = "FAILED";
+      // The SIMULATED client restarted and forgot the deposit; nothing real was sent: quote again.
+      b.depositAddress = undefined;
+      b.depositTx = undefined;
+      b.status = "QUOTING";
     }
     // After a real deposit, only 1Click's status decides; keep polling.
     this.save(b);

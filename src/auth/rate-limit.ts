@@ -39,4 +39,6 @@ const HOUR = 60 * 60_000;
 export const AI_DRAFT_LIMIT: Limit = { perKey: 6, global: 120, windowMs: HOUR };
 export const AI_GUIDE_LIMIT: Limit = { perKey: 20, global: 300, windowMs: HOUR };
 // Per owner: a few attempts so a chain whose send failed can be retried; each chain is still funded once.
+/** Fund-from-anywhere quotes are unsigned (a preview), so they are bounded per owner and in total. */
+export const FUND_QUOTE_LIMIT: Limit = { perKey: 30, global: 600, windowMs: HOUR };
 export const FAUCET_LIMIT: Limit = { perKey: 3, global: 30, windowMs: 24 * HOUR };

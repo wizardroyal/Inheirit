@@ -74,7 +74,7 @@ await waitState("GuardianVote", 600);
 for (const g of [g1, g2]) console.log(`  ${g} attests Deceased ${nearblocks((await call(g, "attest", { owner, kind: "Deceased" })).hash)}`);
 await waitState("Challenge", 60);
 
-await agentPost("/demo/signal", { owner, source: "x" });
+await agentPost("/demo/signal", { signed: await signed(owner, "demo_signal", { source: "x" }) });
 console.log(`${at()} SIMULATED X post sent; a lone weak signal must not count. Waiting 40 s…`);
 await sleep(40);
 const still = stateName((await view<Will>("get_will", { owner }))!.state);

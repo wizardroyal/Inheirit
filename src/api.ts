@@ -5,7 +5,7 @@ import { z } from "zod";
 import type { AttestationResult } from "./ai/attestation";
 import type { GuideAnswer, GuideTurn } from "./ai/heir-guide";
 import { AuthError, type Nep413Verifier, type SignedAction, type Verified } from "./auth/nep413";
-import { AI_DRAFT_LIMIT, AI_GUIDE_LIMIT, FAUCET_LIMIT, RateLimiter } from "./auth/rate-limit";
+import { AI_DRAFT_LIMIT, AI_GUIDE_LIMIT, FAUCET_LIMIT, FUND_QUOTE_LIMIT, RateLimiter } from "./auth/rate-limit";
 import type { FaucetSend } from "./demo/faucet";
 import type { PolicyDraft } from "./ai/policy-parser";
 import type { ChainVault } from "./executor/executor";
@@ -36,10 +36,11 @@ export interface ApiDeps {
   };
   /** Telegram check bot; absent when TELEGRAM_BOT_TOKEN / TELEGRAM_BOT_USERNAME aren't set. */
   telegram?: Pick<TelegramBot, "issueLink" | "isLinked" | "username">;
-  /** NEAR Intents 1Click client (SIMULATED on testnet, §J.7); absent = Intents routes off. */
+  /** NEAR Intents 1Click client (SIMULATED on testnet, §J.7); absent = Intents routes off. Kept
+   * separate from the payout engine's client, so unsigned fund quotes can't crowd out its deposits. */
   intents?: OneClickClient;
   /** Override the default rate limits (tests). */
-  limiters?: { draft: RateLimiter; guide: RateLimiter; faucet: RateLimiter };
+  limiters?: { draft: RateLimiter; guide: RateLimiter; faucet: RateLimiter; fund?: RateLimiter };
   /** Absent when NEARAI_API_KEY isn't configured. */
   ai?: {
     attestation(): Promise<AttestationResult>;
@@ -85,8 +86,7 @@ function parseUnits(amount: string, decimals: number): bigint {
   return BigInt(whole) * 10n ** BigInt(decimals) + BigInt((frac + "0".repeat(decimals)).slice(0, decimals) || "0");
 }
 
-const DemoSignal = z.object({
-  owner: z.string().min(2),
+const DemoSignalFields = z.object({
   source: z.enum(SIMULATED_SOURCES.map((s) => s.source) as [string, ...string[]]),
   at: z.string().datetime().optional(),
 });
@@ -105,6 +105,7 @@ export function api(deps: ApiDeps): Hono {
     guide: new RateLimiter(AI_GUIDE_LIMIT),
     faucet: new RateLimiter(FAUCET_LIMIT),
   };
+  const fundLimiter = deps.limiters?.fund ?? new RateLimiter(FUND_QUOTE_LIMIT);
   // Many open pages poll these routes; each call costs the agent RPC/Sepolia/mempool requests from one
   // IP, so answers are shared for a few seconds.
   const cache = new Map<string, { at: number; value: Promise<unknown> }>();
@@ -376,9 +377,14 @@ export function api(deps: ApiDeps): Hono {
     if (!will) return c.json({ error: `No will for ${owner}` }, 404);
     const s = store.get();
     const policy = s.policies[owner];
+    // Heirs stay hidden (§8): only while the release is under way or done. After a halt the will is
+    // back to Active and heirs are hidden again (break-it 2026-11-06).
+    const revealed = ["Executing", "SecretsBuffer", "SecretsReleased", "Completed"].includes(stateName(will.state));
     const base = { enabled: !!deps.intents, simulated: deps.intents?.simulated ?? true, value_mode: policy?.payout_value_mode ?? "as_is", min_usd: MIN_PAYOUT_USD };
     const slices = slicesFor(will, policy);
-    if (!slices.length || !deps.intents) return c.json({ ...base, started: false, heirs: {} });
+    if (!slices.length || !deps.intents || !revealed) return c.json({ ...base, started: false, heirs: {} });
+    // Payout addresses are personal data not in contract state: shown masked.
+    const mask = (a: string) => (a.length > 14 ? `${a.slice(0, 6)}…${a.slice(-4)}` : a);
     const tokens = await cached("intents:tokens", 60_000, () => deps.intents!.tokens());
     const batches = s.payouts[owner] ?? [];
     const only = c.req.query("heir");
@@ -389,7 +395,12 @@ export function api(deps: ApiDeps): Hono {
         const t = tokens.find((k) => k.assetId === ORIGIN_ASSET[x.chain].assetId);
         return { key: x.key, chain: x.chain, symbol: ORIGIN_ASSET[x.chain].symbol, amount: x.amount.toString(), usd: t ? Number(usdValue(x.amount, t).toFixed(2)) : null, exhausted: x.exhausted };
       });
-      heirs[heir] = { pref: s.payoutPrefs[owner]?.[heir] ?? null, batches: batches.filter((b) => b.heir === heir), waiting };
+      const pref = s.payoutPrefs[owner]?.[heir];
+      heirs[heir] = {
+        pref: pref ? { ...pref, address: mask(pref.address) } : null,
+        batches: batches.filter((b) => b.heir === heir).map((b) => ({ ...b, recipient: mask(b.recipient) })),
+        waiting,
+      };
     }
     return c.json({ ...base, started: true, heirs });
   });
@@ -401,14 +412,19 @@ export function api(deps: ApiDeps): Hono {
     const parsed = FundQuote.safeParse(await c.req.json());
     if (!parsed.success) return c.json({ error: parsed.error.issues }, 400);
     const { owner, vault, origin_asset, amount } = parsed.data;
-    if (!(await contract.getWill(owner))) return c.json({ error: `No will for ${owner}` }, 404);
+    const wait = fundLimiter.take(owner);
+    if (wait) return c.json(tooMany(wait), 429);
+    if (!(await cached(`will:${owner}`, 5_000, () => contract.getWill(owner)))) return c.json({ error: `No will for ${owner}` }, 404);
+    const vaultAdapter = deps.vaults.find((v) => v.chain === vault);
+    if (vault !== "Near" && !vaultAdapter) return c.json({ error: `This agent has no ${vault} vault` }, 400);
     const tokens = await cached("intents:tokens", 60_000, () => deps.intents!.tokens());
     const origin = tokens.find((t) => t.assetId === origin_asset);
     if (!origin) return c.json({ error: "Unknown asset" }, 400);
     const units = parseUnits(amount, origin.decimals);
+    if (units <= 0n) return c.json({ error: "Amount must be more than zero" }, 400);
     const usd = usdValue(units, origin);
     if (usd > 10_000) return c.json({ error: "Keep demo amounts under $10,000" }, 400);
-    const recipient = vault === "Near" ? owner : await deps.vaults.find((v) => v.chain === vault)!.address(owner);
+    const recipient = vault === "Near" ? owner : await vaultAdapter!.address(owner);
     try {
       const q = await deps.intents.quote(
         quoteRequest({ dry: false, originAsset: origin.assetId, destinationAsset: ORIGIN_ASSET[vault].assetId, amount: units.toString(), refundTo: "your-wallet", recipient }),
@@ -488,9 +504,14 @@ export function api(deps: ApiDeps): Hono {
   // SIMULATED signals for the demo panel (CLAUDE.md §7.1). Never available outside demo mode.
   app.post("/demo/signal", async (c) => {
     if (!deps.demoMode) return c.json({ error: "Simulated signals are available only in demo mode" }, 403);
-    const parsed = DemoSignal.safeParse(await c.req.json());
-    if (!parsed.success) return c.json({ error: parsed.error.issues }, 400);
-    const { owner, source, at } = parsed.data;
+    // Signed by the owner: a SIMULATED Gmail or Calendar signal (0.7) counts alone, so an unsigned
+    // route would let anyone keep any demo will from ever executing (break-it 2026-11-06).
+    const body = (await c.req.json()) as { signed?: unknown };
+    if (!body?.signed) return c.json({ error: "A simulated signal must be signed by the owner" }, 401);
+    const r = await ownerRequest(body, "demo_signal", DemoSignalFields, z.never());
+    if (r.error) return c.json(r.error.body, r.error.status);
+    const { owner } = r;
+    const { source, at } = r.data;
     const when = at ?? new Date().toISOString();
     store.update((s) => (s.simulated[owner] = { ...s.simulated[owner], [source]: when }));
     return c.json({ ok: true, simulated: true, owner, source, at: when });

@@ -39,8 +39,14 @@ const BASE_USDC_CONTRACT = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" as const
 const MPC = "v1.signer";
 // [VERIFY] mainnet sign deposit: v1.signer runs the same code as v1.signer-prod.testnet, which takes 1 yocto.
 const SIGN_DEPOSIT = BigInt(process.env.MAINNET_SIGN_DEPOSIT_YOCTO || "1");
-const MAX_TX = Number(process.env.INTENTS_MAX_USD_PER_TX || "5");
-const MAX_TOTAL = Number(process.env.INTENTS_MAX_USD_TOTAL || "25");
+function cap(name: string, fallback: number): number {
+  const v = Number(process.env[name] || fallback);
+  // A typo must never turn the caps off (NaN compares false).
+  if (!Number.isFinite(v) || v <= 0) throw new Error(`${name} must be a positive number`);
+  return v;
+}
+const MAX_TX = cap("INTENTS_MAX_USD_PER_TX", 5);
+const MAX_TOTAL = cap("INTENTS_MAX_USD_TOTAL", 25);
 const LEDGER = path.join(os.homedir(), ".config/inheirit/mainnet-ledger.json");
 const RECORDS = path.join(import.meta.dirname, "../web/src/data/mainnet-payouts.json");
 
@@ -86,8 +92,13 @@ async function balances(address: Hex) {
   return { eth, usdc };
 }
 
-function ledger(): { total_usd: number; txs: unknown[] } {
+type Ledger = { total_usd: number; txs: { at: string; usd: number; status: "reserved" | "sent"; txHash?: string; depositAddress: string }[] };
+function ledger(): Ledger {
   return fs.existsSync(LEDGER) ? JSON.parse(fs.readFileSync(LEDGER, "utf8")) : { total_usd: 0, txs: [] };
+}
+function saveLedger(l: Ledger) {
+  fs.mkdirSync(path.dirname(LEDGER), { recursive: true });
+  fs.writeFileSync(LEDGER, JSON.stringify(l, null, 2));
 }
 
 async function confirm(lines: string[]): Promise<boolean> {
@@ -201,9 +212,11 @@ async function main() {
     if (!dep) throw new Error("No deposit address in the quote");
     const b = await balances(v.address);
     const amount = BigInt(q.quote.amountIn);
+    // Send exactly what was asked and capped, never a figure from the quote response.
+    if (amount !== parseUnits(usd.toString(), 6)) throw new Error(`Quote amountIn ${q.quote.amountIn} differs from the requested ${usd} USDC; not sending`);
     if (b.usdc < amount) throw new Error(`Vault ${v.address} has ${Number(b.usdc) / 1e6} USDC, needs ${usd}`);
     const ok = await confirm([
-      `From:        ${usd} USDC on Base, demo vault ${v.address} (${v.kind})`,
+      `From:        ${usd} USDC on Base (${amount} units), demo vault ${v.address} (${v.kind})`,
       `To:          ${q.quote.amountOutFormatted} ${to.symbol} on ${to.blockchain} (min ${q.quote.minAmountOut} units after 1% slippage)`,
       `Recipient:   ${need("recipient")}`,
       `Value out:   $${q.quote.amountOutUsd} (in $${q.quote.amountInUsd}; fees ≈ $${(Number(q.quote.amountInUsd) - Number(q.quote.amountOutUsd)).toFixed(4)})`,
@@ -215,14 +228,17 @@ async function main() {
       `Links to:    ${arg("link") ?? "(no testnet stage)"}`,
     ]);
     if (!ok) return console.log("Stopped. Nothing was sent.");
+    // Reserve against the cap before signing: if the process dies after broadcasting, the spend still counts.
+    const l = ledger();
+    l.total_usd += usd;
+    const entry: Ledger["txs"][number] = { at: new Date().toISOString(), usd, status: "reserved", depositAddress: dep };
+    l.txs.push(entry);
+    saveLedger(l);
     const data = encodeFunctionData({ abi: erc20Abi, functionName: "transfer", args: [dep, amount] });
     const txHash = await signAndSend({ from: v.address, to: BASE_USDC_CONTRACT, data });
     console.log(`Deposit sent: https://basescan.org/tx/${txHash}`);
-    const l = ledger();
-    l.total_usd += usd;
-    l.txs.push({ at: new Date().toISOString(), usd, txHash, depositAddress: dep });
-    fs.mkdirSync(path.dirname(LEDGER), { recursive: true });
-    fs.writeFileSync(LEDGER, JSON.stringify(l, null, 2));
+    Object.assign(entry, { status: "sent", txHash });
+    saveLedger(l);
     await oneclick.submitDeposit(txHash, dep).catch((e) => console.warn(`deposit/submit: ${e.message} (status polling still works)`));
     const st = await waitStatus(dep);
     const records = fs.existsSync(RECORDS) ? JSON.parse(fs.readFileSync(RECORDS, "utf8")) : [];

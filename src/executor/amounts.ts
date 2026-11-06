@@ -67,3 +67,37 @@ export function stageTargets(
   }
   return out;
 }
+
+/**
+ * Stage targets for a chain that can't send outputs below `dust` (Bitcoin). Without this a small
+ * vault split among several heirs makes every attempt throw, the stage never completes, and the will
+ * never reaches the secrets (break-it 2026-11-06).
+ * - Non-last stage: a slice below dust is deferred; it stays in the vault for the final sweep.
+ * - Last stage: the sweep pays the heirs whose share clears dust; dust-sized shares go to them rather
+ *   than to miners. A vault holding only dust pays nobody, so the stage still completes.
+ */
+export function dustSafeTargets(
+  job: { isLast: boolean; gross: bigint; unpaidShares: Record<string, number> },
+  feeFor: (outputs: number) => bigint,
+  dust: bigint,
+): Map<string, bigint> {
+  if (!job.isLast) {
+    const t = stageTargets(job, 0n);
+    for (const [id, v] of t) if (v < dust) t.delete(id);
+    return t;
+  }
+  const shares = Object.fromEntries(Object.entries(job.unpaidShares).filter(([, w]) => w > 0));
+  for (;;) {
+    const ids = Object.keys(shares);
+    if (!ids.length) return new Map();
+    const pool = job.gross - feeFor(ids.length);
+    if (pool < dust) {
+      if (job.gross < dust * 2n) return new Map(); // only dust left
+      throw new Error(`vault balance ${job.gross} does not cover fees ${feeFor(ids.length)}`);
+    }
+    const t = splitWeighted(pool, shares);
+    const small = [...t].filter(([, v]) => v < dust).map(([id]) => id);
+    if (!small.length) return t;
+    for (const id of small) delete shares[id];
+  }
+}

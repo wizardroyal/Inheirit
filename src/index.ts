@@ -225,7 +225,8 @@ const faucet =
     : undefined;
 
 const app = api({
-  intents,
+  // A separate client: unsigned fund-from-anywhere quotes never share memory with the engine's deposits.
+  intents: new SimulatedOneClickClient(new HttpOneClickClient(undefined, config.oneclickBaseUrl())),
   faucet,
   telegram,
   ai,

@@ -231,7 +231,7 @@ function WillPanel({ cast }: { cast: Cast }) {
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <SimulatedTag />
             {SIMULATED.map((x) => (
-              <ActionButton key={x.source} tone="quiet" disabled={done} onClick={() => agent.simulate(cast.owner, x.source)}>
+              <ActionButton key={x.source} tone="quiet" disabled={done} onClick={async () => agent.simulate(await signRequest(cast.owner, "demo_signal", { source: x.source }))}>
                 {x.label}
               </ActionButton>
             ))}
