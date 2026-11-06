@@ -18,6 +18,7 @@
 
 ### Hard rules (never break these without the human's explicit yes in chat)
 1. **Testnet only.** Never deploy to mainnet, never sign mainnet transactions, never spend real funds.
+   - **One scoped exception (v3, §9A):** NEAR Intents has no testnet, so its legs are shown on mainnet with small amounts. Only `scripts/mainnet-payout.ts` may do this. **Every mainnet transaction needs the human's explicit "yes" in chat, every time, after the script prints the origin asset/chain, amount, destination asset/chain, recipient, quote, fees and refund address.** Caps: ≤ $5 per transaction, ≤ $25 in total unless the human raises them. No Shade Agent and no contract on mainnet. A blanket "do everything" does not count as that yes. Read-only mainnet calls (dry quotes, views, address derivation) are fine.
 2. **No secrets in the repo.** Keys, seed phrases, API keys live in `.env` files that are git-ignored. Provide `.env.example` with placeholder names only.
 3. **Never push, make the repo public, or deploy to Phala Cloud** without asking first.
 4. **Never post anything** (X, Discord, etc.) on the human's behalf.
@@ -110,7 +111,7 @@ Billions in crypto are lost when holders die or become incapacitated. Past attem
 | **NEAR AI Cloud** (OpenAI-compatible, TEE inference, attestation) | Plain-English will → structured policy; heir claim guide; attestation badge | `agent/src/ai/`, `web/` |
 | Named accounts, function-call keys | Readable heirs/guardians; (backlog) caretaker allowance in incapacity mode | `contract/`, `web/` |
 | Meta transactions (backlog) | Gasless claims for non-crypto heirs | `web/`, relayer |
-| NEAR Intents / 1Click (optional, mainnet, backlog) | Heir chooses "receive as USDC on chain X". No testnet exists for Intents — mainnet small amounts only, human approval required | `agent/src/intents/` |
+| **NEAR Intents / 1Click** (v3, §9A) | Universal payout (each heir chooses the asset and chain they receive), stable-value inheritance, fund from anywhere. No testnet: the agent uses a SIMULATED 1Click client priced from the live token list; real mainnet legs only via an approval-gated local script | `src/intents/`, `scripts/mainnet-payout.ts`, `web/src/components/Payouts.tsx` |
 
 Key facts confirmed from docs (Oct 26, 2026):
 - Chain Signatures MPC contract: testnet `v1.signer-prod.testnet`, mainnet `v1.signer`. Addresses derive from (calling NEAR account, derivation path, MPC master key). The sign call yields and resumes, so it takes time to return. Bitcoin needs one signature per UTXO.
@@ -556,6 +557,68 @@ v1 as of 2026-11-05, the starting point:
 
 Scripts: `scripts/demo-cancel.ts` and `scripts/demo-execute.ts` run both headlessly; the README links them. They need updating for v2: accept guardians, stage waits, the secrets stage, acceleration.
 
+
+---
+
+## 9A. NEAR Intents (v3): payout, stable value, fund from anywhere
+
+> Merged 2026-11-06 from the human's `CLAUDE-update-v3-intents.md`. Reconciliation and live findings are in the Decision log (2026-11-06).
+
+### 9A.1 The story (README wording)
+**"Your heirs receive what they actually use."** Each heir chooses the asset and chain they receive (e.g. USDC on Base, SOL on Solana, NEAR). Owners can choose **stable-value inheritance**, which converts slices to stablecoins as they are released, so heirs aren't exposed to volatility during a months-long staged release. Owners can **fund their will from anywhere**. All three run on **NEAR Intents (1Click)**. It is a "universal checkout" turned into a **universal payout**, and it fixes a real failure of past crypto wills: heirs who can't claim because they lack the right wallet.
+
+### 9A.2 How it fits the testnet core (reconciliation)
+- The vaults still pay each slice on testnet exactly as before (NEAR by the contract, Sepolia/BTC by the agent). The **payout layer** takes each released slice (one execution record per round, stage, chain and heir) and sends it on through 1Click to the heir's choice. On testnet this onward leg runs on the **SIMULATED 1Click client** (real live prices from the public `/v0/tokens`, a fake deposit address, status PENDING_DEPOSIT → PROCESSING → SUCCESS), labelled SIMULATED everywhere.
+- **Not done (would need contract changes):** holding a slice *in the vault* until the heir chooses. NEAR slices are paid by the contract in `advance()`. Instead the *onward payout* waits ("awaiting heir"), and the slices pay out together when the heir chooses. Documented.
+- The agent never moves mainnet value and has no 1Click key; no new TEE env keys.
+- Real mainnet legs: `scripts/mainnet-payout.ts`, run by the human (§9A.6).
+
+### 9A.3 1Click flow (field names [VERIFIED] against the live OpenAPI spec, 2026-11-06)
+Base `https://1click.chaindefuser.com`, header **`X-API-Key: $ONECLICK_JWT`** (the spec's recommended scheme; `Authorization: Bearer` is legacy). Code: `src/intents/oneclick.ts`.
+1. `GET /v0/tokens` → `{assetId, decimals, blockchain, symbol, price, …}`; cached 10 min. Asset IDs are never hand-typed.
+2. `POST /v0/quote`: `dry`, `swapType: EXACT_INPUT`, `slippageTolerance: 100` (bps), `originAsset`, `depositType: ORIGIN_CHAIN`, `destinationAsset`, `amount` (origin smallest units), `refundTo`, `refundType: ORIGIN_CHAIN`, `recipient`, `recipientType: DESTINATION_CHAIN`, `deadline` (+1 h), **`quoteWaitingTimeMs: 5000` always**, optional `confidentiality: basic|advanced`. The response `quote` has `depositAddress` (non-dry only), `amountOut(Formatted|Usd)`, `minAmountOut`, `deadline`, `timeEstimate`, `withdrawFee`, `refundFee`.
+3. Send `amount` to `depositAddress` on the origin chain; `POST /v0/deposit/submit {txHash, depositAddress}`.
+4. `GET /v0/status?depositAddress=` → `KNOWN_DEPOSIT_TX | PENDING_DEPOSIT | INCOMPLETE_DEPOSIT | PROCESSING | SUCCESS | REFUNDED | FAILED` (the v3 file did not list `KNOWN_DEPOSIT_TX`), with `swapDetails.originChainTxHashes / destinationChainTxHashes [{hash, explorerUrl}]`, `refundReason`.
+
+Rules (`src/intents/payout.ts`):
+- **Idempotency:** one deposit address per batch; the deposit tx hash is saved before anything else, so a batch is never deposited twice. REFUNDED/FAILED frees its slices for a new batch, at most 3 batches per slice ("needs attention" after that).
+- **Minimum:** batches below **$1** wait for more slices; once the release is over (state no longer Executing) the rest goes out regardless.
+- **Same asset and chain as the vault:** `mode: direct`, no 1Click.
+- **"Quoting for this pair is not available"** (`NoRouteError`): the batch shows "waiting for a route" and retries with backoff (30 s, 60 s, 120 s, then every 5 min). It never fails or skips the slice.
+- **Route probe:** an heir's choice is accepted only if a dry quote (≈ $10 from the NEAR vault asset) succeeds.
+- **Expired quote before deposit:** dropped and re-quoted.
+
+### 9A.4 Feature 1: universal payout
+- An heir's **payout preference** `{blockchain, assetId, address}` is set by the heir on `/heir/[owner]`, signed by the heir (NEP-413 action `payout_pref`), and validated against `/v0/tokens` and the chain's address format. Offered chains: NEAR, Ethereum, Base, Arbitrum, Optimism, Polygon, Solana, Bitcoin; symbols USDC, USDT, wNEAR, ETH, BTC, SOL, POL.
+- **Owner presets** for an heir's payout (v3 "optional") are **not built**.
+- Heirs hidden: `GET /api/payouts/:owner` reveals nothing until a slice has been released. Before that, the heir's browser remembers its own choice.
+- The heir page and the owner/demo panels show per-batch status, amounts and explorer links.
+
+### 9A.5 Feature 2: stable value · Feature 3: fund from anywhere
+- Policy field **`payout_value_mode: "as_is" | "stable"`** (optional, so existing policy hashes don't change). In stable mode, the destination is USDC on the heir's chosen chain, else USDT. If that chain has neither, the payout uses the heir's asset and the record says so. The policy parser recognises "in dollars / stablecoins / USDC". Setup and demo have a checkbox.
+- **Fund from anywhere:** owner/demo panel → pick an origin token → quote into the will's vault → deposit address and expected amount. The user sends from their own wallet. SIMULATED on testnet (no coins arrive; the demo faucet still funds testnet vaults). The real flow is `mainnet-payout.ts fund` into the mainnet demo vault.
+
+### 9A.6 Mainnet demo (honest and minimal)
+- **Demo vault:** a **Chain Signatures-derived Base address** from a NEAR mainnet account the human holds (`MAINNET_DEMO_ACCOUNT` + `MAINNET_DEMO_PRIVATE_KEY`, path `inheirit/demo/base`), signed by `v1.signer` (mainnet). **Fallback:** a plain EVM key (`MAINNET_DEMO_EVM_KEY`). It holds ~$25 USDC on Base plus a little ETH on Base for gas.
+- **Not yet available:** the human hasn't created the mainnet account. Derivation is checked: with a placeholder account the script derived an address via the mainnet MPC key.
+- `scripts/mainnet-payout.ts`:
+  - read-only: `vault | tokens | quote | status`;
+  - moves value: **`pay`**, which enforces the caps, takes a fresh non-dry quote, prints every field, waits for a typed `yes`, sends USDC to the deposit address, submits the tx, polls the status, then records the payout in `web/src/data/mainnet-payouts.json` (shown in the app as "On mainnet") and the ledger in `~/.config/inheirit/mainnet-ledger.json`;
+  - `fund`: prints a deposit address for the human's own wallet and sends nothing.
+- **[VERIFY] the mainnet `sign` deposit:** the script attaches 1 yocto, like testnet (`MAINNET_SIGN_DEPOSIT_YOCTO` overrides).
+- README wording: "Core runs on NEAR testnet. NEAR Intents has no testnet, so payout and funding via Intents are demonstrated on mainnet with small real amounts from a demo vault signed by a local script. In production, the attested agent's mainnet contract would sign these legs."
+
+### 9A.7 Tests
+- `test/intents.test.ts`: quote building; formatting; stable selection with the USDT fallback; address/asset checks; SIMULATED status walk; slice mapping; mixed heirs with one choosing late; no double deposit; stable conversion; no stablecoin on chain; direct transfer; minimum accumulation; no-route backoff; refund cap; failed send; and the API (signed choice, privacy before release, fund-from-anywhere, tokens).
+- Hosted headless check: `scripts/demo-payout.ts`.
+- **Mainnet checks** (human-approved, within the caps): one universal payout, one stable payout, one fund-from-anywhere deposit, each recorded in `docs/DEMO.md`.
+
+### 9A.8 Feature 4: Confidential Intents (gated)
+Start only after features 1–3 pass §9A.7 **including the mainnet checks**, and only without hurting the Nov 9–10 break/audit work. **Hard stop: Nov 11 end of day.** Otherwise it goes to the roadmap.
+- A dry quote with `confidentiality: basic` and `advanced` succeeded on Base USDC → Arbitrum USDC on 2026-11-06 (same price as public).
+- Use only that field on a normal ORIGIN_CHAIN → DESTINATION_CHAIN quote; not the `CONFIDENTIAL_INTENTS` deposit types.
+- UI copy, only after reading what each mode hides: "Observers can't link your will's release to your heir's receipt." Never "invisible" or "anonymous".
+
 ---
 
 ## 10. Environment variables (`.env.example`, placeholders only)
@@ -578,6 +641,16 @@ NOTIFY_FROM_EMAIL=
 TELEGRAM_BOT_TOKEN=          # BotFather; never commit
 TELEGRAM_BOT_USERNAME=       # for t.me/<bot>?start=<token> links
 DEMO_MODE=true
+# NEAR Intents (§9A). The agent needs none of these; they are for scripts/mainnet-payout.ts.
+ONECLICK_BASE_URL=https://1click.chaindefuser.com
+ONECLICK_JWT=                # Partner Portal key (a JWT), sent as X-API-Key; never commit
+MAINNET_DEMO_ACCOUNT=        # NEAR mainnet account whose key the human holds (derives the Base vault)
+MAINNET_DEMO_PRIVATE_KEY=    # never commit
+MAINNET_DEMO_DERIVATION_PATH=inheirit/demo/base
+MAINNET_DEMO_EVM_KEY=        # fallback vault: a plain EVM key; never commit
+BASE_RPC_URL=
+INTENTS_MAX_USD_PER_TX=5     # raise only with the human's approval
+INTENTS_MAX_USD_TOTAL=25
 ```
 
 ---
@@ -632,16 +705,22 @@ DEMO_MODE=true
 **Never cut:** the snap-back moment, the Telegram owner check, standard staging with a long first wait, secrets-last gating.
 
 ### Nov 8–14 — improve, test, break, audit
-- **Nov 8–9, break it:** adversarial testing session(s). Each finding becomes a test, then a fix. Cover:
+- **Nov 8, Intents day (v3, §9A):**
+  - **Built ahead on 2026-11-06:** the 1Click client (real + SIMULATED), features 1–3, the heir payout step, the stable-mode setting, fund from anywhere, `scripts/mainnet-payout.ts` and `scripts/demo-payout.ts`.
+  - **Left for the human (each transaction needs a "yes"):** create the NEAR mainnet account and fund the Base vault (~$25 USDC + a little ETH), then run one payout, one stable payout and one funding deposit.
+  - ✅ When the SIMULATED Scenario B passes with mixed heir choices, three mainnet tx links are in `docs/DEMO.md`, and the app shows a mainnet slice arriving.
+  - Cut order: (1) Chain Signatures mainnet origin → the plain EVM key fallback; (2) the real mainnet funding deposit → SIMULATED + UI only. Never cut universal payout.
+- **Nov 9, break it:** adversarial testing session(s). Each finding becomes a test, then a fix. Cover:
   - greedy-heir scenarios and a colluding guardian;
   - replayed or forged signals, and simulated-signal spam;
   - signing a payload outside `Executing`, and double execution;
   - an early `store_released_note`;
   - an agent restart mid-execution;
   - Bitcoin UTXO and fee edge cases;
-  - empty or partly funded vaults.
+  - empty or partly funded vaults;
+  - Intents: double-send attempts, the refund path, expired quotes, cap enforcement, wrong-chain addresses, an heir's choice set by someone else.
 - **Nov 10, audit:** a fresh Claude Code session with no prior context reviews the contract and agent against `docs/THREAT_MODEL.md` and this spec, and reports findings only. Fix what it finds. Also confirm the Intel TDX check (nearai-cloud-verifier) still passes before showing the "verified" badge.
-- **Nov 11, polish:**
+- **Nov 11, polish** (plus Confidential Intents §9A.8 only if its gate is met; hard stop end of day):
   - Copy, empty states, mobile layout, performance.
   - README per §11: the pitch, the insights from §2.1, "do X → see Y", the list of simulated sources, limitations, roadmap.
   - Replace `<WEB_URL>` in `README.md` with `https://inheirit.vercel.app` and check "try it in 5 minutes" against the hosted app.
@@ -654,7 +733,7 @@ DEMO_MODE=true
 2. Normal life: signals pulse, nothing happens; the verdict says "Alive."
 3. Silence: the ladder climbs, a Telegram message arrives on a real phone, friends and guardians are asked.
 4. The owner replies on Telegram → **the ladder snaps back** → the verdict explains why.
-5. Replay without a reply: quorum → challenge → 10% lands on NEAR/Sepolia/BTC → the long wait (fast-forwarded) → the remaining slices → buffer → the heir opens a sealed note.
+5. Replay without a reply: quorum → challenge → 10% lands on NEAR/Sepolia/BTC → "Ada chose USDC on Base — here it arrives" (the mainnet explorer link on screen) and one line on stable value → the long wait (fast-forwarded) → the remaining slices → buffer → the heir opens a sealed note.
 6. Close on the privacy strip and "Built on NEAR: Chain Signatures, Shade Agents (TEE), NEAR AI Cloud."
 
 ---
@@ -669,7 +748,10 @@ DEMO_MODE=true
 - stale-will review;
 - a lawyer companion letter;
 - gasless heir claims;
-- an optional mainnet Intents payout ("receive as USDC on chain X"; **human approval required**).
+- **Private inheritance with Confidential Intents** (if not shipped by Nov 11): payouts that observers can't trace from the will's release to the heir's receipt.
+- **Intents-native vault:** the will holds every asset as a NEAR Intents balance, distributes by internal transfer, and heirs withdraw to any chain. One vault for every asset, instant cross-chain payout; needs mainnet and production Shade Agents. Feasibility checked: a dry 1Click quote from a NEAR Intents balance (`depositType: INTENTS`) to USDC on Base succeeded on 2026-11-05.
+- Self-funding upkeep (the agent pays its own inference and hosting via Intents) and automatic gas top-ups for vaults and heirs.
+- Holding a slice in the vault (contract-level) until the heir chooses a payout.
 
 **Engineering backlog (from v1, still open):**
 - Hardening: guardian disagreement, partial vault funding, fee estimation, BTC UTXO edge cases, an idempotency audit.
@@ -687,10 +769,10 @@ DEMO_MODE=true
 ## 14. Status (update every session)
 - **Phase:** v2 Day A (2026-11-05), code complete locally. The contract, agent, scripts and web app are on v2 (commits `6dd38ac`…`602506e`, branch `web-day4`, **not pushed**). The v2 contract is live on `inheirit.testnet`. The **TEE agent runs v2a** (registered on the v2 contract, same sealed-notes key, Telegram on). `main` has the v2 web app (`06e4e41`); the Day B web panel (`1ad60ca`) is not pushed yet. Local runs use `inheirit-dev2.testnet` (local mode, v2; `inheirit-dev.testnet` is v1 and stale) with a local agent on port 3002 (`DATA_DIR=./data-v2`). Hosted setup:
 - **Last checkpoint:** ✅ 2026-11-05: Scenario B ran to **Completed on all three chains on the hosted app** (owner `alice.inheirit-kjgw3v.testnet`, details in the Decision log). Scenario A's cancel moment was also run by the human on the hosted app (guardian vote → Challenge → owner sign of life → Active). Tests: 126 vitest, agent typecheck clean, web typecheck clean.
-- **TEE agent (provision once; never re-create, §7.5):** CVM `inheirit-agent`, vm `e3685437-e716-493a-ac4e-3717a72e7fdd`, **app_id `d5b714731becca502b6bd054a5cf6ffa5ce71f61`**, dstack-0.5.12, tdx.small, gateway `dstack-pha-prod9.phala.network`. Image `unwizarding/inheirit-agent@sha256:97e7966997cc559e79fac8d55080930d4ad87c2b07b6709db68d03527c77c28e` (v2d: v2c + Telegram repeats once per silence), live compose hash `b075a4d2d603a4221991734e7de59c74280691a4387b2d926f89c3f9d7666355` (11 allowed_envs, incl. DEMO_FAUCET_*, NEAR_RPC_URL, TELEGRAM_BOT_TOKEN, TELEGRAM_BOT_USERNAME). It is the only approved hash on 2026-11-06; earlier hashes are retired. `NEAR_RPC_URL` in the TEE = keyed FastNEAR only (key sent as a bearer header). Agent account changes on every boot (implicit account); on 2026-11-06 ~08:50Z it is `11a43bc4b58f7e17d2e0f8a15a1c8b669ea83abb7116ff8be5fbbdab2bd9f9ea`. **Sealed-notes key on `inheirit.testnet`: `ae74cf06b6be6e3896aa9e9641f4d67e8a598db39724903cec7f1955c2ffa51e`** (app_id `d5b71473…`, from dstack in the TEE). API: `https://d5b714731becca502b6bd054a5cf6ffa5ce71f61-3000.dstack-pha-prod9.phala.network`. Logs: `https://d5b714731becca502b6bd054a5cf6ffa5ce71f61-8090.dstack-pha-prod9.phala.network/logs/shade-agent-app?text&bare&timestamps&tail=50`. Record in `deploy/tee-agent.json`; tool `scripts/tee-agent.ts provision|approve|upgrade|env|retire|status|stop|start` (needs the shade CLI keyring: Phala key + testnet account `paid-outside.testnet`; **the keyring is wiped on every WSL restart**, see Decision log 2026-11-05). It costs about $0.06/h while running; `stop` keeps the app_id and key.
+- **TEE agent (provision once; never re-create, §7.5):** CVM `inheirit-agent`, vm `e3685437-e716-493a-ac4e-3717a72e7fdd`, **app_id `d5b714731becca502b6bd054a5cf6ffa5ce71f61`**, dstack-0.5.12, tdx.small, gateway `dstack-pha-prod9.phala.network`. Image `unwizarding/inheirit-agent@sha256:86712d856a20f18eb70292db6d9570883ac7a81ec20b6de1612b0c78056a26ea` (v2e: v2d + NEAR Intents, SIMULATED 1Click), live compose hash `fb1bd5d1350a34f079269348de93531c36b593f85cd3b6d30514473936e4a8d8` (11 allowed_envs, incl. DEMO_FAUCET_*, NEAR_RPC_URL, TELEGRAM_BOT_TOKEN, TELEGRAM_BOT_USERNAME). It is the only approved hash on 2026-11-06; earlier hashes are retired. `NEAR_RPC_URL` in the TEE = keyed FastNEAR only (key sent as a bearer header). Agent account changes on every boot (implicit account); on 2026-11-06 ~10:00Z it is `9c364c97c0670b59ef7f8ce6e287aff0f234ecc42ad6451b026a3f2a42f42fea`. **Sealed-notes key on `inheirit.testnet`: `ae74cf06b6be6e3896aa9e9641f4d67e8a598db39724903cec7f1955c2ffa51e`** (app_id `d5b71473…`, from dstack in the TEE). API: `https://d5b714731becca502b6bd054a5cf6ffa5ce71f61-3000.dstack-pha-prod9.phala.network`. Logs: `https://d5b714731becca502b6bd054a5cf6ffa5ce71f61-8090.dstack-pha-prod9.phala.network/logs/shade-agent-app?text&bare&timestamps&tail=50`. Record in `deploy/tee-agent.json`; tool `scripts/tee-agent.ts provision|approve|upgrade|env|retire|status|stop|start` (needs the shade CLI keyring: Phala key + testnet account `paid-outside.testnet`; **the keyring is wiped on every WSL restart**, see Decision log 2026-11-05). It costs about $0.06/h while running; `stop` keeps the app_id and key.
 - **Shipped in v2a (2026-11-05):** the faucet fixes (`66758d5`) and the transport-only RPC failover (`3f3433b`). It is now safe to set `NEAR_RPC_URL=https://test.rpc.fastnear.com?apiKey=…,https://near-testnet.drpc.org` and run `tee-agent.ts env` (no new hash, because the key list is unchanged). **Only one Telegram poller per bot token:** don't run a local agent with the Telegram keys while the TEE agent is up; unset them locally.
 - **How to ship an agent change (the flow that worked on 2026-11-05):** (1) human: `docker build --platform linux/amd64 -t unwizarding/inheirit-agent:<tag> .` and `docker push …` (Docker Desktop with WSL integration on; trailing ` .` matters); (2) Claude: pin the pushed digest on the `image:` line of `docker-compose.yaml`; (3) make sure the keyring has both credentials (`tee-agent.ts status` works); (4) CVM must be **running** (`tee-agent.ts start` if not); (5) `tee-agent.ts upgrade` (approves the new hash before reboot); (6) only if `ENV_KEYS` in `scripts/tee-agent.ts` gained a key: `tee-agent.ts env` (retry while it says "Another operation is already in progress"), wait ~45 s, then `tee-agent.ts approve` **immediately** (the env update changes the compose hash; unapproved = registration fails and burns agent NEAR); (7) watch the logs for `Agent registered` after the newest `Agent account ID` line; (8) `tee-agent.ts retire <old hashes>`; append to `deploy/tee-agent.json`; commit. A pure value change in `.env` (same keys) is just `tee-agent.ts env`, no approve.
-- **Next steps (in order):** (1) The human checks Vercel → Firewall (Attack Challenge Mode or bot protection; the Persistent Action from 2026-11-05 should expire) so that tools and AI judges can load `inheirit.vercel.app`. (2) Done: repeat Telegram messages after an expired vote go out once per silence (v2d). (3) Nov 8–14 per §12: break-it session, a second audit, polish (mobile, empty states), the demo video script and X post draft for the human. Then the human makes the repo public, re-reads the live HACKATHON.md and submits.
+- **Next steps (in order):** (1) The human checks Vercel → Firewall (Attack Challenge Mode or bot protection; the Persistent Action from 2026-11-05 should expire) so that tools and AI judges can load `inheirit.vercel.app`. (2) Done: repeat Telegram messages after an expired vote go out once per silence (v2d). (2b) **NEAR Intents (§9A) built and live (SIMULATED, v2e).** The human: create a NEAR mainnet account, fund the Base demo vault, then approve each of the three mainnet checks one by one (`docs/DEMO.md`). Confidential Intents stays gated (§9A.8). (3) Nov 8–14 per §12: break-it session, a second audit, polish (mobile, empty states), the demo video script and X post draft for the human. Then the human makes the repo public, re-reads the live HACKATHON.md and submits.
 - **Contracts:** `inheirit.testnet` = TEE mode (the real one; only the attested CVM agent). `inheirit-dev.testnet` = local mode for laptop runs (`scripts/deploy-dev-contract.ts`; self-owned throwaway demo key; its sealed-notes key is a LOCAL DEV key, not protected).
 - **Blockers / open questions:** (1) `/api/owners` is no longer demo-only: signed requests work in any mode. (2) Local machine: mempool.space is **unreachable from the home network** (IPv6 down, all IPv4 addresses time out; the old `/etc/hosts` pin is gone), so check BTC through the TEE logs or the explorer in the browser. (3) Local agents on :3000/:3001 from October may still be running; stop whichever isn't needed. (4) Stranded test coins: 0.003 Sepolia ETH + 30,000 sats in the vaults of `alice.inheirit-4aqpxg.testnet` (keys lost; see Decision log). (5) In this Claude session the shell's `grep` was a broken wrapper; use `/usr/bin/grep` if `grep` prints "claude native binary not installed".
 
@@ -929,3 +1011,28 @@ DEMO_MODE=true
   - The demo funder `inheirit-fund-sp6ecr.testnet` ran dry (0.02 NEAR). The new funder is `inheirit-fund-0am6d3.testnet` (`DEMO_FUNDER_ACCOUNT`).
 - 2026-11-05 — **Repeat Telegram messages after an expired vote capped** (agent only, not yet in the TEE image). An expired vote returns the will to Active with the same `last_alive_at`, so each lap re-sent the Telegram check (and guardian welfare/vote messages) to real phones. Now Telegram sends each of those once per silence; repeats are recorded in the app as "not resent". The challenge alarm and heir notices always go out. Tests: 159 vitest.
 - 2026-11-06 — [VERIFIED] **v2d live in the TEE** (built and pushed by Claude, in-place upgrade approved before the reboot, no env change). Agent `11a43bc4…` registered on the first try; same sealed-notes key `ae74cf06…`, enabled; `88deb635…` retired, so `b075a4d2…` is the only approved hash. The `-8090` log endpoint returned nothing for a few minutes after the reboot, so check registration with `tee-agent.ts status` instead.
+- 2026-11-06 — **NEAR Intents (v3) merged and built** from the human's `CLAUDE-update-v3-intents.md`. The human gave full permission to proceed without the plan-mode wait. The v3 rule that every mainnet transaction needs an explicit "yes" each time was kept: no mainnet transaction was sent. New §9A, a scoped exception under hard rule 1, plus updates to §3, §10, §12 (Nov 8 Intents day), §13 and the README.
+  - **Reconciliation:**
+    - (a) The vaults still pay testnet slices on schedule. The Intents layer pays each released slice onward to the heir's choice, on a SIMULATED 1Click client in the agent (live prices). Holding a slice *in the vault* until the heir chooses would need contract changes (NEAR slices are paid in `advance()`), so the onward payout waits instead. Documented; roadmap.
+    - (b) The agent gets no 1Click key or new TEE env key and never moves mainnet value. Real legs run only via `scripts/mainnet-payout.ts`.
+    - (c) `payout_value_mode` is optional in the policy, so existing policy hashes are unchanged.
+    - (d) Owner presets of an heir's payout are not built.
+    - (e) Confidential Intents stays gated, because its gate needs the mainnet checks first.
+  - [VERIFIED] **Live 1Click findings (dry quotes, read-only):**
+    - The OpenAPI spec matches the v3 field names.
+    - Status also has `KNOWN_DEPOSIT_TX`.
+    - Auth: `X-API-Key` (recommended) or a legacy bearer JWT.
+    - Placeholder addresses like `0x…dEaD` are rejected ("recipient is not valid").
+    - A NEAR recipient must be an existing account (a nonexistent one gives "Internal server error").
+    - The same-chain EVM pair Base USDC → Base USDC quotes (v3's "same-chain doesn't quote" was NEAR→NEAR).
+    - $0.50 quotes fine.
+    - `confidentiality: basic` and `advanced` both quote at the public price.
+    - Quotes are in `docs/DEMO.md`.
+  - [VERIFIED] **Mainnet Chain Signatures derivation works read-only:** with a placeholder account, `v1.signer` derived a Base address. `v1.signer` has no `experimental_signature_deposit` view, so the sign deposit stays [VERIFY]; the script attaches 1 yocto, as on testnet.
+  - **Code:**
+    - `src/intents/{oneclick,payout}.ts`;
+    - API routes `/api/intents/tokens`, `/api/heir/payout` (signed `payout_pref`, with a route probe), `/api/payouts/:owner` (empty until a slice is released), `/api/intents/fund-quote|fund-sent|status`;
+    - web `Payouts.tsx` (heir step, panels, fund from anywhere, mainnet records) and a stable-value checkbox in setup and in the demo;
+    - `scripts/mainnet-payout.ts` and `scripts/demo-payout.ts`.
+  - Tests: 179 vitest (22 new). Fixed while testing: batch ids collided when two batches were made in the same millisecond, so a retry overwrote the refunded batch.
+- 2026-11-06 — [VERIFIED] **v2e live in the TEE** (in-place, no env change). Agent `9c364c97…` registered with the same sealed-notes key. `/api/intents/tokens` serves live 1Click prices from inside the TEE. `b075a4d2…` is retired; `fb1bd5d1…` is the only approved hash.

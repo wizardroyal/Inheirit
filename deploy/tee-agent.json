@@ -71,7 +71,13 @@
       "compose_hash": "b075a4d2d603a4221991734e7de59c74280691a4387b2d926f89c3f9d7666355",
       "image": "unwizarding/inheirit-agent@sha256:97e7966997cc559e79fac8d55080930d4ad87c2b07b6709db68d03527c77c28e",
       "at": "2026-11-06T08:47:30.994Z",
-      "note": "v2d image (Telegram repeats once per silence); live, only approved hash"
+      "note": "v2d image (Telegram repeats once per silence); retired 2026-11-06"
+    },
+    {
+      "compose_hash": "fb1bd5d1350a34f079269348de93531c36b593f85cd3b6d30514473936e4a8d8",
+      "image": "unwizarding/inheirit-agent@sha256:86712d856a20f18eb70292db6d9570883ac7a81ec20b6de1612b0c78056a26ea",
+      "at": "2026-11-06T09:41:26.905Z",
+      "note": "v2e image (NEAR Intents: SIMULATED payouts, stable value, fund from anywhere); live, only approved hash"
     }
   ]
 }

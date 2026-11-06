@@ -1,6 +1,6 @@
 # Inheirit — a will that doesn't make you prove you're alive
 
-Built at **NEAR HACKATHON** (November 2026). Testnet only: nothing here touches real money.
+Built at **NEAR HACKATHON** (November 2026). The will runs on NEAR testnet and touches no real money. NEAR Intents has no testnet, so its payouts are SIMULATED in the app; a small, optional mainnet demo runs only from a local script that asks for approval before every transaction.
 
 Inheirit reads normal signs of life privately and only reaches out when you've gone quiet for longer than usual. It **never acts on silence alone**. If people confirm you're gone and you stay silent through a challenge period, it hands over your assets across **NEAR, Ethereum and Bitcoin** in small, reversible slices. Sealed instructions for everything else are revealed to the right heir **last**.
 
@@ -13,6 +13,8 @@ Inheirit reads normal signs of life privately and only reaches out when you've g
 3. **Secrets come last.** Funds move in slices, but a revealed secret can never be un-revealed. Sealed notes are released only after distribution completes, plus a buffer.
 4. **Private by construction.** The agent reads signals inside a TEE and only timestamps leave it. In-product AI uses only an attested NEAR AI Cloud model.
 
+**Your heirs receive what they actually use.** Each heir chooses the asset and chain they're paid in (USDC on Base, SOL on Solana, NEAR…), and every released slice goes on to them through **NEAR Intents**. Owners can choose **stable value**, so each slice is converted to US dollars as it's released and heirs aren't exposed to price swings during a release that takes months. And a will can be **funded from anywhere**, from whatever token and chain the owner holds.
+
 Inactivity-based tools exist, such as Google Inactive Account Manager and Bitcoin timelock wallets. What's new is the combination: many weighted sources read privately in a TEE, a human escalation ladder before anything moves, staged cross-chain execution, and secrets last.
 
 ## The problem
@@ -24,7 +26,7 @@ Billions in crypto are lost when holders die or become incapacitated. Earlier at
 | Check-in fatigue | Dead-man's switches make you prove you're alive every month. People forget. | No check-ins. The agent watches activity you already produce, and asks (heartbeat app, Telegram) only when you've gone quiet. |
 | False triggers | A hospital stay, a retreat or a lost phone looks like death to a timer. | Silence alone can never execute. It takes a guardian quorum, then a challenge period that any sign of life cancels. |
 | Single chain | Bitcoin-only timelocks, EVM-only contracts. | One will across NEAR, Ethereum (Sepolia) and Bitcoin (testnet4) via NEAR Chain Signatures. |
-| Heirs can't claim | Heirs don't know assets exist or can't operate a wallet. | A guided claim page, plus an AI guide that sees only the heir's own claim details. |
+| Heirs can't claim | Heirs don't know assets exist, or don't have the right wallet for the right chain. | A guided claim page, an AI guide that sees only the heir's own claim details, and payouts in whatever asset and chain the heir already uses (NEAR Intents). |
 | Secrets in a public will | A seed phrase can't go into a will that becomes public. | Sealed notes, encrypted in the browser to a TEE key and re-sealed to the heir only after distribution completes. |
 | No undo | Once triggered, everything moves at once. | 10% → 20% → 30% → 40%, the longest wait after the first slice. Any sign of life halts the rest, and the secrets. |
 
@@ -41,9 +43,9 @@ Open **https://inheirit.vercel.app/demo**. The clock is compressed: a will goes 
 6. Click **Heartbeat (real, signed by Alice)**. Within about 15 s the ladder **snaps back to All good**. Nothing was released.
 
 **Scenario B: it actually executes**
-1. Make a new cast and will, then open the **heir** link → choose Bola → **Create and register my key**.
+1. Make a new cast and will (tick **Stable value** to see slices paid in USDC), then open the **heir** link → choose Bola → **Create and register my key**. Under **How you'd like to receive it**, pick e.g. **USDC on Base** or **SOL on Solana** and an address, then **Save** (signed by Bola; checked against NEAR Intents first).
 2. Repeat steps 3–4 and don't send a sign of life. After the challenge period (2 min) the will is **Releasing in stages**: 10% lands on NEAR, Sepolia and BTC testnet4, with explorer links in *Released so far*.
-3. The next slice waits **3 min**, the longest wait. Then 20%, 30% and 40% follow a minute apart.
+3. The next slice waits **3 min**, the longest wait. Then 20%, 30% and 40% follow a minute apart. **Onward payouts (NEAR Intents)** shows each slice going on to Bola's choice: quote, deposit, swap, arrived (SIMULATED on testnet, priced live from 1Click). Slices under $1 are combined with the next one. If Bola hasn't chosen yet, the panel says the inheritance is waiting for him.
 4. After the last slice comes a 1-minute **secrets buffer**, then **Secrets released**. On the heir page, **Decrypt here** shows *"The Ledger is in the blue folder in the study…"*. That note was sealed in Alice's browser and only Bola's key opens it. Ask the guide a question if you like.
 5. To see the halt instead: during any stage, click **Alice: "I'm alive" on-chain**. The remaining stages and the secrets halt, and the partial release is recorded.
 
@@ -94,7 +96,8 @@ Open **https://inheirit.vercel.app/demo**. The clock is compressed: a will goes 
 | **Chain Signatures** (`v1.signer-prod.testnet`) | Vault addresses on Sepolia and BTC testnet4, derived from the contract account (`heirloom/<owner>/eth\|btc`); release and withdrawal signatures | gate: `agent-contract/src/will/agent.rs`; tx building: `src/chains/evm.ts`, `src/chains/btc.ts` (chainsig.js) |
 | **Shade Agent Framework** (TEE on Phala) | The will agent: liveness scoring and verdict, escalation and checks, execution, sealed-note crypto, Telegram bot. Registered with a real TDX attestation; measurements approved on-chain. | `src/index.ts`, `src/escalation/`, `src/liveness/`, `src/executor/`, `src/sealed/`, `src/telegram/`, `scripts/tee-agent.ts` |
 | **NEAR AI Cloud** (private inference) | Plain-English will → structured policy; heir claim guide. Will text goes only to a model whose attestation passes (TDX quote, NVIDIA GPU, signer bound to a fresh nonce; checked at startup and before each use), and every answer's signature must recover to the attested signer. | `src/ai/attestation.ts`, `src/ai/nearai.ts`, `src/ai/policy-parser.ts`, `src/ai/heir-guide.ts` |
-| NEP-413 signed messages | Owner-signed requests to the agent (heartbeat, watch settings, Telegram link, drafting, guide, demo faucet), checked against the account's on-chain keys | `src/auth/nep413.ts`, `web/src/lib/near.ts` |
+| **NEAR Intents** (1Click API) | Universal payout: each released slice goes on to the heir's chosen asset and chain; stable-value mode (USDC); fund from anywhere. On testnet the agent uses a SIMULATED 1Click client with live prices; real mainnet payouts from a Chain Signatures-derived Base vault via an approval-gated script | `src/intents/oneclick.ts`, `src/intents/payout.ts`, `web/src/components/Payouts.tsx`, `scripts/mainnet-payout.ts` |
+| NEP-413 signed messages | Owner-signed requests to the agent (heartbeat, watch settings, Telegram link, drafting, guide, demo faucet), and heir-signed payout choices, checked against the account's on-chain keys | `src/auth/nep413.ts`, `web/src/lib/near.ts` |
 | Named accounts | Readable owners, heirs, guardians and lawyers | throughout |
 
 ## Privacy
@@ -128,6 +131,8 @@ See [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md). In short:
   - enforcing policy `conditions` (e.g. "not before 2031"), which are parsed and shown;
   - an adaptive "your normal" baseline: the quiet threshold is a fixed setting per will.
 - **Expired guardian votes restart the ladder.** If guardians don't vote, the will returns to Active without a new sign of life, so the ladder starts again at once (about every 7 minutes in the demo timings). The repeat checks and welfare messages appear in the app, but Telegram sends each of them only once per silence. The challenge alarm is always sent.
+- **NEAR Intents is SIMULATED on testnet.** NEAR Intents has no testnet. The testnet slices are real transfers; their onward swap to the heir's choice runs on a simulated 1Click client (live prices, fake deposit address). Payout and funding through Intents are demonstrated on mainnet with small real amounts from a demo vault, signed by a local script (`scripts/mainnet-payout.ts`) that asks for approval before every transaction. In production, the attested agent's mainnet contract would sign these legs. Records of real mainnet payouts appear in the app under "On mainnet".
+- **Payout waiting happens after the vault.** If an heir hasn't chosen how to receive, their onward payout waits and later slices are paid out together. The testnet slice itself still leaves the vault on schedule. Holding it in the vault would need a contract change (roadmap).
 - **Browser-held demo keys.** The demo creates testnet accounts whose keys live in your browser's storage. Wallet connection is on the roadmap.
 
 ## Roadmap
@@ -139,7 +144,9 @@ See [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md). In short:
 - Fire-drill mode, and stale-will review.
 - A lawyer companion letter.
 - Gasless heir claims.
-- An optional mainnet NEAR Intents payout ("receive as USDC on chain X").
+- **Private inheritance with Confidential Intents:** payouts that observers can't trace from the will's release to the heir's receipt. A confidential quote already works with our key; the UI is gated until the public payouts are proven on mainnet.
+- **Intents-native vault:** the will holds every asset as a NEAR Intents balance, distributes by internal transfer, and heirs withdraw to any chain. One vault for every asset, and instant cross-chain payout. A dry 1Click quote from an Intents balance to USDC on Base already succeeds.
+- Self-funding upkeep: the agent pays its own inference and hosting via Intents, and tops up gas for vaults and heirs.
 - Contract-level heir hiding (commit-reveal).
 - An on-chain KMS with a timelocked compose allowlist.
 
@@ -148,7 +155,7 @@ See [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md). In short:
 ```bash
 npm ci                                  # agent (repo root)
 cp .env.example .env                    # AGENT_CONTRACT_ID, SPONSOR_*, NEARAI_API_KEY, DEMO_MODE=true (TELEGRAM_* optional)
-npm test                                # agent tests (154)
+npm test                                # agent tests (179)
 npm run dev                             # agent on :3000
 cd web && npm ci && cp .env.example .env.local && npm run dev -- -p 3100   # web on :3100
 ```
@@ -161,6 +168,8 @@ Headless scenario scripts:
 - `scripts/demo-sealed-note.ts`: English will → sealed note → heir decrypts, secrets last.
 - `scripts/demo-accelerate.ts`: lawyer death proof → accelerated schedule; the challenge period is kept.
 - `scripts/demo-telegram.ts`: an unarmed will stays Active; a Telegram reply cancels Quiet.
+- `scripts/demo-payout.ts`: Scenario B with NEAR Intents payouts (SIMULATED): two heirs, stable value, one heir choosing late.
+- `scripts/mainnet-payout.ts`: the **mainnet** NEAR Intents demo (vault address, dry quotes, approval-gated payouts and funding; caps $5 per transaction, $25 in total).
 
 Helpers: `scripts/fund-vaults.ts`, `scripts/new-funder.ts`. Deploying: [`docs/DEPLOY.md`](docs/DEPLOY.md). The project brief and every decision with its evidence: [`CLAUDE.md`](CLAUDE.md).
 
