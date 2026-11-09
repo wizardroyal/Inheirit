@@ -3,7 +3,7 @@ import { useParams } from "next/navigation";
 import { useState } from "react";
 import { ActAs } from "@/components/ActAs";
 import { AiBadge } from "@/components/Attestation";
-import { ActionButton, Card, ErrorNote, inputCls, Pill } from "@/components/ui";
+import { ActionButton, Card, inputCls, Pill, NoWill } from "@/components/ui";
 import { Releases } from "@/components/WillParts";
 import { HeirPayoutList, IntentsSimTag, PayoutChoice } from "@/components/Payouts";
 import { useKeys, usePoll, useWill } from "@/lib/hooks";
@@ -11,7 +11,7 @@ import { keys } from "@/lib/keys";
 import { agent } from "@/lib/agent";
 import { call, signRequest, view } from "@/lib/near";
 import { keypairFromSeedHex, newSeedHex, openReleased, pubkeyHex } from "@/lib/sealed";
-import { executionStarted, schedule, stateName, type Will } from "@/lib/will";
+import { executionStarted, schedule, stateName, type Will, stateLabel } from "@/lib/will";
 
 type Released = Will["released_notes"][number];
 
@@ -30,7 +30,7 @@ export default function HeirPage() {
   useKeys(); // re-render when the local key store changes
 
   if (!loaded) return <p>Loading…</p>;
-  if (!will) return <ErrorNote>No will for {owner}.</ErrorNote>;
+  if (!will) return <NoWill owner={owner} />;
   const heir = will.heirs.find((h) => h.account_id === me);
   const s = stateName(will.state);
   const started = executionStarted(will.state) || will.execution_round > 0;
@@ -45,7 +45,7 @@ export default function HeirPage() {
         <p className="max-w-2xl text-muted">
           {started
             ? `${owner}'s will is being carried out. This page walks you through what you receive and any private notes left for you.`
-            : `Nothing has been released. ${owner}'s will is in the "${s}" state. You can set up your key now so you're ready.`}
+            : `Nothing has been released. ${owner}'s will is at: ${stateLabel(s)}. You can set up your key now so you're ready.`}
         </p>
       </div>
       <Step n={1} title="Who are you?" done={!!heir}>

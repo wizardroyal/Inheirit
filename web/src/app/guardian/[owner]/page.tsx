@@ -3,7 +3,7 @@ import { useParams } from "next/navigation";
 import { useState } from "react";
 import { ActAs } from "@/components/ActAs";
 import { Ladder } from "@/components/Ladder";
-import { ActionButton, Card, ErrorNote, Field, inputCls, Pill } from "@/components/ui";
+import { ActionButton, Card, ErrorNote, Field, inputCls, Pill, NoWill } from "@/components/ui";
 import { TelegramLink } from "@/components/TelegramLink";
 import { SignalList } from "@/components/WillParts";
 import { useWill } from "@/lib/hooks";
@@ -22,7 +22,7 @@ export default function GuardianPage() {
   const [evidence, setEvidence] = useState<{ name: string; hash: string } | null>(null);
 
   if (!loaded) return <p>Loading…</p>;
-  if (!will) return <ErrorNote>No will for {owner}.</ErrorNote>;
+  if (!will) return <NoWill owner={owner} />;
   const s = stateName(will.state);
   const entry = will.guardians.find((g) => g.account_id === me);
   const isGuardian = !!entry?.accepted;

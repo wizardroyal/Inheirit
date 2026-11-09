@@ -45,7 +45,7 @@ Open **https://inheirit.vercel.app/demo**. The clock is compressed: a will goes 
 **Scenario B: it actually executes**
 1. Make a new cast and will (tick **Stable value** to see slices paid in USDC), then open the **heir** link → choose Bola → **Create and register my key**. Under **How you'd like to receive it**, pick e.g. **USDC on Base** or **SOL on Solana** and an address, then **Save** (signed by Bola; checked against NEAR Intents first).
 2. Repeat steps 3–4 and don't send a sign of life. After the challenge period (2 min) the will is **Releasing in stages**: 10% lands on NEAR, Sepolia and BTC testnet4, with explorer links in *Released so far*.
-3. The next slice waits **3 min**, the longest wait. Then 20%, 30% and 40% follow a minute apart. **Onward payouts (NEAR Intents)** shows each slice going on to Bola's choice: quote, deposit, swap, arrived (SIMULATED on testnet, priced live from 1Click). Slices under $1 are combined with the next one. If Bola hasn't chosen yet, the panel says the inheritance is waiting for him.
+3. The next slice waits **3 min**, the longest wait. Then 20%, 30% and 40% follow a minute apart. **Onward payouts (NEAR Intents)** shows each slice going on to Bola's choice: quote, deposit, swap, arrived (SIMULATED on testnet, priced live from 1Click). Slices under $1 are combined with the next one. If Bola hasn't chosen yet, the panel says the inheritance is waiting for Bola.
 4. After the last slice comes a 1-minute **secrets buffer**, then **Secrets released**. On the heir page, **Decrypt here** shows *"The Ledger is in the blue folder in the study…"*. That note was sealed in Alice's browser and only Bola's key opens it. Ask the guide a question if you like.
 5. To see the halt instead: during any stage, click **Alice: "I'm alive" on-chain**. The remaining stages and the secrets halt, and the partial release is recorded.
 
@@ -92,7 +92,7 @@ Open **https://inheirit.vercel.app/demo**. The clock is compressed: a will goes 
 
 | Tech | Used for | Code |
 |---|---|---|
-| NEAR smart contract (Rust, near-sdk 5) | Will state machine (stage waits, secrets buffer, guardian consent, lawyer acceleration), NEAR vault, signing gate, sealed-note storage, NEP-297 events | `agent-contract/src/will/` (148 unit tests in `tests.rs`, sandbox tests in `agent-contract/tests/will_flow_tests.rs`) |
+| NEAR smart contract (Rust, near-sdk 5) | Will state machine (stage waits, secrets buffer, guardian consent, lawyer acceleration), NEAR vault, signing gate, sealed-note storage, NEP-297 events | `agent-contract/src/will/` (157 unit tests, sandbox tests in `agent-contract/tests/will_flow_tests.rs`) |
 | **Chain Signatures** (`v1.signer-prod.testnet`) | Vault addresses on Sepolia and BTC testnet4, derived from the contract account (`heirloom/<owner>/eth\|btc`); release and withdrawal signatures | gate: `agent-contract/src/will/agent.rs`; tx building: `src/chains/evm.ts`, `src/chains/btc.ts` (chainsig.js) |
 | **Shade Agent Framework** (TEE on Phala) | The will agent: liveness scoring and verdict, escalation and checks, execution, sealed-note crypto, Telegram bot. Registered with a real TDX attestation; measurements approved on-chain. | `src/index.ts`, `src/escalation/`, `src/liveness/`, `src/executor/`, `src/sealed/`, `src/telegram/`, `scripts/tee-agent.ts` |
 | **NEAR AI Cloud** (private inference) | Plain-English will → structured policy; heir claim guide. Will text goes only to a model whose attestation passes (TDX quote, NVIDIA GPU, signer bound to a fresh nonce; checked at startup and before each use), and every answer's signature must recover to the attested signer. | `src/ai/attestation.ts`, `src/ai/nearai.ts`, `src/ai/policy-parser.ts`, `src/ai/heir-guide.ts` |
@@ -160,7 +160,7 @@ npm run dev                             # agent on :3000
 cd web && npm ci && cp .env.example .env.local && npm run dev -- -p 3100   # web on :3100
 ```
 
-Contract: `cd agent-contract && cargo +1.86.0 test --lib`.
+Contract: `cd agent-contract && cargo +1.86.0 test --lib` (157 unit tests). The sandbox tests (`cargo +1.86.0 test --tests`) need the wasm at `target/near/shade_contract_template.wasm` first: `cargo +1.86.0 near build non-reproducible-wasm --no-abi` (or the pinned `sourcescan/cargo-near` Docker image).
 
 Headless scenario scripts:
 - `scripts/demo-cancel.ts`: Scenario A.

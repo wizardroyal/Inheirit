@@ -25,7 +25,8 @@ export function ActAs({ value, onChange, suggested, label = "Acting as" }: { val
         </select>
       ) : (
         <span>
-          no accounts in this browser yet — <Link href="/demo" className="text-accent underline">create a demo cast</Link> or import a key below
+          No accounts in this browser yet. <Link href="/demo" className="text-accent underline">Create a demo cast</Link> (free testnet accounts, about
+          20 s) or <Link href="/owner" className="text-accent underline">import a testnet key</Link>.
         </span>
       )}
     </div>

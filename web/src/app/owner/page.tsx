@@ -244,7 +244,7 @@ function Dashboard({ will, refresh }: { will: Will; refresh: () => void }) {
         <StrengthChecklist will={will} />
         <Card title="NEAR vault">
           <p className="text-2xl">{formatNear(will.near_balance)} NEAR</p>
-          {active ? <NearVaultActions owner={owner} refresh={refresh} /> : <p className="text-xs text-muted">Deposits and withdrawals are open while the will is Active.</p>}
+          {active ? <NearVaultActions owner={owner} refresh={refresh} /> : <p className="text-xs text-muted">Deposits and withdrawals are open while the will is at All good.</p>}
           {will.foreign_chains.length > 0 && (
             <p className="mt-2 text-xs text-muted">Foreign vaults: {will.foreign_chains.join(", ")} (see the demo panel for addresses and balances).</p>
           )}

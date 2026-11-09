@@ -103,6 +103,9 @@ export const LADDER: { state: StateName; label: string; detail: string }[] = [
   { state: "Completed", label: "Completed", detail: "Everything has been released." },
 ];
 
+/** Plain-language name of a state, as the ladder shows it. */
+export const stateLabel = (s: StateName): string => LADDER.find((l) => l.state === s)?.label ?? s;
+
 /** Seconds until the next automatic step, given the current state and timings. */
 export function nextStepIn(w: Will, nowS: number): { label: string; seconds: number } | null {
   const s = stateName(w.state);

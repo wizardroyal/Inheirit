@@ -3,7 +3,7 @@
 import { useParams } from "next/navigation";
 import { useState } from "react";
 import { ActAs } from "@/components/ActAs";
-import { ActionButton, Card, ErrorNote } from "@/components/ui";
+import { ActionButton, Card, NoWill } from "@/components/ui";
 import { useWill } from "@/lib/hooks";
 import { call } from "@/lib/near";
 import { stateName } from "@/lib/will";
@@ -13,7 +13,7 @@ export default function ContactPage() {
   const { data: will, loaded, refresh } = useWill(owner);
   const [me, setMe] = useState("");
   if (!loaded) return <p>Loading…</p>;
-  if (!will) return <ErrorNote>No will for {owner}.</ErrorNote>;
+  if (!will) return <NoWill owner={owner} />;
   const s = stateName(will.state);
   const open = s === "Quiet" || s === "WelfareCheck";
   return (

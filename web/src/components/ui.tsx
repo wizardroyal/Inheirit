@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useState, type ReactNode } from "react";
 import { errorText } from "@/lib/near";
 
@@ -118,4 +119,22 @@ export function short(s: string, n = 10): string {
 
 export function ErrorNote({ children }: { children: ReactNode }) {
   return <p className="rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger">{children}</p>;
+}
+
+/** Empty state for a page addressed to an owner whose will doesn't exist (yet) on this contract. */
+export function NoWill({ owner }: { owner: string }) {
+  return (
+    <Card title="No will found">
+      <div className="space-y-2 text-sm">
+        <p>
+          There is no will for <span className="font-mono">{owner}</span> on this contract. Check the account name in the link you were sent. If the
+          will was only just created, give it a few seconds and reload.
+        </p>
+        <p className="text-muted">
+          Exploring? <Link href="/demo" className="text-accent underline">Open the demo panel</Link> to create a throwaway will and its cast in about
+          a minute.
+        </p>
+      </div>
+    </Card>
+  );
 }
