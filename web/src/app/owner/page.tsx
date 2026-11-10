@@ -39,16 +39,21 @@ function Owner() {
   const { data: will, loaded, refresh } = useWill(owner || null);
   // Keep the writing view until every creation step has finished, even after the will shows up on-chain
   const [creating, setCreating] = useState(false);
-  const showSignIn = signingIn || (!owner && accounts.length === 0);
+  const showSignIn = signingIn || !owner;
 
   return (
     <div className="space-y-6">
-      <div className="space-y-3">
+      <div className="flex flex-col gap-3">
         <h1 className="font-serif text-3xl">Your will</h1>
         {accounts.length > 0 && (
-          <div className="flex flex-wrap items-center gap-3">
-            <ActAs value={owner} onChange={setOwner} suggested={casts.map((c) => c.owner)} />
-            <AccountActions owner={owner} onSignIn={() => setSigningIn(true)} onSignedOut={() => setOwner("")} />
+          <div className={`flex flex-wrap items-center gap-3 ${owner ? "" : "order-last"}`}>
+            <ActAs
+              value={owner}
+              onChange={setOwner}
+              suggested={casts.map((c) => c.owner)}
+              label={owner ? "Acting as" : "Or continue as an account in this browser"}
+            />
+            {owner && <AccountActions owner={owner} onSignIn={() => setSigningIn(true)} onSignedOut={() => setOwner("")} />}
           </div>
         )}
         {showSignIn && (
