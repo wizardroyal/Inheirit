@@ -8,6 +8,7 @@ import { Ladder } from "@/components/Ladder";
 import { ActionButton, Card, CopyLink, Details, ErrorNote, Field, inputCls, Pill } from "@/components/ui";
 import { QuickSetup, StrengthChecklist } from "@/components/Onboarding";
 import { FundAnywhere, PayoutsPanel } from "@/components/Payouts";
+import { SignIn } from "@/components/SignIn";
 import { SignsOfLife } from "@/components/SignsOfLife";
 import { Vaults } from "@/components/Vaults";
 import { NotificationLog, Releases, SignalList, WatchStatus } from "@/components/WillParts";
@@ -16,6 +17,9 @@ import { DEMO_SCHEDULE, REAL_SCHEDULE } from "@/lib/config";
 import { stagesFor, summarize } from "@agent/policy/schedule";
 import { addSealedNote, createWill } from "@/lib/demo";
 import { useKeys, useWill } from "@/lib/hooks";
+import { keys } from "@/lib/keys";
+import { downloadKeyBackup } from "@/lib/onboard";
+import { disconnectWallet, walletAccountId } from "@/lib/wallet";
 import { call, formatNear, nearToYocto, signRequest } from "@/lib/near";
 import { ago, duration, isArmed, schedule, stateName, type Will } from "@/lib/will";
 
@@ -29,21 +33,60 @@ export default function OwnerPage() {
 
 function Owner() {
   const params = useSearchParams();
-  const { casts } = useKeys();
+  const { accounts, casts } = useKeys();
   const [owner, setOwner] = useState(params.get("as") ?? "");
+  const [signingIn, setSigningIn] = useState(false);
   const { data: will, loaded, refresh } = useWill(owner || null);
   // Keep the writing view until every creation step has finished, even after the will shows up on-chain
   const [creating, setCreating] = useState(false);
+  const showSignIn = signingIn || (!owner && accounts.length === 0);
 
   return (
     <div className="space-y-6">
       <div className="space-y-3">
         <h1 className="font-serif text-3xl">Your will</h1>
-        <ActAs value={owner} onChange={setOwner} suggested={casts.map((c) => c.owner)} />
+        {accounts.length > 0 && (
+          <div className="flex flex-wrap items-center gap-3">
+            <ActAs value={owner} onChange={setOwner} suggested={casts.map((c) => c.owner)} />
+            <AccountActions owner={owner} onSignIn={() => setSigningIn(true)} onSignedOut={() => setOwner("")} />
+          </div>
+        )}
+        {showSignIn && (
+          <SignIn
+            onSignedIn={(id) => {
+              setOwner(id);
+              setSigningIn(false);
+            }}
+          />
+        )}
         <ImportKey />
       </div>
       {owner && loaded && (!will || creating) && <CreateWill owner={owner} onCreating={setCreating} onCreated={refresh} />}
       {owner && will && !creating && <Dashboard will={will} refresh={refresh} />}
+    </div>
+  );
+}
+
+/** Key backup for accounts whose key lives in this browser; sign-out for a wallet; another sign-in. */
+function AccountActions({ owner, onSignIn, onSignedOut }: { owner: string; onSignIn: () => void; onSignedOut: () => void }) {
+  useKeys(); // re-render when the wallet or the key store changes
+  const local = !!owner && !!keys.secret(owner);
+  const wallet = !!owner && walletAccountId() === owner;
+  return (
+    <div className="flex flex-wrap gap-3 text-xs">
+      {local && (
+        <button type="button" className="text-accent underline" onClick={() => downloadKeyBackup(owner)}>
+          Download key backup
+        </button>
+      )}
+      {wallet && (
+        <button type="button" className="text-accent underline" onClick={() => disconnectWallet().then(onSignedOut)}>
+          Disconnect wallet
+        </button>
+      )}
+      <button type="button" className="text-muted underline hover:text-ink" onClick={onSignIn}>
+        Use another account
+      </button>
     </div>
   );
 }

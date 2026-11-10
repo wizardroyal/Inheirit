@@ -5,7 +5,7 @@ import { checkPolicy, nearShareBps, policyHash, type Policy } from "@agent/polic
 import { agent } from "./agent";
 import { stagesFor, type SchedulePreset } from "@agent/policy/schedule";
 import { keys, type Cast } from "./keys";
-import { call, createFaucetAccount, createSubaccount, nearToYocto, signRequest, view } from "./near";
+import { call, callMany, createFaucetAccount, createSubaccount, nearToYocto, signRequest, view } from "./near";
 import { sealToBase64 } from "./sealed";
 import type { AgentKey } from "./will";
 
@@ -84,31 +84,31 @@ export interface CreateWillOptions {
 /** create_will + deposit, then hands the approved policy to the agent and asks it to watch (owner-signed). */
 export async function createWill(owner: string, o: CreateWillOptions, progress: Progress): Promise<void> {
   const bps = nearShareBps(o.policy);
-  progress("Creating the will on-chain…");
-  await call(
-    owner,
-    "create_will",
+  const deposit = Number(o.depositNear) > 0 ? nearToYocto(o.depositNear) : 0n;
+  progress(deposit ? `Creating the will on-chain and depositing ${o.depositNear} NEAR into the vault…` : "Creating the will on-chain…");
+  // One transaction, so a wallet asks for one approval
+  await callMany(owner, [
     {
-      config: {
-        heirs: o.policy.heirs.map((h) => ({ account_id: h.near_account, name: h.name, near_share_bps: bps[h.near_account] })),
-        guardians: o.policy.guardians,
-        guardian_threshold: o.policy.guardian_threshold,
-        contacts: o.contacts,
-        stages: stagesFor(o.policy.stages_pct, o.schedule),
-        accelerated_stages: o.schedule.accelerated,
-        timings: o.schedule.timings,
-        policy_hash: policyHash(o.policy),
-        foreign_chains: o.foreignChains,
-        lawyer: o.policy.lawyer ?? null,
-        heirs_hidden: true,
+      methodName: "create_will",
+      args: {
+        config: {
+          heirs: o.policy.heirs.map((h) => ({ account_id: h.near_account, name: h.name, near_share_bps: bps[h.near_account] })),
+          guardians: o.policy.guardians,
+          guardian_threshold: o.policy.guardian_threshold,
+          contacts: o.contacts,
+          stages: stagesFor(o.policy.stages_pct, o.schedule),
+          accelerated_stages: o.schedule.accelerated,
+          timings: o.schedule.timings,
+          policy_hash: policyHash(o.policy),
+          foreign_chains: o.foreignChains,
+          lawyer: o.policy.lawyer ?? null,
+          heirs_hidden: true,
+        },
       },
+      deposit: nearToYocto("0.1"),
     },
-    nearToYocto("0.1"),
-  );
-  if (Number(o.depositNear) > 0) {
-    progress(`Depositing ${o.depositNear} NEAR into the NEAR vault…`);
-    await call(owner, "deposit_near", {}, nearToYocto(o.depositNear));
-  }
+    ...(deposit ? [{ methodName: "deposit_near", deposit }] : []),
+  ]);
   progress("Giving the agent the approved policy…");
   await agent.submitPolicy(owner, o.policy);
   progress("Asking the agent to watch for signs of life (signed by the owner)…");

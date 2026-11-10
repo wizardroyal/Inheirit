@@ -4,6 +4,7 @@ import { agent } from "./agent";
 import { BOOST_EVENT, boosted } from "./boost";
 import { keys, type Cast } from "./keys";
 import { view } from "./near";
+import { walletAccountId } from "./wallet";
 import { nextStepIn, type Will } from "./will";
 
 // Polling policy (keeps the agent, FastNEAR and the shared egress IP calm):
@@ -121,7 +122,11 @@ function subscribe(cb: () => void) {
 export function useKeys(): { accounts: string[]; casts: Cast[] } {
   const snap = useSyncExternalStore(
     subscribe,
-    () => JSON.stringify([keys.accounts(), keys.casts()]),
+    () => {
+      // The wallet's account (if signed in) is listed too: `call` and `signRequest` sign through it.
+      const w = walletAccountId();
+      return JSON.stringify([w && !keys.accounts().includes(w) ? [w, ...keys.accounts()] : keys.accounts(), keys.casts()]);
+    },
     () => "[[],[]]",
   );
   const [accounts, casts] = JSON.parse(snap) as [string[], Cast[]];

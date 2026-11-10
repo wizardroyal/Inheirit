@@ -4,8 +4,10 @@ import { Account } from "@near-js/accounts";
 import { KeyPair, type KeyPairString } from "@near-js/crypto";
 import { JsonRpcProvider } from "@near-js/providers";
 import { KeyPairSigner } from "@near-js/signers";
+import { actionCreators } from "@near-js/transactions";
 import { CONTRACT_ID, NEAR_RPC } from "./config";
 import { keys } from "./keys";
+import { walletAccountId, walletCall, walletSignMessage } from "./wallet";
 
 export const provider = new JsonRpcProvider({ url: NEAR_RPC });
 export const YOCTO = 10n ** 24n;
@@ -53,9 +55,34 @@ export interface CallResult<T = unknown> {
   value: T;
 }
 
-/** Calls the will contract as `accountId`, signed with the key held in this browser. */
+/** True when this browser can sign for `accountId`: a key held here, or the wallet signed in as it. */
+export function canSign(accountId: string): boolean {
+  return !!keys.secret(accountId) || walletAccountId() === accountId;
+}
+
+/**
+ * Calls the will contract as `accountId`: with the key held in this browser if there is one,
+ * otherwise through the wallet signed in as that account (one approval in the wallet).
+ */
 export async function call<T = unknown>(accountId: string, methodName: string, args: Record<string, unknown> = {}, deposit = 0n, gasTgas = 100n): Promise<CallResult<T>> {
-  const outcome = await account(accountId).callFunctionRaw({ contractId: CONTRACT_ID, methodName, args, deposit, gas: gasTgas * TGAS });
+  return callMany<T>(accountId, [{ methodName, args, deposit, gasTgas }]);
+}
+
+/** Several calls to the will contract in one transaction (one wallet approval); returns the last call's value. */
+export async function callMany<T = unknown>(
+  accountId: string,
+  calls: { methodName: string; args?: Record<string, unknown>; deposit?: bigint; gasTgas?: bigint }[],
+): Promise<CallResult<T>> {
+  const actions = calls.map((c) => ({ methodName: c.methodName, args: c.args ?? {}, deposit: c.deposit ?? 0n, gas: (c.gasTgas ?? 100n) * TGAS }));
+  const outcome =
+    !keys.secret(accountId) && walletAccountId() === accountId
+      ? await walletCall(accountId, actions)
+      : actions.length === 1
+        ? await account(accountId).callFunctionRaw({ contractId: CONTRACT_ID, ...actions[0] })
+        : await account(accountId).signAndSendTransaction({
+            receiverId: CONTRACT_ID,
+            actions: actions.map((a) => actionCreators.functionCall(a.methodName, a.args, a.gas, a.deposit)),
+          });
   const status = outcome.status as { SuccessValue?: string; Failure?: unknown };
   if (status.Failure) throw new Error(failureMessage(status.Failure));
   const raw = status.SuccessValue ? atob(status.SuccessValue) : "";
@@ -89,9 +116,13 @@ const b64 = (u: Uint8Array) => btoa(String.fromCharCode(...u));
 /** NEP-413 message addressed to the will contract, as the agent's /api routes expect. */
 export async function signRequest(accountId: string, action: "heartbeat" | "register_owner" | "draft_policy" | "heir_guide" | "demo_faucet" | "telegram_link" | "payout_pref" | "demo_signal", data?: unknown): Promise<SignedRequest> {
   const secret = keys.secret(accountId);
-  if (!secret) throw new Error(`This browser has no key for ${accountId}`);
   const message = JSON.stringify({ action, owner: accountId, issued_at: Date.now(), data });
   const nonce = crypto.getRandomValues(new Uint8Array(32));
+  if (!secret) {
+    if (walletAccountId() !== accountId) throw new Error(`This browser has no key for ${accountId}`);
+    const w = await walletSignMessage(accountId, message, nonce);
+    return { account_id: accountId, public_key: w.publicKey, signature: w.signature, nonce: b64(nonce), message };
+  }
   const signed = await KeyPairSigner.fromSecretKey(secret as KeyPairString).signNep413Message(message, accountId, CONTRACT_ID, nonce);
   return { account_id: accountId, public_key: signed.publicKey.toString(), signature: b64(signed.signature), nonce: b64(nonce), message };
 }
