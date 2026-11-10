@@ -7,7 +7,7 @@ import { KeyPairSigner } from "@near-js/signers";
 import { actionCreators } from "@near-js/transactions";
 import { CONTRACT_ID, NEAR_RPC } from "./config";
 import { keys } from "./keys";
-import { walletAccountId, walletCall, walletCreateSubaccounts, walletSignMessage } from "./wallet";
+import { walletAccountId, walletCall, walletSignMessage } from "./wallet";
 
 export const provider = new JsonRpcProvider({ url: NEAR_RPC });
 export const YOCTO = 10n ** 24n;
@@ -139,24 +139,19 @@ export async function createSubaccount(funder: string, name: string, near: strin
 }
 
 /**
- * Funded subaccounts of `funder`, keys kept in this browser. With a key held here they are created one by
- * one; with a wallet, all in one approval.
+ * Funded subaccounts of `funder` (whose key must be in this browser), keys kept here too. Wallets refuse
+ * to add full-access keys to new accounts, so wallet owners get their cast from /api/onboard instead.
  */
 export async function createSubaccounts(funder: string, specs: { name: string; near: string }[]): Promise<string[]> {
-  const made = specs.map((s) => ({ id: `${s.name}.${funder}`, kp: newKeyPair(), amount: nearToYocto(s.near) }));
-  if (!keys.secret(funder) && walletAccountId() === funder) {
-    await walletCreateSubaccounts(
-      funder,
-      made.map((m) => ({ id: m.id, publicKey: m.kp.getPublicKey().toString(), amount: m.amount })),
-    );
-    for (const m of made) keys.addAccount(m.id, m.kp.toString());
-  } else {
-    for (const m of made) {
-      await account(funder).createAccount(m.id, m.kp.getPublicKey(), m.amount);
-      keys.addAccount(m.id, m.kp.toString());
-    }
+  const ids: string[] = [];
+  for (const s of specs) {
+    const id = `${s.name}.${funder}`;
+    const kp = newKeyPair();
+    await account(funder).createAccount(id, kp.getPublicKey(), nearToYocto(s.near));
+    keys.addAccount(id, kp.toString());
+    ids.push(id);
   }
-  return made.map((m) => m.id);
+  return ids;
 }
 
 /** A top-level testnet account funded by the public testnet faucet helper (CORS allows browsers). */

@@ -11,6 +11,8 @@ import { KeyPairSigner } from "@near-js/signers";
 import { createRemoteJWKSet, jwtVerify } from "jose";
 
 export const runtime = "nodejs";
+// Creating a cast is six sequential transactions
+export const maxDuration = 60;
 
 const YOCTO = 10n ** 24n;
 const GOOGLE_JWKS = createRemoteJWKSet(new URL("https://www.googleapis.com/oauth2/v3/certs"));
@@ -98,6 +100,42 @@ async function topUp(p: NonNullable<ReturnType<typeof parent>>, ip: string, acco
   return Response.json({ accountId, toppedUpTo: env("ONBOARD_FUND_NEAR", "2") });
 }
 
+const CAST_ROLES = ["ada", "g1", "g2", "g3", "friend", "lawyer"] as const;
+
+/**
+ * A test cast for a wallet owner: wallets (rightly) refuse to add full-access keys to new subaccounts, so
+ * these accounts are made here instead, each from a public key generated in the owner's browser.
+ */
+async function cast(p: NonNullable<ReturnType<typeof parent>>, ip: string, publicKeys: Record<string, string> | undefined) {
+  if (!publicKeys || CAST_ROLES.some((r) => !isPublicKey(publicKeys[r]))) {
+    return Response.json({ error: `publicKeys must hold an ed25519 key for each of ${CAST_ROLES.join(", ")}` }, { status: 400 });
+  }
+  if (limited(`cast:${ip}`, 3, 3_600_000)) return Response.json({ error: "Too many casts from this network; try again later" }, { status: 429 });
+  const each = nearToYocto("0.1");
+  const floor = nearToYocto(env("ONBOARD_PARENT_FLOOR_NEAR", "3")!);
+  if (BigInt((await p.provider.viewAccount(p.id)).amount) - each * BigInt(CAST_ROLES.length) < floor) {
+    return Response.json({ error: "Today's free testnet accounts have run out; please try again later" }, { status: 503 });
+  }
+  const tag = randomBytes(4).toString("hex");
+  const accounts: Record<string, string> = {};
+  // One after another: they share the parent key, so parallel sends would collide on its nonce.
+  for (const r of CAST_ROLES) {
+    accounts[r] = `${r}-${tag}.${p.id}`;
+    await createFunded(p, accounts[r], publicKeys[r], each);
+  }
+  return Response.json({ accounts });
+}
+
+function isPublicKey(k: unknown): k is string {
+  if (typeof k !== "string" || !k.startsWith("ed25519:")) return false;
+  try {
+    PublicKey.fromString(k);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** What the sign-in page needs to know (all public). */
 export async function GET() {
   const p = parent();
@@ -107,7 +145,7 @@ export async function GET() {
 export async function POST(req: Request) {
   const p = parent();
   if (!p) return Response.json({ error: "Onboarding is not configured on this deployment" }, { status: 503 });
-  let body: { kind?: string; idToken?: string; publicKey?: string; accountId?: string };
+  let body: { kind?: string; idToken?: string; publicKey?: string; accountId?: string; publicKeys?: Record<string, string> };
   try {
     body = await req.json();
   } catch {
@@ -115,13 +153,9 @@ export async function POST(req: Request) {
   }
   const ip = clientIp(req);
   if (body.kind === "topup") return topUp(p, ip, body.accountId ?? "");
+  if (body.kind === "cast") return cast(p, ip, body.publicKeys);
   const publicKey = body.publicKey ?? "";
-  try {
-    if (!publicKey.startsWith("ed25519:")) throw new Error();
-    PublicKey.fromString(publicKey);
-  } catch {
-    return Response.json({ error: "publicKey must be an ed25519 public key" }, { status: 400 });
-  }
+  if (!isPublicKey(publicKey)) return Response.json({ error: "publicKey must be an ed25519 public key" }, { status: 400 });
 
   let id: string;
   if (body.kind === "google") {
@@ -149,7 +183,7 @@ export async function POST(req: Request) {
     if (limited(`demo:${ip}`, 5, 3_600_000)) return Response.json({ error: "Too many demo accounts from this network; try again later" }, { status: 429 });
     id = `demo-${randomBytes(4).toString("hex")}.${p.id}`;
   } else {
-    return Response.json({ error: 'kind must be "google", "demo" or "topup"' }, { status: 400 });
+    return Response.json({ error: 'kind must be "google", "demo", "topup" or "cast"' }, { status: 400 });
   }
 
   const amount = nearToYocto(env("ONBOARD_FUND_NEAR", "2")!);

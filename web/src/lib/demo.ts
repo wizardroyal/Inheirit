@@ -6,6 +6,7 @@ import { agent } from "./agent";
 import { stagesFor, type SchedulePreset } from "@agent/policy/schedule";
 import { keys, type Cast } from "./keys";
 import { call, callMany, createFaucetAccount, createSubaccount, createSubaccounts, nearToYocto, ROLE_TGAS, signRequest, view } from "./near";
+import { createCastAccounts } from "./onboard";
 import { sealToBase64 } from "./sealed";
 import type { AgentKey } from "./will";
 
@@ -134,7 +135,11 @@ export async function generateWillAndCast(
   progress: Progress,
 ): Promise<Cast> {
   progress("Creating your cast: Ada (heir), three guardians, a friend and a lawyer…");
-  const [heir, g1, g2, g3, contact, lawyer] = await createSubaccounts(owner, [
+  // A wallet won't add full-access keys to new subaccounts, so a wallet owner's cast is made by the
+  // onboarding route instead; an owner whose key is in this browser makes its own subaccounts.
+  const [heir, g1, g2, g3, contact, lawyer] = !keys.secret(owner)
+    ? await createCastAccounts().then((a) => [a.ada, a.g1, a.g2, a.g3, a.friend, a.lawyer])
+    : await createSubaccounts(owner, [
     { name: "ada", near: "0.1" },
     { name: "g1", near: "0.1" },
     { name: "g2", near: "0.1" },
