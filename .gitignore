@@ -44,6 +44,6 @@ target
 
 # new releases
 new-release/
-# Agent state (local runs)
-data/
-data-*/
+# Agent state (local runs), at the repo root only: web/src/data/ holds committed app data
+/data/
+/data-*/
