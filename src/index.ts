@@ -56,9 +56,10 @@ const agent = await ShadeClient.create({
   },
   // Derivation path for fixed agent account ID for local
   derivationPath: sponsorPrivateKey, // Random string kept secret (private key does a good job)
-  // shade-agent-js 2.2.0 throws "First key and additional keys disagree on derivation method"
-  // in local mode with numKeys: 1 ([].every() is true), so use 2
-  numKeys: 2,
+  // shade-agent-js signs each call with the next key round-robin, so concurrent agent transactions need
+  // as many keys as can be in flight: driver concurrency (4) + execution queue (2), plus margin. (It also
+  // throws "First key and additional keys disagree on derivation method" in local mode with numKeys: 1.)
+  numKeys: 8,
 });
 
 console.log("Agent account ID:", agent.accountId());

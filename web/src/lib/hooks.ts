@@ -119,6 +119,12 @@ function subscribe(cb: () => void) {
 }
 
 /** Accounts and demo casts held in this browser; re-renders when they change. */
+/** The `?as=<account>` a role page was opened with (the speedrun's role switcher sets it). */
+export function initialAs(): string {
+  if (typeof window === "undefined") return "";
+  return new URLSearchParams(window.location.search).get("as") ?? "";
+}
+
 export function useKeys(): { accounts: string[]; casts: Cast[] } {
   const snap = useSyncExternalStore(
     subscribe,

@@ -2,11 +2,12 @@
 import { useParams } from "next/navigation";
 import { useState } from "react";
 import { ActAs } from "@/components/ActAs";
+import { BackToOwner } from "@/components/Speedrun";
 import { Ladder } from "@/components/Ladder";
 import { ActionButton, Card, ErrorNote, Field, inputCls, Pill, NoWill } from "@/components/ui";
 import { TelegramLink } from "@/components/TelegramLink";
 import { SignalList } from "@/components/WillParts";
-import { useWill } from "@/lib/hooks";
+import { initialAs, useWill } from "@/lib/hooks";
 import { call, ROLE_TGAS } from "@/lib/near";
 import { ago, guardianIds, stateName } from "@/lib/will";
 
@@ -15,10 +16,51 @@ async function sha256Hex(file: File): Promise<string> {
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+/**
+ * The lawyer's death proof (§5.5): it only shortens the remaining waits. It never skips the guardian vote
+ * or the challenge period, and it's accepted only in GuardianVote, Challenge or Executing.
+ */
+function LawyerCard({ owner, lawyer, state, accelerated, refresh }: { owner: string; lawyer: string; state: string; accelerated: boolean; refresh: () => void }) {
+  const [evidence, setEvidence] = useState<{ name: string; hash: string } | null>(null);
+  const open = ["GuardianVote", "Challenge", "Executing"].includes(state);
+  return (
+    <Card title="Lawyer: death certificate" aside={accelerated ? <Pill tone="warn">accelerated</Pill> : undefined}>
+      <p className="text-sm text-muted">
+        A death certificate shortens the remaining waits (10% → 30% → 60%, 14 days apart for real wills). It never skips the guardian vote or the
+        challenge period, so it can&apos;t be used to rush a living person&apos;s will.
+      </p>
+      {accelerated ? (
+        <p className="mt-3 text-sm">A death proof is on record; the accelerated schedule applies.</p>
+      ) : (
+        <div className="mt-3 space-y-2">
+          <Field label="Certificate" hint="Only its SHA-256 fingerprint goes on-chain; the file stays on your device.">
+            <input
+              type="file"
+              className={inputCls}
+              onChange={async (e) => {
+                const f = e.target.files?.[0];
+                setEvidence(f ? { name: f.name, hash: await sha256Hex(f) } : null);
+              }}
+            />
+          </Field>
+          <ActionButton
+            tone="danger"
+            disabled={!open || !evidence}
+            onClick={() => call(lawyer, "attest_death_proof", { owner, evidence_hash: evidence!.hash }, 0n, ROLE_TGAS).then(refresh)}
+          >
+            File the death certificate
+          </ActionButton>
+          {!open && <p className="text-xs text-muted">Accepted only once guardians have been asked to vote, during the challenge period, or while releasing.</p>}
+        </div>
+      )}
+    </Card>
+  );
+}
+
 export default function GuardianPage() {
   const owner = decodeURIComponent(useParams<{ owner: string }>().owner);
   const { data: will, loaded, refresh } = useWill(owner);
-  const [me, setMe] = useState("");
+  const [me, setMe] = useState(initialAs);
   const [evidence, setEvidence] = useState<{ name: string; hash: string } | null>(null);
 
   if (!loaded) return <p>Loading…</p>;
@@ -32,14 +74,16 @@ export default function GuardianPage() {
   return (
     <div className="space-y-6">
       <div className="space-y-2">
+        <BackToOwner owner={owner} />
         <h1 className="font-serif text-3xl">Guardian: {owner}</h1>
         <p className="max-w-2xl text-muted">
           You were chosen because {owner} trusts you to tell the truth. Confirm a passing only with real evidence. If you believe they&apos;re alive,
           say so: one “alive” from any guardian stops the process.
         </p>
-        <ActAs value={me} onChange={setMe} suggested={guardianIds(will)} label="I am" />
-        {me && !entry && <ErrorNote>{me} is not a guardian of this will.</ErrorNote>}
+        <ActAs value={me} onChange={setMe} suggested={[...guardianIds(will), ...(will.lawyer ? [will.lawyer] : [])]} label="I am" />
+        {me && !entry && me !== will.lawyer && <ErrorNote>{me} is not a guardian or the lawyer of this will.</ErrorNote>}
       </div>
+      {me && me === will.lawyer && <LawyerCard owner={owner} lawyer={me} state={s} accelerated={will.accelerated} refresh={refresh} />}
       {entry && !entry.accepted && (
         <Card title="You've been invited">
           <p className="text-sm">

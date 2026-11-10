@@ -220,6 +220,7 @@ describe("Driver", () => {
   it("hands Executing wills to the executor", async () => {
     const t = setup({ Executing: { stage: 0, since: T0, stage_started: T0 + 45 } });
     await t.driver.tick();
+    await t.driver.idle();
     expect(t.executed).toEqual(["alice.testnet"]);
     expect(t.noted, "secrets last: never while funds are moving").toEqual([]);
   });
@@ -332,7 +333,8 @@ describe("demo watch expiry and rate limits", () => {
   });
   it("skips the rest of a tick when the RPC rate-limits", async () => {
     const store = new Store(null);
-    for (const o of ["a.testnet", "b.testnet"]) store.update((s) => (s.owners[o] = { owner: o }));
+    const owners = Array.from({ length: 10 }, (_, i) => `o${i}.testnet`);
+    for (const o of owners) store.update((s) => (s.owners[o] = { owner: o }));
     let calls = 0;
     const contract = {
       getWill: async () => {
@@ -340,7 +342,72 @@ describe("demo watch expiry and rate limits", () => {
         throw new Error('{"code": -429, "message": "Rate limits exceeded"}');
       },
     } as unknown as WillContract;
-    await new Driver({ contract, adapters: [], store, log: () => {} }).tick();
-    expect(calls).toBe(1);
+    await new Driver({ contract, adapters: [], store, log: () => {}, concurrency: 3 }).tick();
+    // Owners already in flight finish; no new ones start
+    expect(calls).toBe(3);
+  });
+  it("never expires a will with real timings", async () => {
+    const store = new Store(null);
+    store.update((s) => (s.owners["alice.testnet"] = { owner: "alice.testnet", watchedSince: since }));
+    const real = will("Active", { timings: { quiet_after: 90 * 86400, nudge_period: 7 * 86400, welfare_period: 7 * 86400, vote_period: 30 * 86400, challenge_period: 30 * 86400, secrets_buffer: 30 * 86400 } });
+    const contract = new FakeContract(real, () => T0 + 10 * 24 * 3600);
+    const driver = new Driver({ contract, adapters: [], store, now: () => new Date((T0 + 10 * 24 * 3600) * 1000), log: () => {}, demoWatchMs: 3 * HOUR });
+    await driver.tick();
+    expect(store.get().owners["alice.testnet"]).toBeDefined();
+  });
+});
+
+describe("capacity: parallel ticks and the execution queue", () => {
+  function many(n: number, state: WillState, slowMs: number, opts: { concurrency?: number; executionConcurrency?: number } = {}) {
+    const store = new Store(null);
+    const owners = Array.from({ length: n }, (_, i) => `o${i}.testnet`);
+    for (const o of owners) store.update((s) => (s.owners[o] = { owner: o }));
+    const nowS = T0 + 50;
+    const contract = {
+      getWill: async (owner: string) => {
+        await new Promise((r) => setTimeout(r, slowMs));
+        return { ...will(state), owner };
+      },
+      recordLiveness: async () => {},
+      advance: async () => false,
+    } as unknown as WillContract;
+    const started: string[] = [];
+    let inFlight = 0;
+    let maxInFlight = 0;
+    const executor = {
+      run: async (o: string) => {
+        started.push(o);
+        inFlight++;
+        maxInFlight = Math.max(maxInFlight, inFlight);
+        await new Promise((r) => setTimeout(r, 200));
+        inFlight--;
+      },
+    };
+    const driver = new Driver({ contract, adapters: [], store, now: () => new Date(nowS * 1000), log: () => {}, executor, ...opts });
+    return { driver, started, maxInFlight: () => maxInFlight };
+  }
+
+  it("ticks owners in parallel", async () => {
+    const t = many(8, "Active", 50, { concurrency: 4 });
+    const start = Date.now();
+    await t.driver.tick();
+    // 8 owners x 50 ms one by one would take 400 ms
+    expect(Date.now() - start).toBeLessThan(300);
+  });
+  it("a slow execution doesn't hold up the tick, and runs at most executionConcurrency at once", async () => {
+    const t = many(5, { Executing: { stage: 0, since: T0, stage_started: T0 + 45 } }, 1, { executionConcurrency: 2 });
+    const start = Date.now();
+    await t.driver.tick();
+    expect(Date.now() - start, "tick returns before the 200 ms executions").toBeLessThan(150);
+    await t.driver.idle();
+    expect(t.started.sort()).toEqual(["o0.testnet", "o1.testnet", "o2.testnet", "o3.testnet", "o4.testnet"]);
+    expect(t.maxInFlight()).toBe(2);
+  });
+  it("doesn't start a second execution for an owner while one is in flight", async () => {
+    const t = many(1, { Executing: { stage: 0, since: T0, stage_started: T0 + 45 } }, 1);
+    await t.driver.tick();
+    await t.driver.tick();
+    await t.driver.idle();
+    expect(t.started).toEqual(["o0.testnet"]);
   });
 });

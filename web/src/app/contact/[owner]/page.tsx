@@ -3,21 +3,23 @@
 import { useParams } from "next/navigation";
 import { useState } from "react";
 import { ActAs } from "@/components/ActAs";
+import { BackToOwner } from "@/components/Speedrun";
 import { ActionButton, Card, NoWill } from "@/components/ui";
-import { useWill } from "@/lib/hooks";
+import { initialAs, useWill } from "@/lib/hooks";
 import { call, ROLE_TGAS } from "@/lib/near";
 import { stateName } from "@/lib/will";
 
 export default function ContactPage() {
   const owner = decodeURIComponent(useParams<{ owner: string }>().owner);
   const { data: will, loaded, refresh } = useWill(owner);
-  const [me, setMe] = useState("");
+  const [me, setMe] = useState(initialAs);
   if (!loaded) return <p>Loading…</p>;
   if (!will) return <NoWill owner={owner} />;
   const s = stateName(will.state);
   const open = s === "Quiet" || s === "WelfareCheck";
   return (
     <div className="max-w-xl space-y-4">
+      <BackToOwner owner={owner} />
       <h1 className="font-serif text-3xl">Have you heard from {owner}?</h1>
       <p className="text-muted">
         {owner} listed you as someone who&apos;d know if they were okay. They&apos;ve been quiet online for a while. If you&apos;ve heard from them recently, say so

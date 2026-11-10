@@ -10,6 +10,7 @@ import { QuickSetup, StrengthChecklist } from "@/components/Onboarding";
 import { FundAnywhere, PayoutsPanel } from "@/components/Payouts";
 import { SignIn } from "@/components/SignIn";
 import { SignsOfLife } from "@/components/SignsOfLife";
+import { Speedrun } from "@/components/Speedrun";
 import { Vaults } from "@/components/Vaults";
 import { NotificationLog, Releases, SignalList, WatchStatus } from "@/components/WillParts";
 import { agent, type DraftResult } from "@/lib/agent";
@@ -347,6 +348,7 @@ function Dashboard({ will, refresh }: { will: Will; refresh: () => void }) {
   return (
     <div className="space-y-6">
       <SignsOfLife owner={owner} will={will} />
+      <Speedrun will={will} refresh={refresh} />
       <div className="grid gap-6 lg:grid-cols-[1fr_1.1fr]">
       <div className="space-y-6">
         <Card title="Where your will is">

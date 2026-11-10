@@ -2,7 +2,7 @@
 //  1. score liveness from the signal adapters and report a newer "alive" time on-chain;
 //  2. call advance() when the current period has elapsed (one step per tick);
 //  3. notify the right people when the will enters a new state;
-//  4. hand Executing wills to the executor;
+//  4. hand Executing wills to the executor (on its own queue, so signing never blocks other wills);
 //  5. release sealed notes to heirs once the will reaches SecretsReleased (secrets last, §5.5).
 import { type Observation, scoreAlive } from "../liveness/score";
 import {
@@ -44,11 +44,63 @@ export interface DriverDeps {
   now?: () => Date;
   log?: (msg: string) => void;
   /**
-   * Demo mode: stop driving a will this long after the agent started watching it, unless it is mid-
-   * execution. Abandoned demo wills would otherwise cycle (a failed vote returns them to Active) forever,
-   * costing gas and RPC calls. Unset in real mode.
+   * Demo mode: stop driving a speedrun will (demo timings) this long after the agent started watching it,
+   * unless it is mid-execution. Abandoned demo wills would otherwise cycle (a failed vote returns them to
+   * Active) forever, costing gas and RPC calls. Wills with real timings are always watched. Unset in real mode.
    */
   demoWatchMs?: number;
+  /** Owners ticked at once (default 4). Each owner's own steps stay in order. */
+  concurrency?: number;
+  /** Executions and withdrawals in flight at once (default 2): MPC signing is slow, so it runs on its own
+   *  queue and never holds up liveness checks or a snap-back for other wills. */
+  executionConcurrency?: number;
+}
+
+/** A will with compressed (demo) timings: a speedrun (§13A.1). Real wills go quiet after days, not minutes. */
+export function isSpeedrun(will: WillView): boolean {
+  return will.timings.quiet_after < 3600;
+}
+
+/** Runs keyed tasks with a concurrency limit; a key already queued or running is not added twice. */
+export class KeyedQueue {
+  private active = 0;
+  private readonly keys = new Set<string>();
+  private readonly waiting: { key: string; run: () => Promise<void> }[] = [];
+  private idleWaiters: (() => void)[] = [];
+  constructor(
+    private readonly limit: number,
+    private readonly onError: (key: string, e: unknown) => void,
+  ) {}
+
+  add(key: string, run: () => Promise<void>): boolean {
+    if (this.keys.has(key)) return false;
+    this.keys.add(key);
+    this.waiting.push({ key, run });
+    this.pump();
+    return true;
+  }
+
+  /** Resolves once nothing is queued or running. */
+  idle(): Promise<void> {
+    return this.active === 0 && this.waiting.length === 0 ? Promise.resolve() : new Promise((r) => this.idleWaiters.push(r));
+  }
+
+  private pump() {
+    while (this.active < this.limit && this.waiting.length) {
+      const { key, run } = this.waiting.shift()!;
+      this.active++;
+      run()
+        .catch((e) => this.onError(key, e))
+        .finally(() => {
+          this.active--;
+          this.keys.delete(key);
+          this.pump();
+          if (this.active === 0 && this.waiting.length === 0) {
+            for (const w of this.idleWaiters.splice(0)) w();
+          }
+        });
+    }
+  }
 }
 
 /** True for errors that mean the RPC is throttling us; the rest of the tick waits for the next one. */
@@ -141,24 +193,40 @@ export const CHECK_STEPS = ["heartbeat", "email", "telegram", "dm"] as const;
 export class Driver {
   private readonly now: () => Date;
   private readonly log: (msg: string) => void;
+  private readonly execution: KeyedQueue;
   constructor(private readonly deps: DriverDeps) {
     this.now = deps.now ?? (() => new Date());
     this.log = deps.log ?? ((m) => console.log(m));
+    this.execution = new KeyedQueue(deps.executionConcurrency ?? 2, (key, e) =>
+      this.log(`[executor] ${key}: ${e instanceof Error ? e.message : String(e)}`),
+    );
   }
 
   async tick(): Promise<void> {
-    for (const cfg of Object.values(this.deps.store.get().owners)) {
-      try {
-        if (await this.expireDemoWill(cfg)) continue;
-        await this.tickOwner(cfg);
-      } catch (e) {
-        this.log(`[driver] ${cfg.owner}: ${e instanceof Error ? e.message : String(e)}`);
-        if (isRateLimited(e)) {
-          this.log("[driver] NEAR RPC is rate-limiting; skipping the rest of this tick");
-          return;
+    const owners = Object.values(this.deps.store.get().owners);
+    let throttled = false;
+    let next = 0;
+    const worker = async () => {
+      while (!throttled && next < owners.length) {
+        const cfg = owners[next++];
+        try {
+          if (await this.expireDemoWill(cfg)) continue;
+          await this.tickOwner(cfg);
+        } catch (e) {
+          this.log(`[driver] ${cfg.owner}: ${e instanceof Error ? e.message : String(e)}`);
+          if (isRateLimited(e) && !throttled) {
+            throttled = true;
+            this.log("[driver] NEAR RPC is rate-limiting; skipping the rest of this tick");
+          }
         }
       }
-    }
+    };
+    await Promise.all(Array.from({ length: Math.min(this.deps.concurrency ?? 4, owners.length) }, worker));
+  }
+
+  /** Resolves once queued executions and withdrawals have finished (tests, shutdown). */
+  idle(): Promise<void> {
+    return this.execution.idle();
   }
 
   /** Demo mode: drops a will from the watch list once its time is up (never mid-execution). */
@@ -167,6 +235,7 @@ export class Driver {
     if (!ttl || !cfg.watchedSince) return false;
     if (this.now().getTime() - Date.parse(cfg.watchedSince) < ttl) return false;
     const will = await this.deps.contract.getWill(cfg.owner);
+    if (will && !isSpeedrun(will)) return false;
     if (will && executionStarted(will.state) && stateName(will.state) !== "Completed") return false;
     this.deps.store.update((s) => {
       delete s.owners[cfg.owner];
@@ -205,8 +274,24 @@ export class Driver {
     }
     if (typeof will.state !== "string" && "Quiet" in will.state) await this.runChecks(cfg, will, will.state.Quiet.since, nowS);
 
-    if (state === "Executing" && this.deps.executor) await this.deps.executor.run(cfg.owner, will);
-    if (state === "Active" && will.pending_withdrawals.some((w) => w.chain !== "Near")) await this.deps.executor?.withdraw?.(cfg.owner, will);
+    // Queued, not awaited: a slow MPC signature must not delay this tick for other wills. One entry per
+    // owner, so a run still in flight is not started twice; the next tick picks up whatever is left.
+    // A queued task re-reads the will when it starts, so it never acts on a snapshot older than the
+    // previous run's records (the executor's idempotency checks read them).
+    const executor = this.deps.executor;
+    if (state === "Executing" && executor) {
+      this.execution.add(cfg.owner, async () => {
+        const fresh = await contract.getWill(cfg.owner);
+        if (fresh && stateName(fresh.state) === "Executing") await executor.run(cfg.owner, fresh);
+      });
+    }
+    if (state === "Active" && will.pending_withdrawals.some((w) => w.chain !== "Near") && executor?.withdraw) {
+      const withdraw = executor.withdraw.bind(executor);
+      this.execution.add(cfg.owner, async () => {
+        const fresh = await contract.getWill(cfg.owner);
+        if (fresh && stateName(fresh.state) === "Active") await withdraw(cfg.owner, fresh);
+      });
+    }
     // Secrets last: only once distribution and the buffer are over (the contract enforces it too).
     if (state === "SecretsReleased" && this.deps.notes) await this.deps.notes.run(will);
     // Onward payouts over NEAR Intents (§J.3) for every slice released so far, including after a halt.

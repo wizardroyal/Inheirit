@@ -2,11 +2,12 @@
 import { useParams } from "next/navigation";
 import { useState } from "react";
 import { ActAs } from "@/components/ActAs";
+import { BackToOwner } from "@/components/Speedrun";
 import { AiBadge } from "@/components/Attestation";
 import { ActionButton, Card, inputCls, Pill, NoWill } from "@/components/ui";
 import { Releases } from "@/components/WillParts";
 import { HeirPayoutList, IntentsSimTag, PayoutChoice } from "@/components/Payouts";
-import { useKeys, usePoll, useWill } from "@/lib/hooks";
+import { initialAs, useKeys, usePoll, useWill } from "@/lib/hooks";
 import { keys } from "@/lib/keys";
 import { agent } from "@/lib/agent";
 import { call, ROLE_TGAS, signRequest, view } from "@/lib/near";
@@ -26,7 +27,7 @@ function Step({ n, title, done, children }: { n: number; title: string; done?: b
 export default function HeirPage() {
   const owner = decodeURIComponent(useParams<{ owner: string }>().owner);
   const { data: will, loaded, refresh } = useWill(owner);
-  const [me, setMe] = useState("");
+  const [me, setMe] = useState(initialAs);
   useKeys(); // re-render when the local key store changes
 
   if (!loaded) return <p>Loading…</p>;
@@ -41,6 +42,7 @@ export default function HeirPage() {
   return (
     <div className="space-y-6">
       <div className="space-y-2">
+        <BackToOwner owner={owner} />
         <h1 className="font-serif text-3xl">For the heirs of {owner}</h1>
         <p className="max-w-2xl text-muted">
           {started
