@@ -49,6 +49,13 @@ export async function signInWithGoogle(idToken: string): Promise<string> {
   return accountId;
 }
 
+/** Tops a nearly empty testnet account (e.g. a fresh wallet account) up to the onboarding amount. */
+export async function topUpAccount(accountId: string): Promise<void> {
+  const res = await fetch("/api/onboard", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind: "topup", accountId }) });
+  const out = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(out.error ?? `Top-up failed (${res.status})`);
+}
+
 /** Downloads the account's key so it can be restored in another browser. */
 export function downloadKeyBackup(accountId: string): void {
   const secret = keys.secret(accountId);

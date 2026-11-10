@@ -14,7 +14,7 @@ import { CONTRACT_ID, DEMO_SCHEDULE, explorer } from "@/lib/config";
 import { acceptAsGuardians, addSealedNote, createCast, createWill, DEMO_NOTE, demoHeirReceive, demoPolicy, fundFromFaucet } from "@/lib/demo";
 import { useKeys, usePoll, useWill } from "@/lib/hooks";
 import type { Cast } from "@/lib/keys";
-import { call, signRequest } from "@/lib/near";
+import { call, ROLE_TGAS, signRequest } from "@/lib/near";
 import { ago, stateName, type StateName, type Will } from "@/lib/will";
 
 const SIMULATED: { source: SignalSource; label: string }[] = [
@@ -245,10 +245,10 @@ function WillPanel({ cast }: { cast: Cast }) {
                     {short(g, 14)} {a && <Pill tone={a.kind === "Deceased" ? "danger" : "accent"}>{a.kind === "Deceased" ? "confirmed passing" : "says alive"}</Pill>}
                   </span>
                   <span className="flex gap-2">
-                    <ActionButton tone="danger" disabled={s !== "GuardianVote" || !!a} onClick={() => call(g, "attest", { owner: cast.owner, kind: "Deceased", evidence_hash: null }).then(refresh)}>
+                    <ActionButton tone="danger" disabled={s !== "GuardianVote" || !!a} onClick={() => call(g, "attest", { owner: cast.owner, kind: "Deceased", evidence_hash: null }, 0n, ROLE_TGAS).then(refresh)}>
                       Confirm passing
                     </ActionButton>
-                    <ActionButton tone="quiet" disabled={s !== "GuardianVote" || !!a} onClick={() => call(g, "attest", { owner: cast.owner, kind: "Alive", evidence_hash: null }).then(refresh)}>
+                    <ActionButton tone="quiet" disabled={s !== "GuardianVote" || !!a} onClick={() => call(g, "attest", { owner: cast.owner, kind: "Alive", evidence_hash: null }, 0n, ROLE_TGAS).then(refresh)}>
                       Alive
                     </ActionButton>
                   </span>
@@ -257,7 +257,7 @@ function WillPanel({ cast }: { cast: Cast }) {
             })}
             <li className="flex flex-wrap items-center justify-between gap-2 border-t border-line pt-2">
               <span>Friend {short(cast.contact, 14)}</span>
-              <ActionButton tone="quiet" disabled={s !== "Quiet" && s !== "WelfareCheck"} onClick={() => call(cast.contact, "contact_confirm_alive", { owner: cast.owner }).then(refresh)}>
+              <ActionButton tone="quiet" disabled={s !== "Quiet" && s !== "WelfareCheck"} onClick={() => call(cast.contact, "contact_confirm_alive", { owner: cast.owner }, 0n, ROLE_TGAS).then(refresh)}>
                 “I heard from Alice”
               </ActionButton>
             </li>

@@ -5,7 +5,7 @@ import { checkPolicy, nearShareBps, policyHash, type Policy } from "@agent/polic
 import { agent } from "./agent";
 import { stagesFor, type SchedulePreset } from "@agent/policy/schedule";
 import { keys, type Cast } from "./keys";
-import { call, callMany, createFaucetAccount, createSubaccount, nearToYocto, signRequest, view } from "./near";
+import { call, callMany, createFaucetAccount, createSubaccount, createSubaccounts, nearToYocto, ROLE_TGAS, signRequest, view } from "./near";
 import { sealToBase64 } from "./sealed";
 import type { AgentKey } from "./will";
 
@@ -119,8 +119,66 @@ export async function createWill(owner: string, o: CreateWillOptions, progress: 
 export async function acceptAsGuardians(owner: string, guardians: string[], progress: Progress): Promise<void> {
   for (const g of guardians) {
     progress(`${g} accepts the guardian role…`);
-    await call(g, "accept_guardian", { owner });
+    await call(g, "accept_guardian", { owner }, 0n, ROLE_TGAS);
   }
+}
+
+/**
+ * "Generate a will and cast for me" (CLAUDE.md §13A.1): an heir, three guardians, a friend and a lawyer as
+ * subaccounts of the owner (keys in this browser, so one person can play every role), then a full will
+ * with a sealed note. The guardians accept at once, so the will is armed.
+ */
+export async function generateWillAndCast(
+  owner: string,
+  o: { schedule: SchedulePreset; foreignChains: ("Eth" | "Btc")[]; depositNear: string; stable?: boolean },
+  progress: Progress,
+): Promise<Cast> {
+  progress("Creating your cast: Ada (heir), three guardians, a friend and a lawyer…");
+  const [heir, g1, g2, g3, contact, lawyer] = await createSubaccounts(owner, [
+    { name: "ada", near: "0.1" },
+    { name: "g1", near: "0.1" },
+    { name: "g2", near: "0.1" },
+    { name: "g3", near: "0.1" },
+    { name: "friend", near: "0.1" },
+    { name: "lawyer", near: "0.1" },
+  ]);
+  const cast: Cast = { funder: owner, owner, heir, guardians: [g1, g2, g3], contact, lawyer, createdAt: new Date().toISOString() };
+  keys.addCast(cast);
+  const receive = await demoHeirReceive();
+  const check = checkPolicy({
+    version: 1,
+    owner,
+    display_name: owner.split(".")[0],
+    heirs: [
+      {
+        id: "ada",
+        name: "Ada",
+        near_account: heir,
+        receive: { ...(o.foreignChains.includes("Eth") ? { eth: receive.eth } : {}), ...(o.foreignChains.includes("Btc") ? { btc: receive.btc } : {}) },
+      },
+    ],
+    allocations: [
+      { asset: "NEAR", shares: { ada: 100 } },
+      ...(o.foreignChains.includes("Eth") ? [{ asset: "ETH", shares: { ada: 100 } }] : []),
+      ...(o.foreignChains.includes("Btc") ? [{ asset: "BTC", shares: { ada: 100 } }] : []),
+    ],
+    stages_pct: [10, 20, 30, 40],
+    guardians: cast.guardians,
+    guardian_threshold: 2,
+    contacts: [contact],
+    lawyer,
+    ...(o.stable ? { payout_value_mode: "stable" } : {}),
+  });
+  if (!check.ok) throw new Error(check.errors.join("; "));
+  await createWill(owner, { policy: check.policy, contacts: [contact], schedule: o.schedule, foreignChains: o.foreignChains, depositNear: o.depositNear }, progress);
+  await acceptAsGuardians(owner, cast.guardians, progress);
+  progress("Sealing a note for Ada (released last)…");
+  await addSealedNote(owner, heir, DEMO_NOTE.label, DEMO_NOTE.text);
+  if (o.foreignChains.length) {
+    progress("Asking the demo faucet for a little Sepolia ETH / testnet BTC (while the pool lasts)…");
+    await fundFromFaucet(owner, progress).catch((e) => progress(`Faucet unavailable: ${e instanceof Error ? e.message : e}. Those vaults stay empty; NEAR still runs for real.`));
+  }
+  return cast;
 }
 
 /** Seals a note in this browser to the agent's TEE key; only ciphertext goes on-chain. */

@@ -112,6 +112,19 @@ export async function walletCall(accountId: string, calls: WalletCall[]) {
   return outcome;
 }
 
+/** Creates funded subaccounts of the wallet's account, one transaction each, in one wallet approval. */
+export async function walletCreateSubaccounts(accountId: string, accounts: { id: string; publicKey: string; amount: bigint }[]) {
+  const wallet = await activeWallet(accountId);
+  const { PublicKey } = await import("@near-js/crypto");
+  await wallet.signAndSendTransactions({
+    transactions: accounts.map((a) => ({
+      signerId: accountId,
+      receiverId: a.id,
+      actions: [actionCreators.createAccount(), actionCreators.transfer(a.amount), actionCreators.addKey(PublicKey.from(a.publicKey), actionCreators.fullAccessKey())],
+    })),
+  });
+}
+
 /** NEP-413 signature from the wallet, in the shape the agent's /api routes expect. */
 export async function walletSignMessage(accountId: string, message: string, nonce: Uint8Array): Promise<{ publicKey: string; signature: string }> {
   const wallet = await activeWallet(accountId);

@@ -72,6 +72,32 @@ async function createFunded(p: NonNullable<ReturnType<typeof parent>>, id: strin
   }
 }
 
+/**
+ * Wallet users bring their own account; one that holds almost nothing gets topped up to the onboarding
+ * amount so it can create a will and fund its vault. Same exposure as a demo account, same limits.
+ */
+async function topUp(p: NonNullable<ReturnType<typeof parent>>, ip: string, accountId: string) {
+  if (!/^[a-z0-9._-]{2,64}$/.test(accountId) || (!accountId.endsWith(".testnet") && !/^[0-9a-f]{64}$/.test(accountId))) {
+    return Response.json({ error: "accountId must be a testnet account" }, { status: 400 });
+  }
+  if (limited(`topup:${ip}`, 3, 3_600_000)) return Response.json({ error: "Too many top-ups from this network; try again later" }, { status: 429 });
+  let have: bigint;
+  try {
+    have = BigInt((await p.provider.viewAccount(accountId)).amount);
+  } catch {
+    return Response.json({ error: `${accountId} doesn't exist on testnet` }, { status: 404 });
+  }
+  const target = nearToYocto(env("ONBOARD_FUND_NEAR", "2")!);
+  if (have >= nearToYocto("0.5")) return Response.json({ error: "This account already has testnet NEAR; top-ups are for empty accounts" }, { status: 409 });
+  const amount = target - have;
+  const floor = nearToYocto(env("ONBOARD_PARENT_FLOOR_NEAR", "3")!);
+  if (BigInt((await p.provider.viewAccount(p.id)).amount) - amount < floor) {
+    return Response.json({ error: "Today's free testnet NEAR has run out; please try again later" }, { status: 503 });
+  }
+  await p.account.transfer({ receiverId: accountId, amount });
+  return Response.json({ accountId, toppedUpTo: env("ONBOARD_FUND_NEAR", "2") });
+}
+
 /** What the sign-in page needs to know (all public). */
 export async function GET() {
   const p = parent();
@@ -81,12 +107,14 @@ export async function GET() {
 export async function POST(req: Request) {
   const p = parent();
   if (!p) return Response.json({ error: "Onboarding is not configured on this deployment" }, { status: 503 });
-  let body: { kind?: string; idToken?: string; publicKey?: string };
+  let body: { kind?: string; idToken?: string; publicKey?: string; accountId?: string };
   try {
     body = await req.json();
   } catch {
     return Response.json({ error: "Send JSON" }, { status: 400 });
   }
+  const ip = clientIp(req);
+  if (body.kind === "topup") return topUp(p, ip, body.accountId ?? "");
   const publicKey = body.publicKey ?? "";
   try {
     if (!publicKey.startsWith("ed25519:")) throw new Error();
@@ -95,7 +123,6 @@ export async function POST(req: Request) {
     return Response.json({ error: "publicKey must be an ed25519 public key" }, { status: 400 });
   }
 
-  const ip = clientIp(req);
   let id: string;
   if (body.kind === "google") {
     const clientId = env("GOOGLE_CLIENT_ID");
@@ -122,14 +149,14 @@ export async function POST(req: Request) {
     if (limited(`demo:${ip}`, 5, 3_600_000)) return Response.json({ error: "Too many demo accounts from this network; try again later" }, { status: 429 });
     id = `demo-${randomBytes(4).toString("hex")}.${p.id}`;
   } else {
-    return Response.json({ error: 'kind must be "google" or "demo"' }, { status: 400 });
+    return Response.json({ error: 'kind must be "google", "demo" or "topup"' }, { status: 400 });
   }
 
-  const amount = nearToYocto(env("ONBOARD_FUND_NEAR", "1.6")!);
+  const amount = nearToYocto(env("ONBOARD_FUND_NEAR", "2")!);
   const floor = nearToYocto(env("ONBOARD_PARENT_FLOOR_NEAR", "3")!);
   const balance = BigInt((await p.provider.viewAccount(p.id)).amount);
   if (balance - amount < floor) return Response.json({ error: "Today's free testnet accounts have run out; please try again later" }, { status: 503 });
 
   await createFunded(p, id, publicKey, amount);
-  return Response.json({ accountId: id, existed: false, fundedNear: env("ONBOARD_FUND_NEAR", "1.6") });
+  return Response.json({ accountId: id, existed: false, fundedNear: env("ONBOARD_FUND_NEAR", "2") });
 }

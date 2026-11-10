@@ -15,12 +15,12 @@ import { NotificationLog, Releases, SignalList, WatchStatus } from "@/components
 import { agent, type DraftResult } from "@/lib/agent";
 import { DEMO_SCHEDULE, REAL_SCHEDULE } from "@/lib/config";
 import { stagesFor, summarize } from "@agent/policy/schedule";
-import { addSealedNote, createWill } from "@/lib/demo";
-import { useKeys, useWill } from "@/lib/hooks";
+import { addSealedNote, createWill, generateWillAndCast } from "@/lib/demo";
+import { useKeys, usePoll, useWill } from "@/lib/hooks";
 import { keys } from "@/lib/keys";
-import { downloadKeyBackup } from "@/lib/onboard";
+import { downloadKeyBackup, topUpAccount } from "@/lib/onboard";
 import { disconnectWallet, walletAccountId } from "@/lib/wallet";
-import { call, formatNear, nearToYocto, signRequest } from "@/lib/near";
+import { balanceOf, call, formatNear, nearToYocto, signRequest } from "@/lib/near";
 import { ago, duration, isArmed, schedule, stateName, type Will } from "@/lib/will";
 
 export default function OwnerPage() {
@@ -61,9 +61,26 @@ function Owner() {
         )}
         <ImportKey />
       </div>
+      {owner && loaded && (!will || creating) && <LowBalance owner={owner} />}
       {owner && loaded && (!will || creating) && <CreateWill owner={owner} onCreating={setCreating} onCreated={refresh} />}
       {owner && will && !creating && <Dashboard will={will} refresh={refresh} />}
     </div>
+  );
+}
+
+/** A wallet account with almost no testnet NEAR can't create a will; offer a free top-up. */
+function LowBalance({ owner }: { owner: string }) {
+  const { data: balance, refresh } = usePoll(() => balanceOf(owner), 30_000, [owner]);
+  if (balance === null || balance === undefined || balance >= nearToYocto("0.5")) return null;
+  return (
+    <Card title="This account needs a little testnet NEAR">
+      <p className="text-sm text-muted">
+        {owner} has {formatNear(balance)} NEAR. Creating a will and funding its vault takes about 1 NEAR. Testnet NEAR is free:
+      </p>
+      <div className="mt-3">
+        <ActionButton onClick={async () => (await topUpAccount(owner), refresh())}>Get free testnet NEAR</ActionButton>
+      </div>
+    </Card>
   );
 }
 
@@ -93,10 +110,13 @@ function AccountActions({ owner, onSignIn, onSignedOut }: { owner: string; onSig
 
 /** Quick setup (3 steps) by default; the plain-English route through NEAR AI is the alternative. */
 function CreateWill(props: { owner: string; onCreating: (b: boolean) => void; onCreated: () => void }) {
-  const [mode, setMode] = useState<"quick" | "english">("quick");
+  const [mode, setMode] = useState<"generate" | "quick" | "english">("generate");
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap gap-2 text-sm">
+        <ActionButton tone={mode === "generate" ? undefined : "quiet"} onClick={async () => setMode("generate")}>
+          Generate a will and cast for me
+        </ActionButton>
         <ActionButton tone={mode === "quick" ? undefined : "quiet"} onClick={async () => setMode("quick")}>
           Quick setup (3 steps)
         </ActionButton>
@@ -104,12 +124,102 @@ function CreateWill(props: { owner: string; onCreating: (b: boolean) => void; on
           Write it in plain English
         </ActionButton>
       </div>
-      {mode === "quick" ? (
+      {mode === "generate" ? (
+        <GenerateWill {...props} />
+      ) : mode === "quick" ? (
         <QuickSetup {...props} summary={(stagesPct, demoClock) => <SetupSummary stagesPct={stagesPct} demoClock={demoClock} />} />
       ) : (
         <WriteWill {...props} />
       )}
     </div>
+  );
+}
+
+/** One click: a test cast (heir, guardians, friend, lawyer) with keys in this browser, and a complete will. */
+function GenerateWill({ owner, onCreating, onCreated }: { owner: string; onCreating: (b: boolean) => void; onCreated: () => void }) {
+  const [chains, setChains] = useState({ Eth: true, Btc: true });
+  const [demoClock, setDemoClock] = useState(true);
+  const [stable, setStable] = useState(false);
+  const [deposit, setDeposit] = useState("0.5");
+  const [log, setLog] = useState<string[]>([]);
+  const [failed, setFailed] = useState(false);
+  return (
+    <Card title="Generate a will and cast for me">
+      <p className="text-sm text-muted">
+        Creates testnet accounts for an heir (Ada), three guardians, a friend and a lawyer under <b>{owner}</b>, with their keys in this browser so
+        you can play every role. Then it writes a will (100% to Ada, released 10% → 20% → 30% → 40%), the guardians accept, and a sealed note is
+        added for Ada. You can change any of it later while the will is at All good.
+      </p>
+      <div className="mt-3 flex flex-wrap gap-4 text-sm">
+        <label className="flex items-center gap-2">
+          <input type="checkbox" checked disabled /> NEAR vault
+        </label>
+        {(["Eth", "Btc"] as const).map((c) => (
+          <label key={c} className="flex items-center gap-2">
+            <input type="checkbox" checked={chains[c]} onChange={(e) => setChains({ ...chains, [c]: e.target.checked })} />
+            {c === "Eth" ? "Sepolia ETH vault" : "BTC testnet4 vault"}
+          </label>
+        ))}
+        <label className="flex items-center gap-2">
+          <input type="checkbox" checked={stable} onChange={(e) => setStable(e.target.checked)} /> Stable value for Ada (NEAR Intents, SIMULATED on testnet)
+        </label>
+      </div>
+      <div className="mt-3 flex flex-wrap items-end gap-4">
+        <Field label="NEAR to put in the vault now">
+          <input className={`${inputCls} w-28`} value={deposit} onChange={(e) => setDeposit(e.target.value)} />
+        </Field>
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" checked={demoClock} onChange={(e) => setDemoClock(e.target.checked)} />
+          Demo clock (minutes instead of months)
+        </label>
+      </div>
+      <p className="mt-2 text-xs text-muted">
+        Sepolia ETH and testnet BTC come from a small demo pool while it lasts. If it&apos;s empty, those vaults stay empty and only NEAR moves for
+        real.
+      </p>
+      <div className="mt-3">
+        <SetupSummary stagesPct={[10, 20, 30, 40]} demoClock={demoClock} />
+      </div>
+      <div className="mt-3">
+        <ActionButton
+          onClick={async () => {
+            setLog([]);
+            setFailed(false);
+            onCreating(true);
+            try {
+              await generateWillAndCast(
+                owner,
+                {
+                  schedule: demoClock ? DEMO_SCHEDULE : REAL_SCHEDULE,
+                  foreignChains: [...(chains.Eth ? ["Eth" as const] : []), ...(chains.Btc ? ["Btc" as const] : [])],
+                  depositNear: deposit,
+                  stable,
+                },
+                (m) => setLog((l) => [...l, m]),
+              );
+              onCreated();
+              onCreating(false);
+            } catch (e) {
+              // Stay on this view so the log and the error stay visible; the will may already exist.
+              setFailed(true);
+              throw e;
+            }
+          }}
+        >
+          Generate and create my will
+        </ActionButton>
+        {failed && (
+          <ActionButton tone="quiet" className="ml-2" onClick={async () => (onCreating(false), onCreated())}>
+            Go to my dashboard anyway
+          </ActionButton>
+        )}
+      </div>
+      <ul className="mt-3 font-mono text-xs text-muted">
+        {log.map((l, i) => (
+          <li key={i}>{l}</li>
+        ))}
+      </ul>
+    </Card>
   );
 }
 

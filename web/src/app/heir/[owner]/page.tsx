@@ -9,7 +9,7 @@ import { HeirPayoutList, IntentsSimTag, PayoutChoice } from "@/components/Payout
 import { useKeys, usePoll, useWill } from "@/lib/hooks";
 import { keys } from "@/lib/keys";
 import { agent } from "@/lib/agent";
-import { call, signRequest, view } from "@/lib/near";
+import { call, ROLE_TGAS, signRequest, view } from "@/lib/near";
 import { keypairFromSeedHex, newSeedHex, openReleased, pubkeyHex } from "@/lib/sealed";
 import { executionStarted, schedule, stateName, type Will, stateLabel } from "@/lib/will";
 
@@ -116,7 +116,7 @@ function KeyStep({ owner, heir, refresh }: { owner: string; heir: Will["heirs"][
               const s = seed ?? (await newSeedHex());
               keys.setHeirSeed(owner, heir.account_id, s);
               const pub = await pubkeyHex(await keypairFromSeedHex(s));
-              await call(heir.account_id, "register_heir_key", { owner, x25519_pubkey: pub });
+              await call(heir.account_id, "register_heir_key", { owner, x25519_pubkey: pub }, 0n, ROLE_TGAS);
               refresh();
             }}
           >

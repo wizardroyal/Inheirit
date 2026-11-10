@@ -10,6 +10,8 @@ export interface Cast {
   heir: string;
   guardians: string[];
   contact: string;
+  /** Set for casts generated for a signed-in owner (the funder is then the owner itself) */
+  lawyer?: string;
   createdAt: string;
 }
 

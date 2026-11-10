@@ -7,10 +7,13 @@ import { KeyPairSigner } from "@near-js/signers";
 import { actionCreators } from "@near-js/transactions";
 import { CONTRACT_ID, NEAR_RPC } from "./config";
 import { keys } from "./keys";
-import { walletAccountId, walletCall, walletSignMessage } from "./wallet";
+import { walletAccountId, walletCall, walletCreateSubaccounts, walletSignMessage } from "./wallet";
 
 export const provider = new JsonRpcProvider({ url: NEAR_RPC });
 export const YOCTO = 10n ** 24n;
+/** Gas for the small role calls (accept, attest, confirm, register a key): cast accounts hold little NEAR,
+ *  and testnet reserves ~0.001 NEAR per Tgas up front, so the 100 Tgas default would need 0.1 NEAR each. */
+export const ROLE_TGAS = 30n;
 const TGAS = 10n ** 12n;
 
 export function nearToYocto(near: number | string): bigint {
@@ -132,11 +135,28 @@ export function newKeyPair(): KeyPair {
 }
 
 export async function createSubaccount(funder: string, name: string, near: string): Promise<string> {
-  const id = `${name}.${funder}`;
-  const kp = newKeyPair();
-  await account(funder).createAccount(id, kp.getPublicKey(), nearToYocto(near));
-  keys.addAccount(id, kp.toString());
-  return id;
+  return (await createSubaccounts(funder, [{ name, near }]))[0];
+}
+
+/**
+ * Funded subaccounts of `funder`, keys kept in this browser. With a key held here they are created one by
+ * one; with a wallet, all in one approval.
+ */
+export async function createSubaccounts(funder: string, specs: { name: string; near: string }[]): Promise<string[]> {
+  const made = specs.map((s) => ({ id: `${s.name}.${funder}`, kp: newKeyPair(), amount: nearToYocto(s.near) }));
+  if (!keys.secret(funder) && walletAccountId() === funder) {
+    await walletCreateSubaccounts(
+      funder,
+      made.map((m) => ({ id: m.id, publicKey: m.kp.getPublicKey().toString(), amount: m.amount })),
+    );
+    for (const m of made) keys.addAccount(m.id, m.kp.toString());
+  } else {
+    for (const m of made) {
+      await account(funder).createAccount(m.id, m.kp.getPublicKey(), m.amount);
+      keys.addAccount(m.id, m.kp.toString());
+    }
+  }
+  return made.map((m) => m.id);
 }
 
 /** A top-level testnet account funded by the public testnet faucet helper (CORS allows browsers). */

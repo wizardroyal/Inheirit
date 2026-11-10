@@ -7,7 +7,7 @@ import { ActionButton, Card, ErrorNote, Field, inputCls, Pill, NoWill } from "@/
 import { TelegramLink } from "@/components/TelegramLink";
 import { SignalList } from "@/components/WillParts";
 import { useWill } from "@/lib/hooks";
-import { call } from "@/lib/near";
+import { call, ROLE_TGAS } from "@/lib/near";
 import { ago, guardianIds, stateName } from "@/lib/will";
 
 async function sha256Hex(file: File): Promise<string> {
@@ -48,7 +48,7 @@ export default function GuardianPage() {
             start.
           </p>
           <div className="mt-3">
-            <ActionButton onClick={() => call(me, "accept_guardian", { owner }).then(refresh)}>I accept the guardian role</ActionButton>
+            <ActionButton onClick={() => call(me, "accept_guardian", { owner }, 0n, ROLE_TGAS).then(refresh)}>I accept the guardian role</ActionButton>
           </div>
         </Card>
       )}
@@ -86,10 +86,10 @@ export default function GuardianPage() {
                 <p className="text-sm">You attested “{mine.kind}” {ago(mine.at)}.</p>
               ) : (
                 <div className="flex flex-wrap gap-2">
-                  <ActionButton tone="danger" disabled={!isGuardian} onClick={() => call(me, "attest", { owner, kind: "Deceased", evidence_hash: evidence?.hash ?? null }).then(refresh)}>
+                  <ActionButton tone="danger" disabled={!isGuardian} onClick={() => call(me, "attest", { owner, kind: "Deceased", evidence_hash: evidence?.hash ?? null }, 0n, ROLE_TGAS).then(refresh)}>
                     I confirm {owner} has passed away
                   </ActionButton>
-                  <ActionButton tone="quiet" disabled={!isGuardian} onClick={() => call(me, "attest", { owner, kind: "Alive", evidence_hash: evidence?.hash ?? null }).then(refresh)}>
+                  <ActionButton tone="quiet" disabled={!isGuardian} onClick={() => call(me, "attest", { owner, kind: "Alive", evidence_hash: evidence?.hash ?? null }, 0n, ROLE_TGAS).then(refresh)}>
                     They&apos;re alive
                   </ActionButton>
                 </div>

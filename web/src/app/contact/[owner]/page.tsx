@@ -5,7 +5,7 @@ import { useState } from "react";
 import { ActAs } from "@/components/ActAs";
 import { ActionButton, Card, NoWill } from "@/components/ui";
 import { useWill } from "@/lib/hooks";
-import { call } from "@/lib/near";
+import { call, ROLE_TGAS } from "@/lib/near";
 import { stateName } from "@/lib/will";
 
 export default function ContactPage() {
@@ -27,7 +27,7 @@ export default function ContactPage() {
         <ActAs value={me} onChange={setMe} suggested={will.contacts} label="I am" />
         <div className="mt-3">
           {open ? (
-            <ActionButton disabled={!will.contacts.includes(me)} onClick={() => call(me, "contact_confirm_alive", { owner }).then(refresh)}>
+            <ActionButton disabled={!will.contacts.includes(me)} onClick={() => call(me, "contact_confirm_alive", { owner }, 0n, ROLE_TGAS).then(refresh)}>
               Yes, they&apos;re fine
             </ActionButton>
           ) : (
