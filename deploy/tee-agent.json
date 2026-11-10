@@ -100,7 +100,13 @@
       "compose_hash": "02cc55b90732eaa871b06521bd2a6991dfc8fe19e53462d6a3256576e1dc7b0c",
       "image": "unwizarding/inheirit-agent@sha256:b86d5af598c9aec1561e61ab3576bdadca7cdb2ff0ae91337e37ffa32057f55d",
       "at": "2026-11-06T13:20:16.943Z",
-      "note": "v2g: second-audit fixes (signed owner routes, BTC signature cap, stale txs, owner withdrawals); first boot with the separate TEE sponsor tee-sponsor.inheirit-fund-0am6d3.testnet; live, only approved hash"
+      "note": "v2g: second-audit fixes (signed owner routes, BTC signature cap, stale txs, owner withdrawals); first boot with the separate TEE sponsor tee-sponsor.inheirit-fund-0am6d3.testnet; retired 2026-11-10 (v2h)"
+    },
+    {
+      "compose_hash": "758ef2b0664bd13eb504c8bb0ac41a681c282410da0e9f44ab3ff162ddbbb787",
+      "image": "unwizarding/inheirit-agent@sha256:0580171dd3c1f46f30316965c3dbef3d17f61284f461014e741236452b70e78a",
+      "at": "2026-11-10T13:54:00.357Z",
+      "note": "v2h: parallel ticks + execution queue + numKeys 8, poke on sign of life (snap-back 4-8 s under 10 concurrent wills), speedrun-only watch expiry, verdict/vault fixes; registered 2026-11-10, same sealed-notes key ae74cf06; live, only approved hash"
     }
   ]
 }
