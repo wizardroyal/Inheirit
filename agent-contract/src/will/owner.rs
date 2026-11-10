@@ -6,13 +6,31 @@ impl Contract {
     #[payable]
     pub fn create_will(&mut self, config: WillConfig) {
         let owner = env::predecessor_account_id();
-        require!(self.wills.get(&owner).is_none(), "Will already exists");
+        // "Start over" (§13A.1): an owner may replace their own Completed will, never one still running.
+        let previous = self.wills.get(&owner).cloned();
+        if let Some(old) = &previous {
+            require!(
+                matches!(old.state, WillState::Completed { .. }),
+                "Will already exists"
+            );
+        }
         config.validate(&owner);
         let initial = env::storage_usage();
-        let will = Will::new(owner.clone(), config, now_s());
+        let mut will = Will::new(owner.clone(), config, now_s());
+        if let Some(old) = &previous {
+            // NEAR credited back after a failed payout stays the owner's; the agent keys executions and
+            // payouts by round and notes by id, so numbering continues instead of restarting.
+            will.near_balance = old.near_balance;
+            will.execution_round = old.execution_round;
+            will.next_note_id = old.next_note_id;
+        }
         emit(
             "will_created",
-            serde_json::json!({ "owner": owner, "policy_hash": will.policy_hash }),
+            serde_json::json!({
+                "owner": owner,
+                "policy_hash": will.policy_hash,
+                "replaced_completed": previous.is_some(),
+            }),
         );
         self.save(will);
         self.wills.flush();

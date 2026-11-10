@@ -294,6 +294,54 @@ fn create_will_twice_rejected() {
     t.pay(OWNER, STORAGE_DEPOSIT).create_will(config());
 }
 
+// ---------------------------------------------------------------- start over (§13A.1)
+
+#[test]
+fn create_will_replaces_own_completed_will() {
+    let mut t = T::with_will();
+    t.to_completed();
+    let round = t.will().execution_round;
+    assert!(round >= 1);
+    t.pay(OWNER, STORAGE_DEPOSIT).create_will(config());
+    let w = t.will();
+    assert_eq!(w.state, WillState::Active);
+    assert!(w.executions.is_empty(), "history of the old will is not carried");
+    assert!(w.guardians.iter().all(|g| !g.accepted), "guardians are invited afresh");
+    // The agent keys executions and payouts by round, so numbering continues
+    assert_eq!(w.execution_round, round);
+    assert_eq!(w.near_balance.0, 0);
+}
+
+#[test]
+fn start_over_carries_leftover_near_and_note_ids() {
+    let mut t = T::with_will();
+    t.to_completed();
+    // A payout transfer that failed is credited back to a Completed will's vault
+    let mut w = t.will();
+    w.near_balance = U128(near(1));
+    w.next_note_id = 5;
+    t.c.wills.insert(acc(OWNER), w);
+    t.c.total_vault_near += near(1);
+
+    t.pay(OWNER, STORAGE_DEPOSIT).create_will(config());
+    let w = t.will();
+    assert_eq!(w.near_balance.0, near(1));
+    assert_eq!(t.c.get_total_vault_near().0, near(1));
+    assert_eq!(w.next_note_id, 5);
+}
+
+#[test]
+fn start_over_rejected_before_completed() {
+    for to_state in states_before_completed() {
+        let mut t = T::with_will();
+        to_state(&mut t);
+        let before = format!("{:?}", t.state());
+        set_ctx(OWNER, t.now, STORAGE_DEPOSIT);
+        let r = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| t.c.create_will(config())));
+        assert!(r.is_err(), "create_will must not replace a will in {before}");
+    }
+}
+
 fn create_invalid(mutate: impl FnOnce(&mut WillConfig)) {
     let mut t = T::new();
     let mut cfg = config();
