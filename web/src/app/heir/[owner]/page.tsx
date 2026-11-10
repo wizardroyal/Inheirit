@@ -7,7 +7,7 @@ import { AiBadge } from "@/components/Attestation";
 import { ActionButton, Card, inputCls, Pill, NoWill } from "@/components/ui";
 import { Releases } from "@/components/WillParts";
 import { HeirPayoutList, IntentsSimTag, PayoutChoice } from "@/components/Payouts";
-import { initialAs, useKeys, usePoll, useWill } from "@/lib/hooks";
+import { useActingAs, useKeys, usePoll, useWill } from "@/lib/hooks";
 import { keys } from "@/lib/keys";
 import { agent } from "@/lib/agent";
 import { call, ROLE_TGAS, signRequest, view } from "@/lib/near";
@@ -27,7 +27,7 @@ function Step({ n, title, done, children }: { n: number; title: string; done?: b
 export default function HeirPage() {
   const owner = decodeURIComponent(useParams<{ owner: string }>().owner);
   const { data: will, loaded, refresh } = useWill(owner);
-  const [me, setMe] = useState(initialAs);
+  const [me, setMe] = useActingAs();
   useKeys(); // re-render when the local key store changes
 
   if (!loaded) return <p>Loading…</p>;

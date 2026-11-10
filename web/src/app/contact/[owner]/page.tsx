@@ -1,18 +1,17 @@
 "use client";
 // Welfare-check link sent to contacts (the agent's WelfareCheck notification points here).
 import { useParams } from "next/navigation";
-import { useState } from "react";
 import { ActAs } from "@/components/ActAs";
 import { BackToOwner } from "@/components/Speedrun";
 import { ActionButton, Card, NoWill } from "@/components/ui";
-import { initialAs, useWill } from "@/lib/hooks";
+import { useActingAs, useWill } from "@/lib/hooks";
 import { call, ROLE_TGAS } from "@/lib/near";
 import { stateName } from "@/lib/will";
 
 export default function ContactPage() {
   const owner = decodeURIComponent(useParams<{ owner: string }>().owner);
   const { data: will, loaded, refresh } = useWill(owner);
-  const [me, setMe] = useState(initialAs);
+  const [me, setMe] = useActingAs();
   if (!loaded) return <p>Loading…</p>;
   if (!will) return <NoWill owner={owner} />;
   const s = stateName(will.state);

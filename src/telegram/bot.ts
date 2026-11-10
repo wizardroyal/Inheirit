@@ -57,14 +57,16 @@ export const CHECK_TEXT = "We haven't seen activity from you for a while. Reply 
 export class TelegramBot {
   private readonly now: () => Date;
   private readonly log: (msg: string) => void;
+  private readonly onReply?: (accounts: string[]) => void;
   constructor(
     private readonly api: TelegramApi,
     private readonly store: Store,
     readonly username: string,
-    opts: { now?: () => Date; log?: (msg: string) => void } = {},
+    opts: { now?: () => Date; log?: (msg: string) => void; onReply?: (accounts: string[]) => void } = {},
   ) {
     this.now = opts.now ?? (() => new Date());
     this.log = opts.log ?? ((m) => console.log(m));
+    this.onReply = opts.onReply;
   }
 
   /** A one-time deep link that binds the chat that opens it to `account`. */
@@ -141,6 +143,7 @@ export class TelegramBot {
       for (const a of accounts) s.telegramReplies[a] = at;
     });
     this.log(`[telegram] reply received for ${accounts.join(", ")}`);
+    this.onReply?.(accounts);
     await this.api.sendMessage(chatId, "Thanks, noted. Nothing else happens.");
   }
 

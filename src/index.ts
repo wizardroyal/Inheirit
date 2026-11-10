@@ -148,7 +148,12 @@ const notes = new NoteReleaser(contract, notesEnabled ? sealed.keypair : null);
 // Telegram check bot (§7.7): long polling, so it needs no inbound URL.
 const tgToken = config.telegramToken();
 const tgUsername = config.telegramUsername();
-const telegram = tgToken && tgUsername ? new TelegramBot(new HttpTelegramApi(tgToken), store, tgUsername) : undefined;
+// Set once the driver exists; a reply that arrives before then just waits for the next tick.
+let pokeOwner: (owner: string) => void = () => {};
+const telegram =
+  tgToken && tgUsername
+    ? new TelegramBot(new HttpTelegramApi(tgToken), store, tgUsername, { onReply: (accounts) => accounts.forEach((a) => pokeOwner(a)) })
+    : undefined;
 if (telegram) {
   console.log(`[telegram] check bot on: @${tgUsername}`);
   void telegram.run();
@@ -177,6 +182,7 @@ const driver = new Driver({
   executor: new StagedExecutor(contract, vaults, store),
   demoWatchMs: config.demoMode() ? config.demoWatchHours() * 3_600_000 : undefined,
 });
+pokeOwner = (owner) => void driver.poke(owner);
 
 // NEAR AI Cloud: will contents go only to a model whose TEE attestation passes (checked before each use, cached 10 min)
 const nearaiKey = config.nearaiApiKey();
@@ -226,6 +232,7 @@ const faucet =
     : undefined;
 
 const app = api({
+  onSignOfLife: (owner) => pokeOwner(owner),
   // A separate client: unsigned fund-from-anywhere quotes never share memory with the engine's deposits.
   intents: new SimulatedOneClickClient(new HttpOneClickClient(undefined, config.oneclickBaseUrl())),
   faucet,

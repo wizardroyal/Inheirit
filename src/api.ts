@@ -25,6 +25,8 @@ export interface ApiDeps {
   vaults: ChainVault[];
   demoMode: boolean;
   agentInfo: () => Promise<Record<string, unknown>>;
+  /** A sign of life arrived for this owner; the driver ticks the will right away (snap-back latency). */
+  onSignOfLife?: (owner: string) => void;
   /** Checks owner-signed (NEP-413) requests. */
   auth: Pick<Nep413Verifier, "verify">;
   /** Demo vault faucet; absent unless demo mode has pool keys configured. */
@@ -190,6 +192,7 @@ export function api(deps: ApiDeps): Hono {
       s.heartbeats[r.owner] = at;
       s.owners[r.owner] ??= { owner: r.owner, watchedSince: at };
     });
+    deps.onSignOfLife?.(r.owner);
     return c.json({ ok: true, owner: r.owner, at });
   });
 
@@ -527,6 +530,7 @@ export function api(deps: ApiDeps): Hono {
     const { source, at } = r.data;
     const when = at ?? new Date().toISOString();
     store.update((s) => (s.simulated[owner] = { ...s.simulated[owner], [source]: when }));
+    deps.onSignOfLife?.(owner);
     return c.json({ ok: true, simulated: true, owner, source, at: when });
   });
 

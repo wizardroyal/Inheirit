@@ -115,6 +115,14 @@ describe("owner-signed routes", () => {
     expect(t.store.get().heartbeats["alice.testnet"]).toBeDefined();
     expect(t.store.get().owners["alice.testnet"]).toMatchObject({ owner: "alice.testnet", watchedSince: expect.any(String) });
   });
+  it("a signed heartbeat asks the driver to act on it at once", async () => {
+    const poked: string[] = [];
+    const t = setup(false, HASH, undefined, { onSignOfLife: (o) => poked.push(o) });
+    await t.post("/api/heartbeat", { signed: { owner: "alice.testnet", action: "heartbeat" } });
+    expect(poked).toEqual(["alice.testnet"]);
+    await t.post("/api/heartbeat", { owner: "alice.testnet" });
+    expect(poked, "an unsigned heartbeat changes nothing").toEqual(["alice.testnet"]);
+  });
   it("never accepts an unsigned heartbeat, even in demo mode", async () => {
     expect((await setup(true).post("/api/heartbeat", { owner: "alice.testnet" })).status).toBe(401);
   });

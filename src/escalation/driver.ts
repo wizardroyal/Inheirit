@@ -194,6 +194,8 @@ export class Driver {
   private readonly now: () => Date;
   private readonly log: (msg: string) => void;
   private readonly execution: KeyedQueue;
+  /** Per-owner chain: a poke and the loop's tick never run the same will at once. */
+  private readonly ownerRuns = new Map<string, Promise<void>>();
   constructor(private readonly deps: DriverDeps) {
     this.now = deps.now ?? (() => new Date());
     this.log = deps.log ?? ((m) => console.log(m));
@@ -211,7 +213,7 @@ export class Driver {
         const cfg = owners[next++];
         try {
           if (await this.expireDemoWill(cfg)) continue;
-          await this.tickOwner(cfg);
+          await this.serial(cfg.owner, () => this.tickOwner(cfg));
         } catch (e) {
           this.log(`[driver] ${cfg.owner}: ${e instanceof Error ? e.message : String(e)}`);
           if (isRateLimited(e) && !throttled) {
@@ -222,6 +224,31 @@ export class Driver {
       }
     };
     await Promise.all(Array.from({ length: Math.min(this.deps.concurrency ?? 4, owners.length) }, worker));
+  }
+
+  /**
+   * A sign of life just arrived for `owner` (heartbeat, Telegram reply, demo signal): tick that will now
+   * instead of at the next loop, so the snap-back doesn't wait up to a whole tick interval.
+   */
+  poke(owner: string): Promise<void> {
+    const cfg = this.deps.store.get().owners[owner];
+    if (!cfg) return Promise.resolve();
+    return this.serial(owner, () => this.tickOwner(cfg)).catch((e) =>
+      this.log(`[driver] ${owner}: ${e instanceof Error ? e.message : String(e)}`),
+    );
+  }
+
+  private serial(owner: string, run: () => Promise<void>): Promise<void> {
+    const next = (this.ownerRuns.get(owner) ?? Promise.resolve()).then(run);
+    // The chain itself never rejects (the caller gets `next` and handles its error); otherwise a failed
+    // run would surface as an unhandled rejection.
+    const tracked: Promise<void> = next
+      .catch(() => {})
+      .finally(() => {
+        if (this.ownerRuns.get(owner) === tracked) this.ownerRuns.delete(owner);
+      });
+    this.ownerRuns.set(owner, tracked);
+    return next;
   }
 
   /** Resolves once queued executions and withdrawals have finished (tests, shutdown). */

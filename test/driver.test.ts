@@ -357,6 +357,37 @@ describe("demo watch expiry and rate limits", () => {
   });
 });
 
+describe("poke: act on a sign of life at once", () => {
+  it("ticks the poked will right away and records the sign of life", async () => {
+    let heartbeat: Date | null = null;
+    const t = setup({ Quiet: { since: T0 + 30 } }, [adapter("phone_heartbeat", 0.9, () => heartbeat)]);
+    heartbeat = new Date((T0 + 45) * 1000);
+    await t.driver.poke("alice.testnet");
+    expect(t.contract.calls).toEqual([`record_liveness ${T0 + 45}`]);
+    expect(t.contract.w.state).toBe("Active");
+  });
+  it("ignores owners the agent doesn't watch", async () => {
+    const t = setup();
+    await t.driver.poke("stranger.testnet");
+    expect(t.contract.calls).toEqual([]);
+  });
+  it("never runs the same will twice at once (poke during a tick)", async () => {
+    const t = setup();
+    let inside = 0;
+    let maxInside = 0;
+    const slow = t.driver.tickOwner.bind(t.driver);
+    t.driver.tickOwner = async (cfg) => {
+      inside++;
+      maxInside = Math.max(maxInside, inside);
+      await new Promise((r) => setTimeout(r, 30));
+      await slow(cfg);
+      inside--;
+    };
+    await Promise.all([t.driver.tick(), t.driver.poke("alice.testnet"), t.driver.poke("alice.testnet")]);
+    expect(maxInside).toBe(1);
+  });
+});
+
 describe("capacity: parallel ticks and the execution queue", () => {
   function many(n: number, state: WillState, slowMs: number, opts: { concurrency?: number; executionConcurrency?: number } = {}) {
     const store = new Store(null);

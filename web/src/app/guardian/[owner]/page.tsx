@@ -7,7 +7,7 @@ import { Ladder } from "@/components/Ladder";
 import { ActionButton, Card, ErrorNote, Field, inputCls, Pill, NoWill } from "@/components/ui";
 import { TelegramLink } from "@/components/TelegramLink";
 import { SignalList } from "@/components/WillParts";
-import { initialAs, useWill } from "@/lib/hooks";
+import { useActingAs, useWill } from "@/lib/hooks";
 import { call, ROLE_TGAS } from "@/lib/near";
 import { ago, guardianIds, stateName } from "@/lib/will";
 
@@ -60,7 +60,7 @@ function LawyerCard({ owner, lawyer, state, accelerated, refresh }: { owner: str
 export default function GuardianPage() {
   const owner = decodeURIComponent(useParams<{ owner: string }>().owner);
   const { data: will, loaded, refresh } = useWill(owner);
-  const [me, setMe] = useState(initialAs);
+  const [me, setMe] = useActingAs();
   const [evidence, setEvidence] = useState<{ name: string; hash: string } | null>(null);
 
   if (!loaded) return <p>Loading…</p>;
