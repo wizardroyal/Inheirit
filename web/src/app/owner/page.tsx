@@ -5,10 +5,11 @@ import { Suspense, useState } from "react";
 import { ActAs, ImportKey } from "@/components/ActAs";
 import { AgentBadge, AiBadge } from "@/components/Attestation";
 import { Ladder } from "@/components/Ladder";
-import { ActionButton, Card, ErrorNote, Field, inputCls, Pill } from "@/components/ui";
+import { ActionButton, Card, CopyLink, Details, ErrorNote, Field, inputCls, Pill } from "@/components/ui";
 import { QuickSetup, StrengthChecklist } from "@/components/Onboarding";
 import { FundAnywhere, PayoutsPanel } from "@/components/Payouts";
 import { SignsOfLife } from "@/components/SignsOfLife";
+import { Vaults } from "@/components/Vaults";
 import { NotificationLog, Releases, SignalList, WatchStatus } from "@/components/WillParts";
 import { agent, type DraftResult } from "@/lib/agent";
 import { DEMO_SCHEDULE, REAL_SCHEDULE } from "@/lib/config";
@@ -192,7 +193,7 @@ function Dashboard({ will, refresh }: { will: Will; refresh: () => void }) {
       <div className="space-y-6">
         <Card title="Where your will is">
           <WatchStatus owner={owner} will={will} canSign />
-          <Ladder will={will} />
+          <Ladder will={will} compact />
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <ActionButton disabled={s === "Completed"} onClick={() => call(owner, "i_am_alive").then(refresh)}>
               I&apos;m alive
@@ -229,24 +230,32 @@ function Dashboard({ will, refresh }: { will: Will; refresh: () => void }) {
             )}
           </dl>
           {!isArmed(will) && (
-            <p className="mt-2 text-sm text-warn">
-              Not armed yet: {will.guardian_threshold} guardian{will.guardian_threshold > 1 ? "s" : ""} must accept before your will can ever escalate. Send them
-              their link: /guardian/{owner}
-            </p>
+            <div className="mt-2 space-y-1 text-sm text-warn">
+              <p>
+                Not armed yet: {will.guardian_threshold} guardian{will.guardian_threshold > 1 ? "s" : ""} must accept before your will can ever escalate.
+                Send them this link:
+              </p>
+              <CopyLink path={`/guardian/${owner}`} />
+            </div>
           )}
           <p className="mt-2 text-xs text-muted">
             Stages: {schedule(will).map((st) => `${st.pct}% (then wait ${duration(st.wait_after)})`).join(" → ")}; secrets after a further{" "}
-            {duration(will.timings.secrets_buffer)}. Policy hash {will.policy_hash.slice(0, 16)}…
+            {duration(will.timings.secrets_buffer)}.
           </p>
+          <div className="mt-2">
+            <Details summary="Technical details">
+              <div>policy hash {will.policy_hash}</div>
+            </Details>
+          </div>
         </Card>
       </div>
       <div className="space-y-6">
         <StrengthChecklist will={will} />
-        <Card title="NEAR vault">
-          <p className="text-2xl">{formatNear(will.near_balance)} NEAR</p>
-          {active ? <NearVaultActions owner={owner} refresh={refresh} /> : <p className="text-xs text-muted">Deposits and withdrawals are open while the will is at All good.</p>}
-          {will.foreign_chains.length > 0 && (
-            <p className="mt-2 text-xs text-muted">Foreign vaults: {will.foreign_chains.join(", ")} (see the demo panel for addresses and balances).</p>
+        <Vaults owner={owner} will={will}>
+          {active ? (
+            <NearVaultActions owner={owner} refresh={refresh} />
+          ) : (
+            <p className="mt-2 text-xs text-muted">Deposits and withdrawals are open while the will is at All good.</p>
           )}
           {active && will.foreign_chains.length > 0 && <ForeignWithdraw owner={owner} will={will} refresh={refresh} />}
           {will.pending_withdrawals.length > 0 && (
@@ -258,7 +267,7 @@ function Dashboard({ will, refresh }: { will: Will; refresh: () => void }) {
               ))}
             </ul>
           )}
-        </Card>
+        </Vaults>
         <SealedNotes will={will} refresh={refresh} />
         <Card title="Released so far">
           <Releases will={will} />

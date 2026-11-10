@@ -105,7 +105,9 @@ export function explainLiveness(will: WillView, observations: Observation[], now
       details.push(lastSeen());
       break;
     case "WelfareCheck":
-      headline = `Quiet for ${quietFor} and no reply to the checks. Guardians, friends and the lawyer are asked whether they've heard from ${will.owner}.`;
+      const asked = ["guardians", ...(will.contacts.length ? ["friends"] : []), ...(will.lawyer ? ["the lawyer"] : [])];
+      const who = asked.length > 1 ? `${asked.slice(0, -1).join(", ")} and ${asked[asked.length - 1]}` : asked[0];
+      headline = `Quiet for ${quietFor} and no reply to the checks. ${who[0].toUpperCase()}${who.slice(1)} are asked whether they've heard from ${will.owner}.`;
       break;
     case "GuardianVote":
       headline = `Quiet for ${quietFor}. Guardians are asked to confirm, with evidence. One "alive" stops it.`;

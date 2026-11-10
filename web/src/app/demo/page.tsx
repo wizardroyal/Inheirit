@@ -4,8 +4,9 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { AgentBadge } from "@/components/Attestation";
 import { Ladder } from "@/components/Ladder";
-import { ActionButton, Card, Details, ExtLink, Pill, short, SimulatedTag } from "@/components/ui";
+import { ActionButton, Card, ExtLink, Pill, short, SimulatedTag } from "@/components/ui";
 import { SignsOfLife } from "@/components/SignsOfLife";
+import { ProgressLog, Vaults } from "@/components/Vaults";
 import { FundAnywhere, PayoutsPanel } from "@/components/Payouts";
 import { NotificationLog, Releases, SignalList, WatchStatus } from "@/components/WillParts";
 import { agent, type SignalSource } from "@/lib/agent";
@@ -13,7 +14,7 @@ import { CONTRACT_ID, DEMO_SCHEDULE, explorer } from "@/lib/config";
 import { acceptAsGuardians, addSealedNote, createCast, createWill, DEMO_NOTE, demoHeirReceive, demoPolicy, fundFromFaucet } from "@/lib/demo";
 import { useKeys, usePoll, useWill } from "@/lib/hooks";
 import type { Cast } from "@/lib/keys";
-import { call, formatNear, signRequest } from "@/lib/near";
+import { call, signRequest } from "@/lib/near";
 import { ago, stateName, type StateName, type Will } from "@/lib/will";
 
 const SIMULATED: { source: SignalSource; label: string }[] = [
@@ -110,17 +111,6 @@ function CastSummary({ cast }: { cast: Cast }) {
   );
 }
 
-function ProgressLog({ lines }: { lines: string[] }) {
-  if (!lines.length) return null;
-  return (
-    <ul className="mt-3 space-y-0.5 font-mono text-xs text-muted">
-      {lines.map((l, i) => (
-        <li key={i}>{l}</li>
-      ))}
-    </ul>
-  );
-}
-
 function WillPanel({ cast }: { cast: Cast }) {
   const { data: will, loaded, refresh } = useWill(cast.owner);
   const [chains, setChains] = useState<{ Eth: boolean; Btc: boolean }>({ Eth: true, Btc: true });
@@ -209,7 +199,7 @@ function WillPanel({ cast }: { cast: Cast }) {
       <div className="space-y-6">
         <Card title="Where the will is" aside={<Link href={`/owner?as=${cast.owner}`} className="text-sm text-accent underline">owner view</Link>}>
           <WatchStatus owner={cast.owner} will={will} canSign />
-          <Ladder will={will} />
+          <Ladder will={will} compact />
           <div className="mt-3 flex flex-wrap gap-2">
             <ActionButton tone="quiet" disabled={done} onClick={() => call(cast.funder, "advance", { owner: cast.owner }).then(refresh)}>
               Advance now (if due)
@@ -329,62 +319,6 @@ function WillPanel({ cast }: { cast: Cast }) {
         </Card>
       </div>
       </div>
-    </div>
-  );
-}
-
-function Vaults({ owner, will }: { owner: string; will: Will }) {
-  const { data, error } = usePoll(() => agent.vaults(owner), 30_000, [owner]);
-  return (
-    <Card title="Vaults">
-      <ul className="space-y-2 text-sm">
-        <li className="flex justify-between gap-2">
-          <span>NEAR (held by the contract)</span>
-          <span>{formatNear(will.near_balance)} NEAR</span>
-        </li>
-        {will.foreign_chains.map((c) => {
-          const v = data?.[c];
-          const ok = v && "address" in v;
-          return (
-            <li key={c} className="space-y-0.5">
-              <div className="flex justify-between gap-2">
-                <span>{c === "Eth" ? "Sepolia ETH" : "BTC testnet4"}</span>
-                <span>{ok ? (c === "Eth" ? `${(Number(v.balance) / 1e18).toFixed(5)} ETH` : `${v.balance} sats`) : v ? "error" : "…"}</span>
-              </div>
-              {ok && (
-                <div className="text-xs text-muted">
-                  <ExtLink href={c === "Eth" ? explorer.ethAddress(v.address) : explorer.btcAddress(v.address)}>{v.address}</ExtLink>
-                </div>
-              )}
-            </li>
-          );
-        })}
-      </ul>
-      <Details summary="How to fund the Sepolia and BTC vaults">
-        <div className="font-sans">
-          These addresses are derived by NEAR Chain Signatures from the contract account and the path heirloom/&lt;owner&gt;/&lt;chain&gt;. Only the
-          contract can have them signed, and only while the will is executing (or for an owner withdrawal). Send a little Sepolia ETH or testnet4 BTC
-          before execution starts: the demo panel asks the agent&apos;s demo faucet to do this when the will is created, or use any public faucet. An
-          empty vault is simply skipped.
-        </div>
-      </Details>
-      <FaucetButton owner={owner} will={will} />
-      {error && <p className="text-xs text-danger">{error}</p>}
-      {will.foreign_chains.length === 0 && <p className="mt-2 text-xs text-muted">This will has no foreign vaults.</p>}
-    </Card>
-  );
-}
-
-function FaucetButton({ owner, will }: { owner: string; will: Will }) {
-  const { data: info } = usePoll(() => agent.faucetInfo(), 60_000);
-  const [log, setLog] = useState<string[]>([]);
-  if (!info?.enabled || will.foreign_chains.length === 0 || stateName(will.state) !== "Active") return null;
-  return (
-    <div className="mt-3">
-      <ActionButton tone="quiet" onClick={() => fundFromFaucet(owner, (m) => setLog((l) => [...l, m]))}>
-        Fund empty vaults from the demo faucet
-      </ActionButton>
-      <ProgressLog lines={log} />
     </div>
   );
 }

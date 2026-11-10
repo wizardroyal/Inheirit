@@ -70,6 +70,13 @@ describe("explainLiveness", () => {
     const v = explainLiveness(will({ Quiet: { since: nowS - 60 } }, { last_alive_at: nowS - 9 * 86400 }), [], now);
     expect(v.headline).toBe("Quiet for 9 days. Checks started: heartbeat app, email, Telegram, then DMs. Any reply stops it.");
   });
+  it("names only the people a WelfareCheck actually asks", () => {
+    const ws = { WelfareCheck: { since: nowS - 60 } };
+    expect(explainLiveness(will(ws), [], now).headline).toMatch(/Guardians are asked/);
+    expect(explainLiveness(will(ws, { contacts: ["f.testnet"], lawyer: "l.testnet" }), [], now).headline).toMatch(
+      /Guardians, friends and the lawyer are asked/,
+    );
+  });
   it("does not say Alive when an Active will is already overdue (e.g. after an expired vote)", () => {
     const v = explainLiveness(will("Active", { last_alive_at: nowS - 7200 }), [o("near_onchain", 7200, 0.9)], now);
     expect(v.headline).toMatch(/^No sign of life for 2 hours; the checks start again shortly\./);

@@ -290,10 +290,13 @@ export function api(deps: ApiDeps): Hono {
     const out = await cached(`vaults:${owner}`, 15_000, async () => {
       const r: Record<string, unknown> = {};
       for (const v of deps.vaults) {
+        let address: string | undefined;
         try {
-          r[v.chain] = { address: await v.address(owner), balance: (await v.balance(owner)).toString() };
+          address = await v.address(owner);
+          r[v.chain] = { address, balance: (await v.balance(owner)).toString() };
         } catch (e) {
-          r[v.chain] = { error: e instanceof Error ? e.message : String(e) };
+          // The address is derived locally, so it is still worth returning when only the balance lookup failed.
+          r[v.chain] = { ...(address ? { vault: address } : {}), error: e instanceof Error ? e.message : String(e) };
         }
       }
       return r;

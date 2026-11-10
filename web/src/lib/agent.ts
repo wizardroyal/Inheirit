@@ -60,7 +60,8 @@ export type SignalSource =
   | "whatsapp"
   | "linkedin";
 export type Observations = Partial<Record<SignalSource, { at: string; trustWeight: number; simulated: boolean }>>;
-export type VaultInfo = Record<"Eth" | "Btc", { address: string; balance: string } | { error: string }>;
+/** Per foreign vault: address and balance, or an error (with the derived address as `vault` when only the balance lookup failed). */
+export type VaultInfo = Record<"Eth" | "Btc", { address: string; balance: string } | { error: string; vault?: string }>;
 
 export type DraftResult = PolicyDraft;
 

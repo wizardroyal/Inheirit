@@ -1,10 +1,15 @@
 "use client";
+import { useState } from "react";
 import { useNow } from "@/lib/hooks";
 import { duration, isArmed, LADDER, nextStepIn, schedule, stateName, type Will } from "@/lib/will";
 
-/** The escalation ladder with the will's current rung highlighted and the next automatic step. */
-export function Ladder({ will }: { will: Will }) {
+/**
+ * The escalation ladder with the will's current rung highlighted and the next automatic step.
+ * `compact` shows only the current rung (the Signs of life bar already shows the whole ladder) until expanded.
+ */
+export function Ladder({ will, compact = false }: { will: Will; compact?: boolean }) {
   const now = useNow();
+  const [expanded, setExpanded] = useState(!compact);
   const current = stateName(will.state);
   const idx = LADDER.findIndex((r) => r.state === current);
   const next = nextStepIn(will, now);
@@ -15,6 +20,7 @@ export function Ladder({ will }: { will: Will }) {
         {LADDER.map((r, i) => {
           const on = i === idx;
           const past = i < idx;
+          if (!expanded && !on) return null;
           return (
             <li key={r.state} className={`flex gap-3 rounded-lg px-3 py-2 ${on ? "bg-accent-soft" : ""}`}>
               <span
@@ -41,6 +47,11 @@ export function Ladder({ will }: { will: Will }) {
           );
         })}
       </ol>
+      {compact && (
+        <button type="button" className="mt-1 px-3 text-xs text-muted hover:text-ink" onClick={() => setExpanded((e) => !e)}>
+          {expanded ? "Hide the other steps" : `Show all ${LADDER.length} steps`}
+        </button>
+      )}
       {next && (
         <p className="mt-3 text-xs text-muted">
           {next.seconds > 0 ? (

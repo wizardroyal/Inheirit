@@ -1,5 +1,6 @@
 "use client";
 // Pieces shared by the owner, guardian, heir and demo pages.
+import { useState } from "react";
 import { agent, type SignalSource } from "@/lib/agent";
 import { explorer } from "@/lib/config";
 import { useOverview, usePoll } from "@/lib/hooks";
@@ -35,10 +36,14 @@ export function strength(weight: number): { label: "strong" | "medium" | "weak";
 export function SignalList({ owner, will }: { owner: string; will: Will | null }) {
   const { data: overview, error } = useOverview(owner);
   const data = overview?.signals;
+  const [showAll, setShowAll] = useState(false);
+  // Simulated sources that have never fired are folded into one row; real sources and anything seen stay visible.
+  const folded = SOURCES.filter((s) => s.simulated && !data?.observations[s.source]?.at);
+  const shown = showAll ? SOURCES : SOURCES.filter((s) => !folded.includes(s));
   return (
     <div className="space-y-2">
       <ul className="divide-y divide-line text-sm">
-        {SOURCES.map((s) => {
+        {shown.map((s) => {
           const at = data?.observations[s.source]?.at;
           return (
             <li key={s.source} className="flex flex-wrap items-center justify-between gap-2 py-2">
@@ -51,6 +56,13 @@ export function SignalList({ owner, will }: { owner: string; will: Will | null }
             </li>
           );
         })}
+        {folded.length > 0 && (
+          <li className="py-2">
+            <button type="button" className="flex flex-wrap items-center gap-2 text-left text-muted hover:text-ink" onClick={() => setShowAll((v) => !v)}>
+              {showAll ? "Hide" : "Show"} {folded.length} simulated sources with nothing seen <SimulatedTag />
+            </button>
+          </li>
+        )}
       </ul>
       {will && <p className="text-xs text-muted">Last confirmed sign of life on-chain: {ago(will.last_alive_at)}.</p>}
       <p className="text-xs text-muted">

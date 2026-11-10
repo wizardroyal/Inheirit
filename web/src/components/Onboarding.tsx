@@ -133,7 +133,10 @@ export function QuickSetup({
             <div key={i} className="grid gap-2 rounded-lg border border-line p-3 sm:grid-cols-[1fr_1.4fr_5rem_auto]">
               <input className={inputCls} value={h.name} onChange={(e) => setHeir(i, { name: e.target.value })} placeholder="Heir name (Ada)" />
               <input className={inputCls} value={h.account} onChange={(e) => setHeir(i, { account: e.target.value.trim() })} placeholder="NEAR account (ada.testnet)" />
-              <input className={inputCls} value={h.pct} onChange={(e) => setHeir(i, { pct: e.target.value })} aria-label="Share in percent" />
+              <span className="relative">
+                <input className={`${inputCls} w-full pr-7`} inputMode="decimal" value={h.pct} onChange={(e) => setHeir(i, { pct: e.target.value })} aria-label="Share in percent" />
+                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted">%</span>
+              </span>
               {heirs.length > 1 ? (
                 <ActionButton tone="quiet" onClick={async () => setHeirs((hs) => hs.filter((_, j) => j !== i))}>
                   Remove
@@ -260,7 +263,7 @@ export function QuickSetup({
                   progress("Adding your Sepolia address as a sign-of-life source…");
                   await agent.registerOwner(await signRequest(owner, "register_owner", { evm_address: evm }));
                 }
-                progress("Done. Send each guardian their invitation link: /guardian/" + owner);
+                progress("Done. Your dashboard shows the invitation link to send each guardian.");
                 onCreated();
               } finally {
                 onCreating(false);
@@ -293,10 +296,10 @@ export function StrengthChecklist({ will }: { will: Will }) {
   const watching = (status?.watching ?? {}) as { evm?: boolean; github?: boolean | string; evmAddress?: string };
   const accepted = acceptedGuardians(will).length;
   const items: { label: string; done: boolean; required?: boolean; hint?: string }[] = [
-    { label: `Guardians accepted (${accepted} of ${will.guardian_threshold} needed)`, done: isArmed(will), required: true, hint: `Send each guardian /guardian/${owner}` },
+    { label: `Guardians accepted (${accepted} accepted, ${will.guardian_threshold} needed)`, done: isArmed(will), required: true, hint: "Send each guardian the invitation link shown under People" },
     { label: "At least one heir", done: will.heirs.length > 0, required: true },
     { label: "A strong sign-of-life source (your NEAR account)", done: true, required: true },
-    { label: "Heartbeat app used", done: !!signals?.heartbeat, hint: "Open /heartbeat on your phone once" },
+    { label: "Heartbeat app used", done: !!signals?.heartbeat, hint: "Open the heartbeat app (/heartbeat) on your phone once" },
     { label: "Another source (Sepolia address or GitHub)", done: !!(watching.evm || watching.evmAddress || watching.github) },
     { label: "Telegram linked for checks", done: !!tg?.linked },
     { label: "Friends for a welfare check", done: will.contacts.length > 0 },

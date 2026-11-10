@@ -117,6 +117,29 @@ export function short(s: string, n = 10): string {
   return s.length > n * 2 + 1 ? `${s.slice(0, n)}…${s.slice(-6)}` : s;
 }
 
+/** A full link on this site with a copy button, for sending to guardians, contacts or heirs. */
+export function CopyLink({ path }: { path: string }) {
+  const [copied, setCopied] = useState(false);
+  const url = typeof window === "undefined" ? path : `${window.location.origin}${path}`;
+  return (
+    <span className="inline-flex max-w-full flex-wrap items-center gap-2">
+      <code className="break-all rounded bg-bg px-1.5 py-0.5 text-xs">{url}</code>
+      <button
+        type="button"
+        className="rounded border border-line px-2 py-0.5 text-xs hover:bg-accent-soft"
+        onClick={() =>
+          navigator.clipboard.writeText(url).then(
+            () => (setCopied(true), setTimeout(() => setCopied(false), 1500)),
+            () => setCopied(false),
+          )
+        }
+      >
+        {copied ? "Copied" : "Copy"}
+      </button>
+    </span>
+  );
+}
+
 export function ErrorNote({ children }: { children: ReactNode }) {
   return <p className="rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger">{children}</p>;
 }
