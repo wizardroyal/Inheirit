@@ -5,7 +5,7 @@ import { agent, type SignalSource } from "@/lib/agent";
 import { explorer } from "@/lib/config";
 import { useOverview, usePoll } from "@/lib/hooks";
 import { formatNear, signRequest } from "@/lib/near";
-import { ago, schedule, SOURCE_LABELS, type Will } from "@/lib/will";
+import { ago, haltReason, schedule, SOURCE_LABELS, type Will } from "@/lib/will";
 import { ActionButton, ExtLink, Pill, short, SimulatedTag } from "./ui";
 
 /** Every source the agent reads (agent §7.1), with its weight and whether it is SIMULATED. */
@@ -66,10 +66,10 @@ export function SignalList({ owner, will }: { owner: string; will: Will | null }
       </ul>
       {will && <p className="text-xs text-muted">Last confirmed sign of life on-chain: {ago(will.last_alive_at)}.</p>}
       <p className="text-xs text-muted">
-        A strong or medium signal counts on its own. Weak ones (social posts can be scheduled or run by someone else) count only when two different
-        sources agree within 24 h. Only timestamps are read; never content.
+        Strong and medium signals count on their own. Weak ones count only when two different sources agree within 24 hours, because posts can be
+        scheduled or written by someone else. The agent reads only when something happened, never what it said.
       </p>
-      {error && <p className="text-xs text-danger">Agent unreachable: {error}</p>}
+      {error && <p className="text-xs text-danger">Can&apos;t reach the agent right now ({error}). Retrying.</p>}
     </div>
   );
 }
@@ -80,7 +80,7 @@ export function NotificationLog({ owner }: { owner: string }) {
   const items = [...(data ?? [])].reverse().slice(0, 20);
   return (
     <div>
-      {items.length === 0 && <p className="text-sm text-muted">No notifications yet.</p>}
+      {items.length === 0 && <p className="text-sm text-muted">Nothing sent yet. Messages appear here once the will goes quiet.</p>}
       <ul className="space-y-2">
         {items.map((n, i) => (
           <li key={i} className="rounded-lg border border-line px-3 py-2 text-sm">
@@ -95,7 +95,7 @@ export function NotificationLog({ owner }: { owner: string }) {
           </li>
         ))}
       </ul>
-      {error && <p className="text-xs text-danger">Agent unreachable: {error}</p>}
+      {error && <p className="text-xs text-danger">Can&apos;t reach the agent right now ({error}). Retrying.</p>}
     </div>
   );
 }
@@ -116,7 +116,7 @@ export function Releases({ will }: { will: Will }) {
   const round = will.execution_round;
   const recs = will.executions.filter((e) => e.round === round);
   const chains = ["Near", ...will.foreign_chains] as const;
-  if (round === 0) return <p className="text-sm text-muted">Nothing has been released.</p>;
+  if (round === 0) return <p className="text-sm text-muted">Nothing has been released. Nothing moves unless guardians confirm and the challenge period passes.</p>;
   return (
     <div className="space-y-3">
       <table className="w-full text-sm">
@@ -158,10 +158,10 @@ export function Releases({ will }: { will: Will }) {
           ))}
         </tbody>
       </table>
-      <p className="text-xs text-muted">NEAR is paid by the contract itself when each stage starts; Sepolia and BTC are signed by the agent through Chain Signatures.</p>
+      <p className="text-xs text-muted">The contract pays NEAR itself as each stage starts. Sepolia and Bitcoin payments are signed by the agent through Chain Signatures.</p>
       {will.halted.filter((h) => h.round === round).map((h, i) => (
         <p key={i} className="rounded-lg bg-warn-soft px-3 py-2 text-sm text-warn">
-          Halted at stage {h.stage + 1} {ago(h.at)}: {h.reason}. Remaining stages were not released.
+          Stopped at stage {h.stage + 1} {ago(h.at)}: {haltReason(h.reason)}. The remaining stages were not released.
         </p>
       ))}
     </div>
@@ -175,13 +175,13 @@ export function WatchStatus({ owner, will, canSign }: { owner: string; will: Wil
   if (!data || (data.watching && data.has_policy)) return null;
   return (
     <div className="space-y-2 rounded-lg bg-warn-soft px-3 py-2 text-sm text-warn">
-      {!data.watching && <p>The agent isn&apos;t watching this will, so it won&apos;t record signs of life or escalate it.</p>}
+      {!data.watching && <p>The agent isn&apos;t watching this will yet, so it won&apos;t notice signs of life or move the will along.</p>}
       {!data.has_policy && will.foreign_chains.length > 0 && (
-        <p>The agent doesn&apos;t have the approved policy, so it can&apos;t release Sepolia or BTC (it needs the heirs&apos; receive addresses).</p>
+        <p>The agent doesn&apos;t have this will&apos;s payout details (the heirs&apos; Sepolia and Bitcoin addresses), so it can&apos;t release those vaults.</p>
       )}
       {!data.watching && canSign && (
         <ActionButton tone="quiet" onClick={async () => agent.registerOwner(await signRequest(owner, "register_owner", {})).then(refresh)}>
-          Ask the agent to watch (signed by {owner})
+          Ask the agent to watch this will
         </ActionButton>
       )}
     </div>

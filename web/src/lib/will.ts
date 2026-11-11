@@ -92,15 +92,15 @@ export function stateSince(s: WillState): number | null {
 
 /** The escalation ladder, in order, with plain-language names. */
 export const LADDER: { state: StateName; label: string; detail: string }[] = [
-  { state: "Active", label: "All good", detail: "Normal signs of life seen. Nothing is asked of anyone." },
-  { state: "Quiet", label: "Quiet", detail: "No signs of life for a while. The owner gets a gentle nudge." },
-  { state: "WelfareCheck", label: "Welfare check", detail: "Trusted contacts are asked whether they've heard from the owner." },
-  { state: "GuardianVote", label: "Guardian vote", detail: "Guardians are asked to confirm, with evidence. One 'alive' stops it." },
-  { state: "Challenge", label: "Challenge period", detail: "Quorum reached. The owner is told on every channel; any activity cancels." },
-  { state: "Executing", label: "Releasing in stages", detail: "Assets go out in slices, the longest wait after the first. A sign of life halts the rest." },
-  { state: "SecretsBuffer", label: "Waiting before secrets", detail: "Everything is distributed. Sealed notes wait out a buffer; a sign of life still stops them." },
-  { state: "SecretsReleased", label: "Secrets released", detail: "Sealed notes are re-sealed to each heir, who opens them in the browser." },
-  { state: "Completed", label: "Completed", detail: "Everything has been released." },
+  { state: "Active", label: "All good", detail: "Normal signs of life are coming in. Nobody is asked anything." },
+  { state: "Quiet", label: "Quiet", detail: "No sign of life for longer than usual, so the owner is checked on: the heartbeat app, then Telegram." },
+  { state: "WelfareCheck", label: "Welfare check", detail: "Guardians, friends and the lawyer are asked whether they've heard from the owner." },
+  { state: "GuardianVote", label: "Guardian vote", detail: "Guardians are asked whether the owner has passed away. One “they're alive” stops it." },
+  { state: "Challenge", label: "Challenge period", detail: "Enough guardians confirmed. The owner is alerted on every channel; any sign of life cancels." },
+  { state: "Executing", label: "Releasing in stages", detail: "Assets go out in slices, with the longest wait after the first. A sign of life stops the rest." },
+  { state: "SecretsBuffer", label: "Waiting before secrets", detail: "Everything is distributed. Sealed notes wait one last period; a sign of life still stops them." },
+  { state: "SecretsReleased", label: "Secrets released", detail: "Each sealed note is re-sealed to its heir, who opens it in their browser." },
+  { state: "Completed", label: "Completed", detail: "Everything has been handed over." },
 ];
 
 /** Plain-language name of a state, as the ladder shows it. */
@@ -114,25 +114,37 @@ export function nextStepIn(w: Will, nowS: number): { label: string; seconds: num
   switch (s) {
     case "Active":
       if (!isArmed(w)) return null; // an unarmed will never escalates
-      return { label: "goes Quiet", seconds: w.last_alive_at + t.quiet_after - nowS };
+      return { label: "Quiet", seconds: w.last_alive_at + t.quiet_after - nowS };
     case "Quiet":
-      return { label: "welfare check", seconds: since! + t.nudge_period - nowS };
+      return { label: "Welfare check", seconds: since! + t.nudge_period - nowS };
     case "WelfareCheck":
-      return { label: "guardian vote", seconds: since! + t.welfare_period - nowS };
+      return { label: "Guardian vote", seconds: since! + t.welfare_period - nowS };
     case "GuardianVote":
-      return { label: "vote closes", seconds: since! + t.vote_period - nowS };
+      return { label: "the vote closes", seconds: since! + t.vote_period - nowS };
     case "Challenge":
-      return { label: "execution starts", seconds: since! + t.challenge_period - nowS };
+      return { label: "the first slice", seconds: since! + t.challenge_period - nowS };
     case "Executing": {
       const e = (w.state as { Executing: { stage: number; stage_started: number } }).Executing;
       const st = schedule(w);
-      return { label: e.stage + 1 < st.length ? `stage ${e.stage + 2}` : "secrets buffer", seconds: e.stage_started + st[e.stage].wait_after - nowS };
+      return { label: e.stage + 1 < st.length ? `stage ${e.stage + 2} (${st[e.stage + 1].pct}%)` : "waiting before secrets", seconds: e.stage_started + st[e.stage].wait_after - nowS };
     }
     case "SecretsBuffer":
       return { label: "secrets released", seconds: since! + t.secrets_buffer - nowS };
     default:
       return null;
   }
+}
+
+/** Why a release was halted, in words (the contract records a reason code). */
+export function haltReason(code: string): string {
+  return (
+    {
+      owner_alive: "the owner said they're alive",
+      signal_alive: "a new sign of life came in",
+      guardian_alive: "a guardian said the owner is alive",
+      contact_alive: "someone confirmed the owner is fine",
+    }[code] ?? code
+  );
 }
 
 export function duration(seconds: number): string {

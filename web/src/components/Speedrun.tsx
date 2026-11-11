@@ -51,7 +51,7 @@ function steps(w: Will, scenario: Scenario, escalated: boolean): Step[] {
   const voters = acceptedGuardians(w).filter(canSign).slice(0, w.guardian_threshold);
   const silent: Step = {
     label: "Go silent",
-    detail: "Do nothing as the owner for about 2 minutes: your own transactions count as signs of life. The ladder above climbs on its own.",
+    detail: "Do nothing as the owner for about 2 minutes (any transaction you sign counts as a sign of life). The ladder above climbs on its own.",
     done: escalated || s !== "Active",
   };
   if (scenario === "returns") {
@@ -59,12 +59,12 @@ function steps(w: Will, scenario: Scenario, escalated: boolean): Step[] {
       silent,
       {
         label: "Checks go out",
-        detail: "The agent nudges you (heartbeat app, Telegram if linked, email and DMs shown in the log), then asks friends and guardians.",
+        detail: "The agent checks in with you (the heartbeat app, Telegram if linked; email and DMs appear in the log), then asks your friends and guardians.",
         done: escalated && (s === "Active" || reached(w, "WelfareCheck")),
       },
       {
         label: "Send a sign of life",
-        detail: "A signed heartbeat from you, as if you opened the heartbeat app. Watch the ladder snap back to All good. No funds move.",
+        detail: "Send a signed heartbeat, as if you'd opened the heartbeat app. Watch the ladder snap back to All good. Nothing moves.",
         done: escalated && s === "Active",
         action: { label: "I'm here (send a heartbeat)", run: () => signOfLife(owner), enabled: s !== "Active" && s !== "Completed" },
       },
@@ -73,8 +73,8 @@ function steps(w: Will, scenario: Scenario, escalated: boolean): Step[] {
   const out: Step[] = [];
   if (heir) {
     out.push({
-      label: `As ${heir.name}, set up the key for sealed notes`,
-      detail: "Notes are released last, re-sealed to a key only the heir holds. Do this any time before the end.",
+      label: `As ${heir.name}, create the key for sealed notes`,
+      detail: "Notes are released last, re-sealed to a key only the heir holds. Any time before the end is fine.",
       done: !!heir.x25519_pubkey,
       action: canSign(heir.account_id) ? { label: `Create ${heir.name}'s key`, run: () => registerHeirKey(owner, heir.account_id), enabled: !heir.x25519_pubkey } : undefined,
     });
@@ -82,7 +82,7 @@ function steps(w: Will, scenario: Scenario, escalated: boolean): Step[] {
   if (scenario === "late-heir") {
     out.push({
       label: `Don't choose ${heir?.name ?? "the heir"}'s payout yet`,
-      detail: "Released slices will wait for the heir's choice instead of paying out (SIMULATED NEAR Intents on testnet).",
+      detail: "Released slices wait for the heir to choose instead of paying out (NEAR Intents, SIMULATED on testnet).",
       done: reached(w, "Executing"),
     });
   }
@@ -90,7 +90,7 @@ function steps(w: Will, scenario: Scenario, escalated: boolean): Step[] {
   if (scenario === "accelerated" && w.lawyer) {
     out.push({
       label: "As the lawyer, file a death certificate",
-      detail: "SIMULATED evidence (a fingerprint of a demo text). It shortens the remaining waits; it never skips the guardian vote or the challenge period.",
+      detail: "The evidence is SIMULATED (the fingerprint of a demo text). It shortens the remaining waits, but never skips the guardian vote or the challenge period.",
       done: w.accelerated,
       action: canSign(w.lawyer)
         ? { label: "File the death certificate", run: () => fileDeathProof(w.lawyer!, owner), enabled: ["GuardianVote", "Challenge", "Executing"].includes(s) && !w.accelerated, tone: "quiet" }
@@ -98,13 +98,13 @@ function steps(w: Will, scenario: Scenario, escalated: boolean): Step[] {
     });
   }
   out.push({
-    label: `As ${w.guardian_threshold} guardians, confirm the death`,
-    detail: "Guardians must accept their role first (done when the will was generated). Only a quorum can start anything.",
+    label: `As ${w.guardian_threshold} guardians, confirm the passing`,
+    detail: "Only accepted guardians count (they accepted when the will was generated). Nothing can start without enough of them.",
     done: reached(w, "Challenge"),
     action:
       voters.length >= w.guardian_threshold
         ? {
-            label: "Both guardians confirm",
+            label: w.guardian_threshold === 2 ? "Both guardians confirm" : `${w.guardian_threshold} guardians confirm`,
             run: async () => {
               for (const g of voters) if (!w.attestations.some((a) => a.guardian === g)) await attestDeceased(g, owner);
             },
@@ -113,20 +113,20 @@ function steps(w: Will, scenario: Scenario, escalated: boolean): Step[] {
           }
         : undefined,
   });
-  out.push({ label: "Challenge period", detail: "The owner is alerted on every channel. Any sign of life now still cancels everything.", done: reached(w, "Executing") });
+  out.push({ label: "Challenge period", detail: "The owner is alerted on every channel. A sign of life now still cancels everything.", done: reached(w, "Executing") });
   out.push({
     label: scenario === "accelerated" ? "Releasing 10% → 30% → 60%" : "Releasing 10% → 20% → 30% → 40%",
     detail:
       scenario === "late-heir"
         ? `After the second slice, open ${heir?.name ?? "the heir"}'s view and choose how to receive: the waiting slices then pay out together.`
-        : "The longest wait comes right after the first 10%: that's when a living owner notices. NEAR moves for real; Sepolia and BTC too if funded.",
+        : "The longest wait comes right after the first 10%, because that's when a living owner would notice. NEAR moves for real, and so do Sepolia and Bitcoin if their vaults were funded.",
     done: reached(w, "SecretsBuffer"),
     link: scenario === "late-heir" && heir ? { label: `Open ${heir.name}'s view`, href: `/heir/${owner}?as=${heir.account_id}` } : undefined,
   });
-  out.push({ label: "Waiting before secrets", detail: "A last buffer: a sign of life here still stops the notes from ever being released.", done: reached(w, "SecretsReleased") });
+  out.push({ label: "Waiting before secrets", detail: "One last wait: a sign of life here still stops the notes from ever being released.", done: reached(w, "SecretsReleased") });
   out.push({
     label: `As ${heir?.name ?? "the heir"}, open the sealed note`,
-    detail: "Released only now, re-sealed to the heir's own key, and opened in their browser.",
+    detail: "Released only now, re-sealed to the heir's own key, and opened in the heir's browser.",
     done: s === "Completed",
     link: heir ? { label: `Open ${heir.name}'s view`, href: `/heir/${owner}?as=${heir.account_id}` } : undefined,
   });
@@ -184,8 +184,9 @@ export function Speedrun({ will, refresh }: { will: Will; refresh: () => void })
     return (
       <Card title="Set your will in motion" aside={<Pill>speedrun</Pill>}>
         <p className="text-sm text-muted">
-          Watch your own will run, in minutes instead of months. This switches it to demo timings (quiet after 2 minutes, slices a minute or three
-          apart). Testnet only: you can switch back, or start over once it completes.
+          Watch your own will run from start to finish in about 15 minutes instead of months. This switches it to demo timings: it goes quiet
+          after 2 minutes of silence, and slices go out minutes apart. It&apos;s testnet, so nothing is lost: switch back any time, or start over
+          once it completes.
         </p>
         <ScenarioPicker value={scenario} onChange={setScenario} />
         <div className="mt-3">
@@ -197,9 +198,9 @@ export function Speedrun({ will, refresh }: { will: Will; refresh: () => void })
               refresh();
             }}
           >
-            Switch to demo timings and start
+            Start the speedrun
           </ActionButton>
-          {s !== "Active" && <p className="mt-1 text-xs text-muted">Timings can change only while the will is at All good.</p>}
+          {s !== "Active" && <p className="mt-1 text-xs text-muted">Timings can only change while the will is at All good.</p>}
         </div>
       </Card>
     );

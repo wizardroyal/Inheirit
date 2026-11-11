@@ -35,7 +35,7 @@ describe("TelegramBot", () => {
     // The token is single-use: a second chat can't take over the link.
     await t.bot.handle(t.msg(2, 99, `/start ${token}`));
     expect(t.store.get().telegramChats["alice.testnet"].chatId).toBe(42);
-    expect(t.api.sent.at(-1)?.[1]).toMatch(/not valid/);
+    expect(t.api.sent.at(-1)?.[1]).toMatch(/expired or was already used/);
   });
 
   it("refuses to link a group chat (any member's message would count as the owner's)", async () => {

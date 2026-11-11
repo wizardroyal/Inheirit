@@ -25,8 +25,8 @@ export function ActAs({ value, onChange, suggested, label = "Acting as" }: { val
         </select>
       ) : (
         <span>
-          No accounts in this browser yet. <Link href="/demo" className="text-accent underline">Create a demo cast</Link> (free testnet accounts, about
-          20 s) or <Link href="/owner" className="text-accent underline">import a testnet key</Link>.
+          No accounts in this browser yet. <Link href="/owner" className="text-accent underline">Sign in on Your will</Link> (a free demo account
+          takes a few seconds), or <Link href="/demo" className="text-accent underline">create a demo cast</Link>.
         </span>
       )}
     </div>
@@ -41,7 +41,7 @@ export function ImportKey() {
   return (
     <Details summary="Use your own testnet account (import a key)">
       <div className="space-y-2 font-sans">
-        <p>Testnet only. The key stays in this browser&apos;s storage. Never paste a mainnet key.</p>
+        <p>Testnet keys only. The key stays in this browser&apos;s storage. Never paste a mainnet key.</p>
         <input className={`${inputCls} w-full`} placeholder="you.testnet" value={id} onChange={(e) => setId(e.target.value.trim())} />
         <input className={`${inputCls} w-full`} placeholder="ed25519:… secret key" value={secret} onChange={(e) => setSecret(e.target.value.trim())} type="password" />
         <ActionButton
@@ -50,7 +50,7 @@ export function ImportKey() {
             const pk = KeyPair.fromString(secret as KeyPairString).getPublicKey().toString();
             const keyList = await provider.viewAccessKeyList(id);
             const k = keyList.keys.find((x) => x.public_key === pk);
-            if (!k) throw new Error(`That key is not on ${id}`);
+            if (!k) throw new Error(`That key doesn't belong to ${id}`);
             keys.addAccount(id, secret);
             setSecret("");
             setDone(`Added ${id}`);

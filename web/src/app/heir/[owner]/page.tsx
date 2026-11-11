@@ -47,12 +47,12 @@ export default function HeirPage() {
         <p className="max-w-2xl text-muted">
           {started
             ? `${owner}'s will is being carried out. This page walks you through what you receive and any private notes left for you.`
-            : `Nothing has been released. ${owner}'s will is at: ${stateLabel(s)}. You can set up your key now so you're ready.`}
+            : `Nothing has been released. ${owner}'s will is at “${stateLabel(s)}”. You can set up your key now, so you're ready if the time comes.`}
         </p>
       </div>
       <Step n={1} title="Who are you?" done={!!heir}>
         <ActAs value={me} onChange={setMe} suggested={suggested} label="I am" />
-        {me && !heir && <p className="mt-2 text-sm text-danger">{me} is not an heir of this will.</p>}
+        {me && !heir && <p className="mt-2 text-sm text-danger">{me} isn&apos;t an heir of this will.</p>}
         {heir && <p className="mt-2 text-sm">Welcome, {heir.name}.</p>}
       </Step>
       {heir && <KeyStep owner={owner} heir={heir} refresh={refresh} />}
@@ -60,7 +60,7 @@ export default function HeirPage() {
         <Step n={3} title="What you receive">
           <p className="mb-3 text-sm text-muted">
             Assets are released in stages: {schedule(will).map((st) => `${st.pct}%`).join(", ")}, with the longest wait after the first. If {owner} turns
-            out to be alive, the remaining stages stop. Private notes come last: only after everything is distributed and a further wait.
+            out to be alive, the remaining stages stop. Private notes come last, after everything is handed over and one more wait.
           </p>
           <Releases will={will} />
         </Step>
@@ -78,12 +78,12 @@ function PayoutStep({ owner, heir }: { owner: string; heir: string }) {
   return (
     <Step n={4} title="How you'd like to receive it" done={!!mine?.pref}>
       <p className="mb-3 text-sm text-muted">
-        Receive your inheritance in what you actually use: USDC on Base, SOL on Solana, NEAR, and more. Each slice goes on through NEAR Intents to the
-        asset and chain you choose{data?.value_mode === "stable" ? `; ${owner} chose stable value, so it arrives as US dollars (USDC) on that chain` : ""}.
+        Receive your inheritance in what you actually use: USDC on Base, SOL on Solana, NEAR and more. Each slice goes on through NEAR Intents to the
+        asset and chain you choose{data?.value_mode === "stable" ? `. ${owner} chose to pay in dollars, so it arrives as USDC on that chain` : ""}.
         {data?.simulated && (
           <>
             {" "}
-            <IntentsSimTag /> on testnet: NEAR Intents has no testnet, so the swap is simulated with live prices.
+            <IntentsSimTag /> on testnet: NEAR Intents has no testnet, so the swap is simulated, priced with live quotes.
           </>
         )}
       </p>
@@ -105,12 +105,13 @@ function KeyStep({ owner, heir, refresh }: { owner: string; heir: Will["heirs"][
   return (
     <Step n={2} title="Your private key for notes" done={matches}>
       <p className="text-sm text-muted">
-        Notes for you are encrypted to a key that only exists on your device. Create it here; only the public half goes on-chain.
+        Notes left for you are encrypted to a key that exists only on your device. Create it here; only its public half goes on-chain. Download
+        a backup: without it, a new browser can&apos;t open your notes.
       </p>
       {registered && !seed && (
-        <p className="mt-2 text-sm text-warn">A key is registered for you, but this browser doesn&apos;t have it. Restore your backup, or create a new one if no notes were released to you yet.</p>
+        <p className="mt-2 text-sm text-warn">A key is registered for you, but this browser doesn&apos;t have it. Restore your backup, or create a new key if no notes have been released to you yet.</p>
       )}
-      {registered && seed && !matches && localPub && <p className="mt-2 text-sm text-warn">This browser&apos;s key differs from the registered one.</p>}
+      {registered && seed && !matches && localPub && <p className="mt-2 text-sm text-warn">This browser holds a different key from the one registered for you.</p>}
       <div className="mt-3 flex flex-wrap gap-2">
         {!matches && (
           <ActionButton
@@ -171,11 +172,11 @@ function NotesStep({ owner, will, heir }: { owner: string; will: Will; heir: str
   const waiting = will.sealed_notes.filter((n) => n.heir === heir && !(released ?? []).some((r) => r.note_id === n.id));
   return (
     <Step n={5} title="Private notes left for you">
-      {(released ?? []).length === 0 && waiting.length === 0 && <p className="text-sm text-muted">No notes were left for you.</p>}
+      {(released ?? []).length === 0 && waiting.length === 0 && <p className="text-sm text-muted">No private notes were left for you.</p>}
       {waiting.length > 0 && (
         <p className="text-sm text-muted">
-          {waiting.length} sealed note{waiting.length > 1 ? "s" : ""} ({waiting.map((n) => `“${n.label}”`).join(", ")}) will be released to your key last:
-          after everything is distributed and a further wait. The agent opens them inside its TEE and re-seals them to you.
+          {waiting.length} sealed note{waiting.length > 1 ? "s" : ""} ({waiting.map((n) => `“${n.label}”`).join(", ")}) will be released to you last,
+          after everything is handed over and one more wait. The agent opens them inside its secure enclave and re-seals them to your key.
         </p>
       )}
       <ul className="mt-3 space-y-3">
@@ -187,14 +188,14 @@ function NotesStep({ owner, will, heir }: { owner: string; will: Will; heir: str
                 <ActionButton
                   onClick={async () => {
                     const seed = keys.heirSeed(owner, heir);
-                    if (!seed) throw new Error("This browser doesn't have your key. Restore your backup first.");
+                    if (!seed) throw new Error("This browser doesn't have your key. Restore your backup first (step 2).");
                     const text = await openReleased(n.ciphertext, await keypairFromSeedHex(seed)).catch(() => {
-                      throw new Error("This note wasn't sealed to the key in this browser.");
+                      throw new Error("This note was sealed to a different key than the one in this browser.");
                     });
                     setOpened((o) => ({ ...o, [n.note_id]: text }));
                   }}
                 >
-                  Decrypt here
+                  Open the note
                 </ActionButton>
               )}
             </div>
@@ -202,7 +203,7 @@ function NotesStep({ owner, will, heir }: { owner: string; will: Will; heir: str
           </li>
         ))}
       </ul>
-      <p className="mt-3 text-xs text-muted">Decryption happens in this browser. The plaintext is never sent anywhere.</p>
+      <p className="mt-3 text-xs text-muted">Notes are opened in this browser, and what they say is never sent anywhere.</p>
     </Step>
   );
 }
@@ -230,8 +231,8 @@ function GuideChat({ owner, heir }: { owner: string; heir: string }) {
   return (
     <Card title="Questions? Ask the guide" aside={<AiBadge />}>
       <p className="mb-3 text-sm text-muted">
-        Answers come from a private model on NEAR AI Cloud running in a TEE. It sees only your own claim details, never your notes. Never share a seed
-        phrase or password with anyone, including here.
+        Answers come from a private model on NEAR AI Cloud, running in a secure enclave. It sees only your own details, never your notes. Never share a
+        seed phrase or password with anyone, here included. An answer takes about 30 seconds.
       </p>
       <ul className="mb-3 space-y-2">
         {turns.map((t, i) => (
@@ -245,7 +246,7 @@ function GuideChat({ owner, heir }: { owner: string; heir: string }) {
           className={`${inputCls} min-w-0 flex-1`}
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="What happens next? What is a sealed note?"
+          placeholder="What happens next? What's a sealed note?"
           maxLength={1000}
         />
         <ActionButton disabled={!q.trim()} onClick={ask}>

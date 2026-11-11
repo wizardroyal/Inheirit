@@ -15,7 +15,7 @@ import { acceptAsGuardians, addSealedNote, createCast, createWill, DEMO_NOTE, de
 import { useKeys, usePoll, useWill } from "@/lib/hooks";
 import type { Cast } from "@/lib/keys";
 import { call, ROLE_TGAS, signRequest } from "@/lib/near";
-import { ago, stateName, type StateName, type Will } from "@/lib/will";
+import { ago, haltReason, stateName, type StateName, type Will } from "@/lib/will";
 
 const SIMULATED: { source: SignalSource; label: string }[] = [
   { source: "x", label: "X post" },
@@ -40,13 +40,17 @@ export default function DemoPage() {
           <Pill tone="warn">demo tooling</Pill>
         </div>
         <p className="max-w-3xl text-muted">
-          Everything here uses throwaway testnet accounts created in your browser from the public faucet. The clock is compressed: a will goes quiet
-          after {DEMO_SCHEDULE.timings.quiet_after / 60} minutes of silence instead of weeks. Follow Scenario A (silence doesn&apos;t kill you) or Scenario B (it
-          actually executes).
+          A hands-on control panel with throwaway testnet accounts made in your browser from the public faucet. The clock is compressed: a will
+          goes quiet after {DEMO_SCHEDULE.timings.quiet_after / 60} minutes of silence instead of weeks. Follow Scenario A (silence doesn&apos;t kill
+          you) or Scenario B (it really executes) from the README. Prefer a guided tour?{" "}
+          <Link href="/owner" className="text-accent underline">
+            Sign in with a demo account and set your will in motion
+          </Link>
+          .
         </p>
         <div className="flex flex-wrap gap-2 text-sm">
           <Pill>contract {CONTRACT_ID}</Pill>
-          {root ? <Pill tone={root.demoMode ? "accent" : "warn"}>agent online{root.demoMode ? ", demo mode" : ", demo mode OFF"}</Pill> : null}
+          {root ? <Pill tone={root.demoMode ? "accent" : "warn"}>agent online{root.demoMode ? ", demo mode" : ", demo mode off"}</Pill> : null}
           {agentError && <Pill tone="danger">agent unreachable</Pill>}
         </div>
       </div>
@@ -66,7 +70,7 @@ export default function DemoPage() {
             {cast ? "Create another cast" : "Create a demo cast"}
           </ActionButton>
           <span className="max-w-md text-xs text-muted">
-            Creates a funded account from the testnet faucet, then Alice (owner), Bola (heir), three guardians and a friend under it. Takes about 20
+            Makes a funded account from the testnet faucet, then Alice (owner), Bola (heir), three guardians and a friend under it. About 20
             seconds.
           </span>
         </div>
@@ -128,8 +132,9 @@ function WillPanel({ cast }: { cast: Cast }) {
     return (
       <Card title="2 · Write the demo will">
         <p className="text-sm text-muted">
-          Alice leaves everything to Bola, released in four stages (10%, 20%, 30%, 40%) with the longest wait after the first. Two of three guardians must confirm. 1 NEAR goes into the
-          NEAR vault; the Sepolia and BTC vaults are addresses derived by Chain Signatures, which you can fund from a faucet.
+          Alice leaves everything to Bola, released in four stages (10%, 20%, 30%, 40%) with the longest wait after the first. Two of three
+          guardians must confirm. 1 NEAR goes into the NEAR vault; the Sepolia and Bitcoin vaults are addresses derived by Chain Signatures, and
+          the demo faucet funds them.
         </p>
         <div className="mt-3 flex flex-wrap gap-4 text-sm">
           {(["Eth", "Btc"] as const).map((c) => (
@@ -144,7 +149,7 @@ function WillPanel({ cast }: { cast: Cast }) {
           </label>
           <label className="flex items-center gap-2" title="NEAR Intents converts each released slice to USDC on the chain Bola chooses">
             <input type="checkbox" checked={stable} onChange={(e) => setStable(e.target.checked)} />
-            Stable value (slices paid to Bola in USDC)
+            Pay Bola in dollars (USDC, stable value)
           </label>
         </div>
         <div className="mt-3">
@@ -197,7 +202,7 @@ function WillPanel({ cast }: { cast: Cast }) {
       <SignsOfLife owner={cast.owner} will={will} />
       <div className="grid gap-6 lg:grid-cols-[1fr_1.1fr]">
       <div className="space-y-6">
-        <Card title="Where the will is" aside={<Link href={`/owner?as=${cast.owner}`} className="text-sm text-accent underline">owner view</Link>}>
+        <Card title="Where the will stands" aside={<Link href={`/owner?as=${cast.owner}`} className="text-sm text-accent underline">Alice&apos;s own view</Link>}>
           <WatchStatus owner={cast.owner} will={will} canSign />
           <Ladder will={will} compact />
           <div className="mt-3 flex flex-wrap gap-2">
@@ -205,11 +210,11 @@ function WillPanel({ cast }: { cast: Cast }) {
               Advance now (if due)
             </ActionButton>
           </div>
-          <p className="mt-2 text-xs text-muted">The agent advances the will on its own every 15 s. Anyone may call advance; it only moves if the time has passed.</p>
+          <p className="mt-2 text-xs text-muted">The agent moves the will on by itself every 15 seconds. Anyone may press this too; it only moves once the wait is over.</p>
         </Card>
 
         <Card title="Signs of life">
-          <p className="mb-3 text-sm text-muted">Stop everything and the will escalates. Then try to stop it:</p>
+          <p className="mb-3 text-sm text-muted">Do nothing and the will climbs the ladder. Then try to stop it:</p>
           <div className="flex flex-wrap gap-2">
             <ActionButton disabled={done} onClick={async () => agent.heartbeat(await signRequest(cast.owner, "heartbeat"))}>
               Heartbeat (real, signed by Alice)
@@ -227,8 +232,8 @@ function WillPanel({ cast }: { cast: Cast }) {
             ))}
           </div>
           <p className="mt-2 text-xs text-muted">
-            A single X or Instagram post is ignored on purpose (someone else could be running the account). Two weak sources within 24 h, or any
-            strong one, count. The agent checks every 15 s.
+            A single X or Instagram post is ignored on purpose: someone else could be running the account. Two weak sources within 24 hours
+            count, and so does any strong one. The agent checks every 15 seconds.
           </p>
           <div className="mt-4">
             <SignalList owner={cast.owner} will={will} />
@@ -263,7 +268,7 @@ function WillPanel({ cast }: { cast: Cast }) {
             </li>
           </ul>
           <p className="mt-2 text-xs text-muted">
-            Guardians can act only during the vote; the friend only during Quiet or the welfare check. Full pages:{" "}
+            Guardians can only vote during the guardian vote; the friend can only answer during Quiet or the welfare check. Their own pages:{" "}
             <Link className="text-accent underline" href={`/guardian/${cast.owner}`}>guardian</Link>,{" "}
             <Link className="text-accent underline" href={`/heir/${cast.owner}`}>heir</Link>.
           </p>
@@ -276,7 +281,7 @@ function WillPanel({ cast }: { cast: Cast }) {
           <Releases will={will} />
         </Card>
         <Card
-          title="Onward payouts (NEAR Intents)"
+          title="Payouts to heirs (NEAR Intents)"
           aside={
             <Link href={`/heir/${cast.owner}`} className="text-sm text-accent underline">
               Bola chooses here
@@ -298,7 +303,7 @@ function WillPanel({ cast }: { cast: Cast }) {
             </label>
           }
         >
-          {events.length === 0 && <p className="text-sm text-muted">Waiting for changes…</p>}
+          {events.length === 0 && <p className="text-sm text-muted">Nothing has happened since you opened this page.</p>}
           <ul className="space-y-1 text-sm">
             {[...events].reverse().map((e, i) => (
               <li key={i} className="flex gap-3">
@@ -311,10 +316,10 @@ function WillPanel({ cast }: { cast: Cast }) {
             ))}
           </ul>
         </Card>
-        <Card title="Notifications sent by the agent">
+        <Card title="Messages the agent sent">
           <NotificationLog owner={cast.owner} />
         </Card>
-        <Card title="Trust">
+        <Card title="Why you can trust the agent">
           <AgentBadge />
         </Card>
       </div>
@@ -349,7 +354,7 @@ function useEventLog(will: Will | null) {
       out.push({ text: `Stage ${x.stage + 1} sent on ${x.chain === "Near" ? "NEAR" : x.chain === "Eth" ? "Sepolia" : "Bitcoin testnet"} to ${short(x.to, 8)}`, tech: "record_execution" });
     for (const x of will.released_notes.slice(p.released_notes.length))
       out.push({ text: `Sealed note "${x.label}" released to ${short(x.heir, 10)}`, tech: "store_released_note" });
-    for (const x of will.halted.slice(p.halted.length)) out.push({ text: "Remaining stages and secrets halted: the owner is alive", tech: `halt(${x.reason})` });
+    for (const x of will.halted.slice(p.halted.length)) out.push({ text: `Remaining stages and sealed notes stopped: ${haltReason(x.reason)}`, tech: `halt(${x.reason})` });
     if (out.length) {
       const at = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
       setEvents((e) => [...e, ...out.map((o) => ({ at, ...o }))].slice(-100));
@@ -364,22 +369,22 @@ function describeTransition(a: StateName, b: StateName, will: Will): string {
   if (b === "Active") return `Sign of life: back to All good`;
   switch (b) {
     case "Quiet":
-      return `${who} went quiet. Checks sent: heartbeat app, email, Telegram, DMs`;
+      return `${who} went quiet. Checking in: heartbeat app, email, Telegram, DMs`;
     case "WelfareCheck":
-      return "No reply to the checks. Guardians, friends and the lawyer asked";
+      return "No reply to the checks. Guardians, friends and the lawyer are asked";
     case "GuardianVote":
-      return "Guardians asked to vote";
+      return "Nobody has heard from them. Guardians are asked to vote";
     case "Challenge":
-      return "Guardians voted. Challenge period: the owner is told on every channel";
+      return "Guardians confirmed. Challenge period: the owner is alerted on every channel";
     case "Executing": {
       const e = (will.state as { Executing: { stage: number } }).Executing;
       const pct = (will.round_stages[e.stage] ?? { pct: 0 }).pct;
-      return a === "Executing" ? `Will executing: stage ${e.stage + 1} (${pct}%) sent` : `Will executing: ${pct}% sent`;
+      return a === "Executing" ? `Stage ${e.stage + 1} released (${pct}%)` : `The will is being carried out: first ${pct}% released`;
     }
     case "SecretsBuffer":
-      return "Everything distributed. Waiting before releasing secrets";
+      return "Everything handed over. One last wait before the sealed notes";
     case "SecretsReleased":
-      return "Secrets released to heirs";
+      return "Sealed notes released to the heirs";
     case "Completed":
       return "The will has been carried out";
     default:

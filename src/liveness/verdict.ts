@@ -42,10 +42,12 @@ export interface Verdict {
 /** "10 minutes ago", "3 hours ago", "2 days ago". */
 export function since(ms: number): string {
   const s = Math.max(0, Math.round(ms / 1000));
-  if (s < 90) return `${s} seconds ago`;
-  if (s < 90 * 60) return `${Math.round(s / 60)} minutes ago`;
-  if (s < 48 * 3600) return `${Math.round(s / 3600)} hours ago`;
-  return `${Math.round(s / 86400)} days ago`;
+  const unit = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"} ago`;
+  if (s < 10) return "just now";
+  if (s < 90) return unit(s, "second");
+  if (s < 90 * 60) return unit(Math.round(s / 60), "minute");
+  if (s < 48 * 3600) return unit(Math.round(s / 3600), "hour");
+  return unit(Math.round(s / 86400), "day");
 }
 
 function label(o: Pick<Observation, "source" | "simulated">): string {
@@ -83,7 +85,7 @@ export function explainLiveness(will: WillView, observations: Observation[], now
       ? `Last strong signal: ${label(obs[0])} ${since(nowMs - best.at.getTime())}.`
       : `Two independent signals agree: ${obs.map(label).join(" and ")}, ${since(nowMs - best.at.getTime())}.`;
   };
-  const quietFor = since(nowMs - lastAliveMs).replace(" ago", "");
+  const quietFor = since(nowMs - lastAliveMs).replace(" ago", "").replace("just now", "a few seconds");
 
   const state = stateName(will.state);
   let headline: string;
@@ -101,7 +103,7 @@ export function explainLiveness(will: WillView, observations: Observation[], now
       }
       break;
     case "Quiet":
-      headline = `Quiet for ${quietFor}. Checks started: heartbeat app, email, Telegram, then DMs. Any reply stops it.`;
+      headline = `Quiet for ${quietFor}, so we're checking in: the heartbeat app, then email, Telegram and DMs. Any reply stops it.`;
       details.push(lastSeen());
       break;
     case "WelfareCheck":
@@ -110,10 +112,10 @@ export function explainLiveness(will: WillView, observations: Observation[], now
       headline = `Quiet for ${quietFor} and no reply to the checks. ${who[0].toUpperCase()}${who.slice(1)} are asked whether they've heard from ${will.owner}.`;
       break;
     case "GuardianVote":
-      headline = `Quiet for ${quietFor}. Guardians are asked to confirm, with evidence. One "alive" stops it.`;
+      headline = `Quiet for ${quietFor}, and nobody has heard from ${will.owner}. Guardians are being asked whether they have passed away; a single "they're alive" stops it.`;
       break;
     case "Challenge":
-      headline = `Guardians confirmed. Challenge period: ${will.owner} is told on every channel, and any sign of life cancels everything.`;
+      headline = `Guardians have confirmed. This is the challenge period: ${will.owner} is alerted on every channel, and any sign of life cancels everything.`;
       break;
     case "Executing": {
       const s = typeof will.state !== "string" && "Executing" in will.state ? will.state.Executing.stage : 0;
@@ -124,7 +126,7 @@ export function explainLiveness(will: WillView, observations: Observation[], now
       headline = "Everything is distributed. Sealed notes wait out a final buffer; a sign of life still stops them.";
       break;
     case "SecretsReleased":
-      headline = "Sealed notes are being released to each heir.";
+      headline = "Everything is distributed, and the sealed notes are being released to each heir.";
       break;
     default:
       headline = "The will has been carried out.";

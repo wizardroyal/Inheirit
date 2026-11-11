@@ -68,7 +68,7 @@ describe("explainLiveness", () => {
   });
   it("describes Quiet with how long and what happens next", () => {
     const v = explainLiveness(will({ Quiet: { since: nowS - 60 } }, { last_alive_at: nowS - 9 * 86400 }), [], now);
-    expect(v.headline).toBe("Quiet for 9 days. Checks started: heartbeat app, email, Telegram, then DMs. Any reply stops it.");
+    expect(v.headline).toBe("Quiet for 9 days, so we're checking in: the heartbeat app, then email, Telegram and DMs. Any reply stops it.");
   });
   it("names only the people a WelfareCheck actually asks", () => {
     const ws = { WelfareCheck: { since: nowS - 60 } };

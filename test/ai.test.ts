@@ -208,7 +208,7 @@ describe("draftPolicy", () => {
     const bad = { ...GOOD, allocations: [{ asset: "NEAR", shares: { h1: 70, h2: 20 } }] };
     const d = await draftPolicy("alice.testnet", "…", fakeAi(JSON.stringify(bad)), { require: async () => ATTESTED });
     expect(d.ok).toBe(false);
-    expect(d.errors.join()).toMatch(/sum to 90/);
+    expect(d.errors.join()).toMatch(/add up to 90%/);
     expect(d.policy).toBeUndefined();
     expect(d.draft).toEqual(bad);
   });

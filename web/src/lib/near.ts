@@ -49,7 +49,7 @@ export async function balanceOf(id: string): Promise<bigint> {
 
 export function account(accountId: string): Account {
   const secret = keys.secret(accountId);
-  if (!secret) throw new Error(`This browser has no key for ${accountId}`);
+  if (!secret) throw new Error(`This browser can't sign for ${accountId}. Sign in as that account, or restore its key backup.`);
   return new Account(accountId, provider, KeyPairSigner.fromSecretKey(secret as KeyPairString));
 }
 
@@ -103,7 +103,11 @@ function failureMessage(f: unknown): string {
 export function errorText(e: unknown): string {
   const msg = e instanceof Error ? e.message : String(e);
   const m = msg.match(/Smart contract panicked: ([^"\\\n]+)/);
-  return m ? m[1] : msg;
+  if (m) return m[1];
+  if (/failed to fetch|networkerror|load failed/i.test(msg)) return "Couldn't reach the server. Check your connection and try again in a moment.";
+  if (/NotEnoughBalance|LackBalanceForState|not enough balance/i.test(msg)) return "This account doesn't have enough testnet NEAR for that. Use “Get free testnet NEAR” on Your will.";
+  if (/rejected|User closed|cancel/i.test(msg) && /wallet|user|request/i.test(msg)) return "The wallet request was cancelled.";
+  return msg;
 }
 
 export interface SignedRequest {
@@ -122,7 +126,7 @@ export async function signRequest(accountId: string, action: "heartbeat" | "regi
   const message = JSON.stringify({ action, owner: accountId, issued_at: Date.now(), data });
   const nonce = crypto.getRandomValues(new Uint8Array(32));
   if (!secret) {
-    if (walletAccountId() !== accountId) throw new Error(`This browser has no key for ${accountId}`);
+    if (walletAccountId() !== accountId) throw new Error(`This browser can't sign for ${accountId}. Sign in as that account, or restore its key backup.`);
     const w = await walletSignMessage(accountId, message, nonce);
     return { account_id: accountId, public_key: w.publicKey, signature: w.signature, nonce: b64(nonce), message };
   }

@@ -62,6 +62,24 @@ export type Policy = z.infer<typeof PolicySchema>;
 
 export type PolicyCheck = { ok: true; policy: Policy } | { ok: false; errors: string[] };
 
+/** A schema problem in words an owner can act on; unusual paths fall back to the field name. */
+function describeIssue(path: PropertyKey[], message: string): string {
+  const [field, index, sub, leaf] = path;
+  const heir = typeof index === "number" ? `Heir ${index + 1}` : "An heir";
+  if (field === "heirs" && sub === "name") return `${heir} needs a name (up to 64 characters).`;
+  if (field === "heirs" && sub === "near_account") return `${heir} needs a NEAR account.`;
+  if (field === "heirs" && sub === "receive" && leaf === "eth") return `${heir}'s Ethereum address should be 0x followed by 40 hex characters.`;
+  if (field === "heirs" && sub === "receive" && leaf === "btc") return `${heir}'s Bitcoin address should be a Bitcoin testnet address starting with tb1.`;
+  if (field === "heirs" && path.length === 1) return "Add at least one heir (at most 10).";
+  if (field === "guardians" && path.length === 1) return "Add at least one guardian (at most 10).";
+  if (field === "guardian_threshold") return "Say how many guardians must confirm (at least 1).";
+  if (field === "stages_pct") return "Each release stage needs a whole percentage between 1 and 100 (at most 10 stages).";
+  if (field === "contacts") return "Add at most 10 welfare-check friends.";
+  if (field === "display_name") return "Your display name can be up to 64 characters.";
+  if (field === "jurisdiction") return "The jurisdiction can be up to 64 characters.";
+  return `${path.map(String).join(".") || "policy"}: ${message}`;
+}
+
 /**
  * Parses and checks a policy deterministically. Never fixes anything silently: every problem is
  * returned as an error for the owner to resolve (CLAUDE.md §7.6).
@@ -69,55 +87,55 @@ export type PolicyCheck = { ok: true; policy: Policy } | { ok: false; errors: st
 export function checkPolicy(input: unknown): PolicyCheck {
   const parsed = PolicySchema.safeParse(input);
   if (!parsed.success) {
-    return { ok: false, errors: parsed.error.issues.map((i) => `${i.path.join(".") || "policy"}: ${i.message}`) };
+    return { ok: false, errors: parsed.error.issues.map((i) => describeIssue(i.path, i.message)) };
   }
   const p = parsed.data;
   const errors: string[] = [];
   const ids = new Set(p.heirs.map((h) => h.id));
-  if (ids.size !== p.heirs.length) errors.push("heirs: duplicate heir id");
+  if (ids.size !== p.heirs.length) errors.push("Two heirs have the same id.");
   const accounts = new Set(p.heirs.map((h) => h.near_account));
-  if (accounts.size !== p.heirs.length) errors.push("heirs: duplicate near_account");
+  if (accounts.size !== p.heirs.length) errors.push("The same NEAR account is listed for two heirs.");
 
   // Foreign execution records name only the receive address, so two heirs sharing one would be
   // indistinguishable (one would look already paid). Break-it 2026-11-06.
   for (const chain of ["eth", "btc"] as const) {
     const addrs = p.heirs.map((h) => h.receive[chain]?.toLowerCase()).filter(Boolean);
-    if (new Set(addrs).size !== addrs.length) errors.push(`heirs: two heirs share a receive.${chain} address`);
+    if (new Set(addrs).size !== addrs.length) errors.push(`Two heirs have the same ${chain === "eth" ? "Ethereum" : "Bitcoin"} receive address; each heir needs their own.`);
   }
 
   const seenAssets = new Set<Asset>();
   for (const a of p.allocations) {
-    if (seenAssets.has(a.asset)) errors.push(`allocations: ${a.asset} listed twice`);
+    if (seenAssets.has(a.asset)) errors.push(`${a.asset} is shared out twice; list it once.`);
     seenAssets.add(a.asset);
     const sum = Object.values(a.shares).reduce((s, v) => s + v, 0);
-    if (sum !== 100) errors.push(`allocations.${a.asset}: shares sum to ${sum}, not 100`);
+    if (sum !== 100) errors.push(`The ${a.asset} shares add up to ${sum}%, not 100%.`);
     for (const [id, share] of Object.entries(a.shares)) {
       const heir = p.heirs.find((h) => h.id === id);
       if (!heir) {
-        errors.push(`allocations.${a.asset}: unknown heir "${id}"`);
+        errors.push(`Part of the ${a.asset} goes to "${id}", who isn't one of the heirs.`);
         continue;
       }
-      if (share > 0 && a.asset === "ETH" && !heir.receive.eth) errors.push(`heirs.${id}: needs receive.eth for an ETH share`);
-      if (share > 0 && a.asset === "BTC" && !heir.receive.btc) errors.push(`heirs.${id}: needs receive.btc for a BTC share`);
+      if (share > 0 && a.asset === "ETH" && !heir.receive.eth) errors.push(`${heir.name} gets ETH but has no Ethereum address to receive it.`);
+      if (share > 0 && a.asset === "BTC" && !heir.receive.btc) errors.push(`${heir.name} gets BTC but has no Bitcoin address to receive it.`);
     }
   }
-  if (!seenAssets.has("NEAR")) errors.push("allocations: NEAR is required (the contract splits its NEAR vault by these shares)");
+  if (!seenAssets.has("NEAR")) errors.push("Say who gets the NEAR: every will splits its NEAR vault between the heirs.");
   for (const c of p.conditions) {
-    if (!ids.has(c.heir)) errors.push(`conditions: unknown heir "${c.heir}"`);
+    if (!ids.has(c.heir)) errors.push(`A condition names "${c.heir}", who isn't one of the heirs.`);
   }
   // The contract caps heirs × stages at 40 (the accelerated schedule has 3 stages), so every
   // release round's records fit on-chain.
-  if (p.heirs.length * Math.max(p.stages_pct.length, 3) > 40) errors.push(`heirs × stages: ${p.heirs.length} heirs × ${p.stages_pct.length} stages is more than 40 slices; use fewer stages`);
+  if (p.heirs.length * Math.max(p.stages_pct.length, 3) > 40) errors.push(`${p.heirs.length} heirs × ${p.stages_pct.length} stages is more than 40 payments; use fewer stages or fewer heirs.`);
   const stageSum = p.stages_pct.reduce((s, v) => s + v, 0);
-  if (stageSum !== 100) errors.push(`stages_pct: sums to ${stageSum}, not 100`);
-  if (p.guardian_threshold > p.guardians.length) errors.push("guardian_threshold: more than the number of guardians");
-  if (new Set(p.guardians).size !== p.guardians.length) errors.push("guardians: duplicate guardian");
+  if (stageSum !== 100) errors.push(`The release stages add up to ${stageSum}%, not 100%.`);
+  if (p.guardian_threshold > p.guardians.length) errors.push("More guardians must confirm than there are guardians.");
+  if (new Set(p.guardians).size !== p.guardians.length) errors.push("The same guardian is listed twice.");
   for (const g of p.guardians) {
-    if (accounts.has(g)) errors.push(`guardians: ${g} is also an heir`);
-    if (g === p.owner) errors.push("guardians: the owner cannot be a guardian");
+    if (accounts.has(g)) errors.push(`${g} can't be both a guardian and an heir.`);
+    if (g === p.owner) errors.push("You can't be your own guardian.");
   }
-  if (p.lawyer && accounts.has(p.lawyer)) errors.push(`lawyer: ${p.lawyer} is also an heir`);
-  if (p.lawyer && p.lawyer === p.owner) errors.push("lawyer: the owner cannot be the lawyer");
+  if (p.lawyer && accounts.has(p.lawyer)) errors.push(`${p.lawyer} can't be both the lawyer and an heir.`);
+  if (p.lawyer && p.lawyer === p.owner) errors.push("You can't be your own lawyer.");
   return errors.length ? { ok: false, errors } : { ok: true, policy: p };
 }
 

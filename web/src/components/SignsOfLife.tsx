@@ -31,7 +31,7 @@ export function SignsOfLife({ owner, will }: { owner: string; will: Will }) {
     <section className="space-y-4 rounded-2xl border border-line bg-card p-5" aria-label="Signs of life">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="font-serif text-xl">Signs of life</h2>
-        {!isArmed(will) && <Pill tone="warn">not armed: guardians haven&apos;t accepted</Pill>}
+        {!isArmed(will) && <Pill tone="warn">not armed yet: guardians haven&apos;t accepted</Pill>}
       </div>
 
       {/* The ladder as a progress bar */}
@@ -56,10 +56,10 @@ export function SignsOfLife({ owner, will }: { owner: string; will: Will }) {
             <span className="text-muted">
               {next.seconds > 0 ? (
                 <>
-                  next: {next.label} in <span className="font-medium tabular-nums text-ink">{duration(next.seconds)}</span>
+                  Next: {next.label} in <span className="font-medium tabular-nums text-ink">{duration(next.seconds)}</span>
                 </>
               ) : (
-                <>next: {next.label}, due now</>
+                <>Next: {next.label}, due now</>
               )}
             </span>
           )}
@@ -77,8 +77,8 @@ export function SignsOfLife({ owner, will }: { owner: string; will: Will }) {
           {/* The agent's verdict can trail the chain by a poll; at the snap-back, say what just happened. */}
           <p className="font-medium">{snapped > 0
               ? movedThisRound
-                ? "Sign of life recorded on-chain. The remaining stages and the secrets are halted; what was already sent stays sent."
-                : "Sign of life recorded on-chain. Everything is cancelled; nothing moved."
+                ? "Sign of life recorded. The remaining stages and the sealed notes are stopped; what was already sent stays sent."
+                : "Sign of life recorded. Everything is cancelled, and nothing moved."
               : data.verdict.headline}</p>
           {data.verdict.details.map((d) => (
             <p key={d} className="mt-1 text-sm text-muted">
@@ -113,7 +113,7 @@ export function SignsOfLife({ owner, will }: { owner: string; will: Will }) {
       {/* Privacy strip */}
       <div className="flex flex-wrap items-center gap-3 border-t border-line pt-3 text-xs text-muted">
         <span>
-          <span className="font-medium text-ink">What the agent saw: timestamps only.</span> It runs in a TEE and never reads or stores content.
+          <span className="font-medium text-ink">What the agent saw: timestamps only.</span> It runs in a sealed enclave (TEE) and never reads or stores what you wrote or posted.
         </span>
         <AgentBadge />
         <AiBadge />

@@ -52,7 +52,7 @@ export class HttpTelegramApi implements TelegramApi {
 
 const LINK_TTL_MS = 15 * 60_000;
 
-export const CHECK_TEXT = "We haven't seen activity from you for a while. Reply anything (or open the heartbeat app) and nothing else happens.";
+export const CHECK_TEXT = "Just checking in: we haven't seen any activity from you for a while. Reply with anything (or open the heartbeat app) and that's it, nothing else happens.";
 
 export class TelegramBot {
   private readonly now: () => Date;
@@ -100,7 +100,7 @@ export class TelegramBot {
     const text = msg.text ?? "";
     // Only one-to-one chats: in a group, any member's message would count as the owner's sign of life.
     if (msg.chat.type && msg.chat.type !== "private") {
-      if (/^\/start\b/.test(text)) await this.api.sendMessage(chatId, "Please link from a private chat with me, not a group.");
+      if (/^\/start\b/.test(text)) await this.api.sendMessage(chatId, "Please link me from a private chat, not a group: in a group, anyone's message would count as yours.");
       return;
     }
     const accounts = Object.entries(this.store.get().telegramChats)
@@ -111,7 +111,7 @@ export class TelegramBot {
     if (start) {
       const link = start[1] ? this.store.get().telegramLinks[start[1]] : undefined;
       if (!link || Date.parse(link.expiresAt) < this.now().getTime()) {
-        await this.api.sendMessage(chatId, "This link is not valid any more. Open Inheirit and choose \"Link Telegram\" again.");
+        await this.api.sendMessage(chatId, "This link has expired or was already used. In Inheirit, choose \"Link Telegram\" again for a new one.");
         return;
       }
       const linkedAt = this.now().toISOString();
@@ -122,7 +122,7 @@ export class TelegramBot {
       this.log(`[telegram] linked for ${link.account}`);
       await this.api.sendMessage(
         chatId,
-        `Linked to ${link.account}. If you go quiet for longer than usual, I'll message you here; any reply means you're fine and nothing else happens.`,
+        `Linked to ${link.account}. If you go quiet for longer than usual, I'll check in here. Any reply tells me you're fine, and nothing else happens. Send /unlink to stop.`,
       );
       return;
     }
@@ -130,11 +130,11 @@ export class TelegramBot {
       this.store.update((s) => {
         for (const a of accounts) delete s.telegramChats[a];
       });
-      await this.api.sendMessage(chatId, "Unlinked. You won't get messages here any more.");
+      await this.api.sendMessage(chatId, "Unlinked. I won't message you here any more.");
       return;
     }
     if (!accounts.length) {
-      await this.api.sendMessage(chatId, "This chat isn't linked to a will. Open Inheirit and choose \"Link Telegram\".");
+      await this.api.sendMessage(chatId, "This chat isn't linked to anyone's will. In Inheirit, choose \"Link Telegram\" to link it.");
       return;
     }
     // A reply from a linked chat is a sign of life for each account it is linked to. Only the time is kept.
@@ -144,7 +144,7 @@ export class TelegramBot {
     });
     this.log(`[telegram] reply received for ${accounts.join(", ")}`);
     this.onReply?.(accounts);
-    await this.api.sendMessage(chatId, "Thanks, noted. Nothing else happens.");
+    await this.api.sendMessage(chatId, "Thanks, got it: that counts as a sign that you're fine. Nothing else happens.");
   }
 
   /** One long-poll round; returns how many updates were handled. */

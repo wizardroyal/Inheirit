@@ -83,9 +83,9 @@ export function QuickSetup({
     ...(stable ? { payout_value_mode: "stable" } : {}),
   });
   const errors = [
-    ...(name.trim() ? [] : ["Your display name is required"]),
-    ...(guardianList.length < 2 ? ["Choose at least two guardians"] : []),
-    ...badAccounts.map((a) => `${a} is not a valid NEAR account id`),
+    ...(name.trim() ? [] : ["Add your display name."]),
+    ...(guardianList.length < 2 ? ["Choose at least two guardians."] : []),
+    ...badAccounts.map((a) => `“${a}” isn't a valid NEAR account name.`),
     ...(check.ok ? [] : check.errors),
   ];
   const policy = check.ok && !errors.length ? (check.policy as Policy) : null;
@@ -101,33 +101,33 @@ export function QuickSetup({
           <Field label="Display name" hint="How heirs and guardians will see you. Required.">
             <input className={inputCls} value={name} onChange={(e) => setName(e.target.value)} placeholder="Alice" />
           </Field>
-          <Field label="Jurisdiction (optional)" hint="For a future lawyer letter. Nothing else is asked: no date of birth, nationality or photo.">
+          <Field label="Country or state (optional)" hint="For a future letter to your lawyer. That's all we ask: no date of birth, nationality or photo.">
             <input className={inputCls} value={jurisdiction} onChange={(e) => setJurisdiction(e.target.value)} placeholder="Nigeria" />
           </Field>
         </div>
       </Card>
 
-      <Card title="1 · Signs of life" aside={<Pill tone="accent">your NEAR account is always watched</Pill>}>
+      <Card title="1 · Signs of life" aside={<Pill tone="accent">your NEAR account always counts</Pill>}>
         <p className="text-sm text-muted">
-          You never need to check in. The agent watches normal activity and only reaches out if you go quiet for longer than usual. A strong source
-          is already on: every transaction you sign with <b>{owner}</b>.
+          You never need to check in. The agent notices normal activity and only reaches out if you go quiet for longer than usual. One strong
+          source is already on: every transaction you sign with <b>{owner}</b>.
         </p>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          <Field label="A personal Sepolia address (optional)" hint="Not a vault. Your outgoing transactions count as signs of life.">
+          <Field label="Your own Sepolia address (optional)" hint="Not a vault. Transactions you send from it count as signs of life.">
             <input className={inputCls} value={evm} onChange={(e) => setEvm(e.target.value.trim())} placeholder="0x…" />
           </Field>
           <div className="text-sm">
             <p className="font-medium">Heartbeat app</p>
             <p className="text-muted">
-              Open <a className="text-accent underline" href="/heartbeat">/heartbeat</a> on your phone and add it to your home screen. Opening it is a
-              strong sign of life.
+              Open <a className="text-accent underline" href="/heartbeat">the heartbeat app</a> on your phone and add it to your home screen. Just
+              opening it is a strong sign of life.
             </p>
           </div>
         </div>
       </Card>
 
       <Card title="2 · The people">
-        <p className="mb-3 text-sm text-muted">Heirs receive in stages. Guardians must accept the invitation; until enough have, the will can never start.</p>
+        <p className="mb-3 text-sm text-muted">Heirs receive in stages. Guardians must accept your invitation, and until enough have, nothing can ever start.</p>
         <div className="space-y-3">
           {heirs.map((h, i) => (
             <div key={i} className="grid gap-2 rounded-lg border border-line p-3 sm:grid-cols-[1fr_1.4fr_5rem_auto]">
@@ -156,20 +156,20 @@ export function QuickSetup({
             <ActionButton tone="quiet" onClick={async () => setHeirs((hs) => [...hs, { name: "", account: "", pct: "0", eth: "", btc: "" }])}>
               Add an heir
             </ActionButton>
-            <span className={pctTotal === 100 ? "text-muted" : "text-danger"}>shares total {pctTotal}%</span>
+            <span className={pctTotal === 100 ? "text-muted" : "text-danger"}>shares add up to {pctTotal}%</span>
           </div>
         </div>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          <Field label="Guardians" hint="At least two NEAR accounts, comma-separated. Not heirs.">
+          <Field label="Guardians" hint="At least two NEAR accounts, separated by commas. Heirs can't be guardians.">
             <input className={inputCls} value={guardians} onChange={(e) => setGuardians(e.target.value)} placeholder="g1.testnet, g2.testnet, g3.testnet" />
           </Field>
           <Field label="How many must confirm">
             <input className={inputCls} value={threshold} onChange={(e) => setThreshold(e.target.value)} />
           </Field>
-          <Field label="Lawyer (optional)" hint="Can speed up release with a death certificate; never skips the waiting periods.">
+          <Field label="Lawyer (optional)" hint="Can speed up the release with a death certificate, but never skips the challenge period.">
             <input className={inputCls} value={lawyer} onChange={(e) => setLawyer(e.target.value.trim())} placeholder="lawyer.testnet" />
           </Field>
-          <Field label="Friends for a welfare check (optional)" hint="NEAR accounts, comma-separated. They can only delay, never start.">
+          <Field label="Friends for a welfare check (optional)" hint="NEAR accounts, separated by commas. They can only stop things, never start them.">
             <input className={inputCls} value={contacts} onChange={(e) => setContacts(e.target.value)} placeholder="friend.testnet" />
           </Field>
         </div>
@@ -190,9 +190,9 @@ export function QuickSetup({
         <label className="mt-3 flex items-start gap-2 text-sm">
           <input type="checkbox" className="mt-1" checked={stable} onChange={(e) => setStable(e.target.checked)} />
           <span>
-            <b>Stable value for heirs</b> (NEAR Intents): your will releases in stages over months. This converts each slice to US dollars (USDC) as
-            it&apos;s released, on whatever chain each heir chooses, so heirs aren&apos;t exposed to price swings, and selling gradually avoids selling
-            everything at once. <SimulatedTag /> on testnet.
+            <b>Pay heirs in dollars</b> (stable value, via NEAR Intents). Your will releases over months; this converts each slice to US dollars
+            (USDC) as it&apos;s released, on whatever chain each heir chooses, so price swings along the way don&apos;t eat into what they get.{" "}
+            <SimulatedTag /> on testnet.
           </span>
         </label>
         <div className="mt-3 max-w-xs">
@@ -215,7 +215,7 @@ export function QuickSetup({
               );
             })}
           </ul>
-          <p className="mt-1 text-xs text-muted">Released 10% → 20% → 30% → 40%, the longest wait after the first slice. Fund the ETH/BTC vaults after creating the will.</p>
+          <p className="mt-1 text-xs text-muted">Released 10% → 20% → 30% → 40%, with the longest wait after the first slice. You fund the ETH and BTC vaults after the will is created.</p>
         </div>
         <label className="mt-3 flex items-center gap-2 text-sm">
           <input type="checkbox" checked={demoClock} onChange={(e) => setDemoClock(e.target.checked)} />
@@ -224,7 +224,7 @@ export function QuickSetup({
         <div className="mt-2">{summary(STANDARD_PCT, demoClock)}</div>
       </Card>
 
-      <Card title="Check and create">
+      <Card title="Check and approve">
         {errors.length > 0 ? (
           <ul className="list-disc space-y-1 pl-5 text-sm text-danger">
             {errors.map((e) => (
@@ -260,10 +260,10 @@ export function QuickSetup({
                   progress,
                 );
                 if (evm) {
-                  progress("Adding your Sepolia address as a sign-of-life source…");
+                  progress("Adding your Sepolia address as a sign of life…");
                   await agent.registerOwner(await signRequest(owner, "register_owner", { evm_address: evm }));
                 }
-                progress("Done. Your dashboard shows the invitation link to send each guardian.");
+                progress("Done. Your dashboard has the invitation link to send each guardian.");
                 onCreated();
               } finally {
                 onCreating(false);
@@ -296,16 +296,16 @@ export function StrengthChecklist({ will }: { will: Will }) {
   const watching = (status?.watching ?? {}) as { evm?: boolean; github?: boolean | string; evmAddress?: string };
   const accepted = acceptedGuardians(will).length;
   const items: { label: string; done: boolean; required?: boolean; hint?: string }[] = [
-    { label: `Guardians accepted (${accepted} accepted, ${will.guardian_threshold} needed)`, done: isArmed(will), required: true, hint: "Send each guardian the invitation link shown under People" },
+    { label: `Guardians accepted (${accepted} of the ${will.guardian_threshold} needed)`, done: isArmed(will), required: true, hint: "Send each guardian the invitation link shown under People" },
     { label: "At least one heir", done: will.heirs.length > 0, required: true },
     { label: "A strong sign-of-life source (your NEAR account)", done: true, required: true },
-    { label: "Heartbeat app used", done: !!signals?.heartbeat, hint: "Open the heartbeat app (/heartbeat) on your phone once" },
+    { label: "Heartbeat app opened once", done: !!signals?.heartbeat, hint: "Open the heartbeat app on your phone and add it to your home screen" },
     { label: "Another source (Sepolia address or GitHub)", done: !!(watching.evm || watching.evmAddress || watching.github) },
     { label: "Telegram linked for checks", done: !!tg?.linked },
     { label: "Friends for a welfare check", done: will.contacts.length > 0 },
-    { label: "A lawyer (can speed up release with a death certificate)", done: !!will.lawyer },
-    { label: "Final secrets sealed (optional)", done: will.sealed_notes.length > 0, hint: "Add a sealed note below" },
-    { label: "Heirs hidden until execution", done: will.heirs_hidden },
+    { label: "A lawyer (can speed up the release with a death certificate)", done: !!will.lawyer },
+    { label: "A sealed note for an heir (optional)", done: will.sealed_notes.length > 0, hint: "Add one under Sealed notes" },
+    { label: "Heirs kept private until the release starts", done: will.heirs_hidden },
     { label: "NEAR vault funded", done: BigInt(will.near_balance) > 0n },
   ];
   const optional = items.filter((i) => !i.required);
@@ -332,7 +332,7 @@ export function StrengthChecklist({ will }: { will: Will }) {
           <TelegramLink account={owner} purpose="Link Telegram so the agent can check in there first if you go quiet." />
         </div>
       )}
-      {!armed && <ErrorNote>Not armed: until {will.guardian_threshold} guardians accept, nothing can ever start.</ErrorNote>}
+      {!armed && <ErrorNote>Not armed yet: until {will.guardian_threshold} guardians accept, nothing can ever start.</ErrorNote>}
     </Card>
   );
 }

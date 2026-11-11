@@ -37,28 +37,28 @@ describe("checkPolicy", () => {
     expect(checkPolicy(base()).ok).toBe(true);
   });
   it("rejects shares not summing to 100", () => {
-    expect(errorsOf((p) => (p.allocations[0].shares.h2 = 10))).toContain("allocations.NEAR: shares sum to 90, not 100");
+    expect(errorsOf((p) => (p.allocations[0].shares.h2 = 10))).toContain("The NEAR shares add up to 90%, not 100%.");
   });
   it("rejects an unknown heir in allocations", () => {
-    expect(errorsOf((p) => (p.allocations[1].shares = { h9: 100 }))).toContain('allocations.ETH: unknown heir "h9"');
+    expect(errorsOf((p) => (p.allocations[1].shares = { h9: 100 }))).toEqual(["Part of the ETH goes to \"h9\", who isn't one of the heirs."]);
   });
   it("rejects two heirs sharing a receive address (records couldn't tell them apart)", () => {
-    expect(errorsOf((p) => (p.heirs[1].receive.eth = p.heirs[0].receive.eth!.toUpperCase().replace("0X", "0x")))).toContain("heirs: two heirs share a receive.eth address");
+    expect(errorsOf((p) => (p.heirs[1].receive.eth = p.heirs[0].receive.eth!.toUpperCase().replace("0X", "0x")))).toContain("Two heirs have the same Ethereum receive address; each heir needs their own.");
   });
   it("requires a receive address for a foreign-chain share", () => {
-    expect(errorsOf((p) => (p.allocations[2].shares = { h2: 100 }))).toContain("heirs.h2: needs receive.btc for a BTC share");
+    expect(errorsOf((p) => (p.allocations[2].shares = { h2: 100 }))).toContain("Charity Fund gets BTC but has no Bitcoin address to receive it.");
   });
   it("rejects stages not summing to 100", () => {
-    expect(errorsOf((p) => (p.stages_pct = [10, 30]))).toContain("stages_pct: sums to 40, not 100");
+    expect(errorsOf((p) => (p.stages_pct = [10, 30]))).toContain("The release stages add up to 40%, not 100%.");
   });
   it("requires a NEAR allocation", () => {
-    expect(errorsOf((p) => p.allocations.shift())[0]).toMatch(/NEAR is required/);
+    expect(errorsOf((p) => p.allocations.shift())[0]).toMatch(/Say who gets the NEAR/);
   });
   it("rejects a guardian who is also an heir", () => {
-    expect(errorsOf((p) => (p.guardians[0] = "bola.testnet"))).toContain("guardians: bola.testnet is also an heir");
+    expect(errorsOf((p) => (p.guardians[0] = "bola.testnet"))).toContain("bola.testnet can't be both a guardian and an heir.");
   });
   it("rejects mainnet BTC addresses", () => {
-    expect(errorsOf((p) => (p.heirs[0].receive.btc = "bc1qjzz0h4l7j3m9x7w6y8ezlmdslr7zfy75zqj7zg")).join()).toMatch(/BTC testnet/);
+    expect(errorsOf((p) => (p.heirs[0].receive.btc = "bc1qjzz0h4l7j3m9x7w6y8ezlmdslr7zfy75zqj7zg")).join()).toMatch(/Bitcoin testnet address/);
   });
   it("reports schema errors instead of throwing", () => {
     expect(errorsOf((p) => (p.version = 2)).length).toBeGreaterThan(0);

@@ -34,7 +34,7 @@ export function Ladder({ will, compact = false }: { will: Will; compact?: boolea
                   {on && r.state === "Executing" && (
                     <span className="ml-2 text-xs text-muted">
                       stage {(will.state as { Executing: { stage: number } }).Executing.stage + 1} of {schedule(will).length}
-                      {will.accelerated && " (accelerated after a death proof)"}
+                      {will.accelerated && " (faster schedule after a death certificate)"}
                     </span>
                   )}
                   {on && r.state === "Active" && !isArmed(will) && (
@@ -57,10 +57,10 @@ export function Ladder({ will, compact = false }: { will: Will; compact?: boolea
           {next.seconds > 0 ? (
             <>
               Next: {next.label} in about <span className="font-medium text-ink">{duration(next.seconds)}</span>
-              {current === "GuardianVote" && " (only if guardians don't reach the threshold first)"}
+              {current === "GuardianVote" && ", unless enough guardians confirm before then. If they don't, the will goes back to All good"}
             </>
           ) : (
-            <>Next: {next.label} — due now; the agent or anyone can call advance.</>
+            <>Next: {next.label}, due now. The agent moves it on within seconds.</>
           )}
         </p>
       )}

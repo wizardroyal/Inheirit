@@ -42,7 +42,7 @@ export function Vaults({ owner, will, children }: { owner: string; will: Will; c
               <div className="flex justify-between gap-2">
                 <span>{c === "Eth" ? "Sepolia ETH" : "BTC testnet4"}</span>
                 <span title={stale ? "Last known balance; the latest lookup failed and will be retried" : undefined}>
-                  {ok ? (c === "Eth" ? `${(Number(v.balance) / 1e18).toFixed(5)} ETH` : `${v.balance} sats`) : v ? "checking again shortly" : "…"}
+                  {ok ? (c === "Eth" ? `${(Number(v.balance) / 1e18).toFixed(5)} ETH` : `${v.balance} sats`) : v ? "balance unavailable, retrying" : "…"}
                   {stale && <span className="text-muted"> (last known)</span>}
                 </span>
               </div>
@@ -61,15 +61,15 @@ export function Vaults({ owner, will, children }: { owner: string; will: Will; c
           <Details summary="How to fund the Sepolia and BTC vaults">
             <div className="font-sans">
               These addresses are derived by NEAR Chain Signatures from the contract account and the path heirloom/&lt;owner&gt;/&lt;chain&gt;. Only the
-              contract can have them signed, and only while the will is executing (or for an owner withdrawal). Send a little Sepolia ETH or testnet4
-              BTC before execution starts, from any public faucet or with the demo faucet button below. An empty vault is simply skipped.
+              contract can get them signed, and only while the will is being carried out (or for a withdrawal you asked for). Send a little Sepolia
+              ETH or testnet4 BTC before the release starts, from any public faucet or with the demo faucet button below. An empty vault is skipped.
             </div>
           </Details>
         </div>
       )}
       <FaucetButton owner={owner} will={will} />
       {error && <p className="text-xs text-danger">{error}</p>}
-      {will.foreign_chains.length === 0 && <p className="mt-2 text-xs text-muted">This will has no Sepolia or Bitcoin vault.</p>}
+      {will.foreign_chains.length === 0 && <p className="mt-2 text-xs text-muted">This will holds NEAR only: no Sepolia or Bitcoin vault.</p>}
     </Card>
   );
 }

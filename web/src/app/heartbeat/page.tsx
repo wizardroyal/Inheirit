@@ -19,7 +19,7 @@ export default function HeartbeatPage() {
     setBusy(true);
     try {
       const r = await agent.heartbeat(await signRequest(who, "heartbeat"));
-      setStatus({ ok: true, text: `Got it. Signed ping recorded at ${new Date(r.at).toLocaleTimeString()}.` });
+      setStatus({ ok: true, text: `Got it, thanks. Recorded at ${new Date(r.at).toLocaleTimeString()}.` });
     } catch (e) {
       setStatus({ ok: false, text: errorText(e) });
     } finally {
@@ -50,8 +50,8 @@ export default function HeartbeatPage() {
   return (
     <div className="mx-auto flex max-w-md flex-col items-center gap-6 py-6 text-center">
       <h1 className="font-serif text-3xl">Heartbeat</h1>
-      <p className="text-muted">Opening this app is enough. It tells your will agent you&apos;re here with a message signed by your key.</p>
-      <ActAs value={owner} onChange={choose} suggested={casts.map((c) => c.owner)} label="Owner" />
+      <p className="text-muted">Just opening this app is enough: it tells your will&apos;s agent you&apos;re here, signed with your key.</p>
+      <ActAs value={owner} onChange={choose} suggested={casts.map((c) => c.owner)} label="Your account" />
       <button
         type="button"
         disabled={!owner || busy}
@@ -62,8 +62,8 @@ export default function HeartbeatPage() {
       </button>
       {status && <p className={status.ok ? "text-accent" : "text-danger"}>{status.text}</p>}
       <p className="text-xs text-muted">
-        A heartbeat counts as a strong sign of life. It is signed with a key on your NEAR account (NEP-413) and checked by the agent against the chain.
-        Add this page to your home screen to install it.
+        A heartbeat is a strong sign of life: it&apos;s signed with a key on your NEAR account (NEP-413), and the agent checks that key on-chain. Add
+        this page to your home screen to install it.
       </p>
     </div>
   );

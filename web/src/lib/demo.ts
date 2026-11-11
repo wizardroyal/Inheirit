@@ -110,9 +110,9 @@ export async function createWill(owner: string, o: CreateWillOptions, progress: 
     },
     ...(deposit ? [{ methodName: "deposit_near", deposit }] : []),
   ]);
-  progress("Giving the agent the approved policy…");
+  progress("Giving the agent the approved will (it needs the heirs' receive addresses)…");
   await agent.submitPolicy(owner, o.policy);
-  progress("Asking the agent to watch for signs of life (signed by the owner)…");
+  progress("Asking the agent to start watching for signs of life…");
   await agent.registerOwner(await signRequest(owner, "register_owner", {}));
 }
 
@@ -134,7 +134,7 @@ export async function generateWillAndCast(
   o: { schedule: SchedulePreset; foreignChains: ("Eth" | "Btc")[]; depositNear: string; stable?: boolean },
   progress: Progress,
 ): Promise<Cast> {
-  progress("Creating your cast: Ada (heir), three guardians, a friend and a lawyer…");
+  progress("Creating the people in your will: Ada (heir), three guardians, a friend and a lawyer…");
   // A wallet won't add full-access keys to new subaccounts, so a wallet owner's cast is made by the
   // onboarding route instead; an owner whose key is in this browser makes its own subaccounts.
   const [heir, g1, g2, g3, contact, lawyer] = !keys.secret(owner)
@@ -180,8 +180,8 @@ export async function generateWillAndCast(
   progress("Sealing a note for Ada (released last)…");
   await addSealedNote(owner, heir, DEMO_NOTE.label, DEMO_NOTE.text);
   if (o.foreignChains.length) {
-    progress("Asking the demo faucet for a little Sepolia ETH / testnet BTC (while the pool lasts)…");
-    await fundFromFaucet(owner, progress).catch((e) => progress(`Faucet unavailable: ${e instanceof Error ? e.message : e}. Those vaults stay empty; NEAR still runs for real.`));
+    progress("Asking the demo faucet for a little Sepolia ETH and testnet BTC (while the pool lasts)…");
+    await fundFromFaucet(owner, progress).catch((e) => progress(`The faucet couldn't help (${e instanceof Error ? e.message : e}). Those vaults stay empty; NEAR still moves for real.`));
   }
   return cast;
 }
@@ -189,7 +189,7 @@ export async function generateWillAndCast(
 /** Seals a note in this browser to the agent's TEE key; only ciphertext goes on-chain. */
 export async function addSealedNote(owner: string, heir: string, label: string, text: string): Promise<void> {
   const key = await view<AgentKey | null>("get_agent_pubkey");
-  if (!key) throw new Error("The agent hasn't published its sealed-notes key on this contract yet");
+  if (!key) throw new Error("The agent hasn't published its sealed-notes key yet, so notes can't be sealed. Try again in a minute.");
   const ciphertext = await sealToBase64(text, key.x25519_pubkey);
   await call(owner, "add_sealed_note", { heir, label, ciphertext }, nearToYocto("0.05"));
 }
@@ -198,5 +198,5 @@ export async function addSealedNote(owner: string, heir: string, label: string, 
 export async function fundFromFaucet(owner: string, progress: Progress): Promise<void> {
   const r = await agent.faucet(await signRequest(owner, "demo_faucet", {}));
   for (const s of r.sends) progress(`Faucet sent ${s.chain === "Eth" ? `${Number(s.amount) / 1e18} Sepolia ETH` : `${s.amount} testnet sats`} to the ${s.chain} vault (tx ${s.txHash.slice(0, 12)}…)`);
-  for (const e of r.errors) progress(`Faucet error: ${e}`);
+  for (const e of r.errors) progress(`The faucet couldn't fund a vault: ${e}`);
 }

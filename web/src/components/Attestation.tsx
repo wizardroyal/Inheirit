@@ -44,9 +44,9 @@ export function AgentBadge() {
   return (
     <div className="space-y-2 text-sm">
       <div className="flex flex-wrap gap-2">
-        {tee ? <Pill tone="accent">Agent runs in a TEE (Intel TDX)</Pill> : <Pill tone="warn">LOCAL DEV agent — no TEE</Pill>}
-        {valid.length > 0 ? <Pill tone="accent">{valid.length} attested agent registered</Pill> : <Pill tone="danger">no valid agent registered</Pill>}
-        {keyMatches ? <Pill tone="accent">sealed-notes key matches the contract</Pill> : <Pill tone="warn">sealed-notes key not confirmed</Pill>}
+        {tee ? <Pill tone="accent">Agent runs in a secure enclave (Intel TDX)</Pill> : <Pill tone="warn">local development agent, no enclave</Pill>}
+        {valid.length > 0 ? <Pill tone="accent">attested agent registered on-chain</Pill> : <Pill tone="danger">no attested agent registered</Pill>}
+        {keyMatches ? <Pill tone="accent">sealed-notes key matches the contract</Pill> : <Pill tone="warn">sealed-notes key not confirmed yet</Pill>}
       </div>
       <Details summary="Technical details">
         <div>
@@ -66,8 +66,8 @@ export function AgentBadge() {
         )}
         {info && <div>agent reports: tee={String(info.sealedNotes.tee)} enabled={String(info.sealedNotes.enabled)}</div>}
         <div className="pt-1 font-sans">
-          Phala&apos;s centralized KMS means the Phala account holder could ship new code that gets the same key; every compose hash we deploy is
-          published and shown here. See the threat model.
+          A caveat: with Phala&apos;s centralized key service, whoever controls our Phala account could ship new code that receives the same key.
+          That&apos;s why every version we deploy is published, and the approved ones are listed above. See the threat model.
         </div>
       </Details>
     </div>
@@ -81,7 +81,7 @@ export function AiBadge() {
   const checks = [...(data.gateway?.checks ?? []), ...data.models.flatMap((m) => m.checks)];
   return (
     <div className="space-y-2 text-sm">
-      {data.ok ? <Pill tone="accent">Verified private inference ({data.model})</Pill> : <Pill tone="danger">NEAR AI attestation failed</Pill>}
+      {data.ok ? <Pill tone="accent">Private AI verified ({data.model})</Pill> : <Pill tone="danger">NEAR AI attestation failed</Pill>}
       <Details summary={`${checks.filter((c) => c.ok).length}/${checks.length} checks passed · ${new Date(data.checkedAt).toLocaleTimeString()}`}>
         {checks.map((c, i) => (
           <div key={i}>

@@ -4,6 +4,7 @@
 //  3. notify the right people when the will enters a new state;
 //  4. hand Executing wills to the executor (on its own queue, so signing never blocks other wills);
 //  5. release sealed notes to heirs once the will reaches SecretsReleased (secrets last, §5.5).
+import { config } from "../config";
 import { type Observation, scoreAlive } from "../liveness/score";
 import {
   acceptedGuardians,
@@ -140,9 +141,20 @@ export interface Message {
   body: string;
 }
 
+/** "3 days", "5 hours", "2 minutes": how long until something happens, for messages. */
+export function inWords(seconds: number): string {
+  const s = Math.max(0, Math.round(seconds));
+  const unit = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
+  if (s >= 2 * 86400) return unit(Math.round(s / 86400), "day");
+  if (s >= 2 * 3600) return unit(Math.round(s / 3600), "hour");
+  if (s >= 120) return unit(Math.round(s / 60), "minute");
+  return unit(s, "second");
+}
+
 /** Who to tell, and what, when a will enters `state` (§7.3). Quiet is handled by the checks. */
 export function notificationsFor(state: StateName, will: WillView, cfg: OwnerSignalConfig, contacts: string[]): Message[] {
   const owner = will.owner;
+  const web = config.webUrl();
   const toOwner = [owner, ...(cfg.email ? [cfg.email] : [])];
   const msg = (to: string[], subject: string, body: string): Message[] => (to.length ? [{ event: state, to, subject, body }] : []);
   switch (state) {
@@ -151,38 +163,39 @@ export function notificationsFor(state: StateName, will: WillView, cfg: OwnerSig
       return msg(
         [...acceptedGuardians(will), ...contacts, ...(will.lawyer ? [will.lawyer] : [])],
         `Have you heard from ${owner} recently?`,
-        `If they're fine, confirm it here: /contact/${owner}`,
+        `${owner} has been quiet for a while and hasn't answered our check-ins. If you've heard from them, tell us they're fine and nothing else happens: ${web}/contact/${owner}`,
       );
     case "GuardianVote":
       return msg(
         acceptedGuardians(will),
-        `Guardian vote for ${owner}`,
-        `${owner} has been silent and didn't answer a welfare check. Attest only with evidence: /guardian/${owner}`,
+        `${owner}: your answer is needed as a guardian`,
+        `${owner} has been silent, and nobody in the welfare check has heard from them. Please tell us what you know. Confirm their passing only if you're sure; if you think they're alive, say so and the process stops: ${web}/guardian/${owner}`,
       );
-    case "Challenge": {
-      const hours = Math.round(will.timings.challenge_period / 3600);
+    case "Challenge":
       return msg(
         toOwner,
-        "Your will executes soon",
-        `Guardians attested. Your will starts executing in ${hours >= 1 ? `${hours} h` : `${will.timings.challenge_period} s`}. Any activity cancels it.`,
+        `Your will starts releasing in ${inWords(will.timings.challenge_period)}`,
+        `Your guardians have confirmed your passing. If that's wrong, do anything at all: reply here, open the heartbeat app, or sign any NEAR transaction, and everything is cancelled. Otherwise the first slice is released in ${inWords(will.timings.challenge_period)}.`,
       );
-    }
     case "Executing":
       return msg(
         will.heirs.map((h) => h.account_id),
-        `${owner}'s will is being executed`,
-        `Assets are being released to you in stages. Your claim page: /heir/${owner}`,
+        `${owner}'s will is being carried out`,
+        `Your inheritance is being released in stages. See what you receive, and choose how you'd like to be paid: ${web}/heir/${owner}`,
       );
     case "SecretsReleased":
       return msg(
         will.heirs.map((h) => h.account_id),
-        `Sealed notes from ${owner} are ready`,
-        `Distribution is complete. Notes left for you can now be opened on your claim page: /heir/${owner}`,
+        `${owner} left you a private note`,
+        `Everything has been distributed, and the notes ${owner} left for you can now be opened: ${web}/heir/${owner}`,
       );
     default:
       return [];
   }
 }
+
+/** Minimum gap between two immediate ticks of the same will triggered by signs of life. */
+export const POKE_GAP_MS = 5_000;
 
 /** Events whose Telegram message goes out every time, even during the same silence. */
 const REPEATABLE_ON_TELEGRAM = new Set(["Challenge", "Executing", "SecretsReleased"]);
@@ -196,6 +209,8 @@ export class Driver {
   private readonly execution: KeyedQueue;
   /** Per-owner chain: a poke and the loop's tick never run the same will at once. */
   private readonly ownerRuns = new Map<string, Promise<void>>();
+  private readonly pokes = new Map<string, Promise<void>>();
+  private readonly lastPoke = new Map<string, number>();
   constructor(private readonly deps: DriverDeps) {
     this.now = deps.now ?? (() => new Date());
     this.log = deps.log ?? ((m) => console.log(m));
@@ -231,11 +246,27 @@ export class Driver {
    * instead of at the next loop, so the snap-back doesn't wait up to a whole tick interval.
    */
   poke(owner: string): Promise<void> {
-    const cfg = this.deps.store.get().owners[owner];
-    if (!cfg) return Promise.resolve();
-    return this.serial(owner, () => this.tickOwner(cfg)).catch((e) =>
-      this.log(`[driver] ${owner}: ${e instanceof Error ? e.message : String(e)}`),
-    );
+    if (!this.deps.store.get().owners[owner]) return Promise.resolve();
+    // At most one poke waits per owner, and pokes start at least POKE_GAP_MS apart: a flood of signed
+    // heartbeats can't turn into a flood of RPC calls (break-it pass 2, F3).
+    const pending = this.pokes.get(owner);
+    if (pending) return pending;
+    const wait = Math.max(0, (this.lastPoke.get(owner) ?? 0) + POKE_GAP_MS - this.now().getTime());
+    const run = (wait ? new Promise((r) => setTimeout(r, wait)) : Promise.resolve())
+      .then(() =>
+        this.serial(owner, () => {
+          this.pokes.delete(owner);
+          this.lastPoke.set(owner, this.now().getTime());
+          const cfg = this.deps.store.get().owners[owner];
+          return cfg ? this.tickOwner(cfg) : Promise.resolve();
+        }),
+      )
+      .catch((e) => this.log(`[driver] ${owner}: ${e instanceof Error ? e.message : String(e)}`))
+      .finally(() => {
+        if (this.pokes.get(owner) === run) this.pokes.delete(owner);
+      });
+    this.pokes.set(owner, run);
+    return run;
   }
 
   private serial(owner: string, run: () => Promise<void>): Promise<void> {
@@ -263,6 +294,9 @@ export class Driver {
     if (this.now().getTime() - Date.parse(cfg.watchedSince) < ttl) return false;
     const will = await this.deps.contract.getWill(cfg.owner);
     if (will && !isSpeedrun(will)) return false;
+    // Never mid-execution, and not in GuardianVote or Challenge either: from there anyone's `advance` can
+    // start a release, which then needs the agent (break-it pass 2, F6).
+    if (will && ["GuardianVote", "Challenge"].includes(stateName(will.state))) return false;
     if (will && executionStarted(will.state) && stateName(will.state) !== "Completed") return false;
     this.deps.store.update((s) => {
       delete s.owners[cfg.owner];
@@ -386,10 +420,10 @@ export class Driver {
       const check = (subject: string, body = CHECK_TEXT): Message => ({ event: "check", to: [owner], subject, body });
       if (step === "heartbeat") this.record(owner, check("Check: heartbeat app"), ["ui", "heartbeat app"]);
       else if (step === "email" && cfg.email)
-        this.record(owner, { ...check("Check: email"), to: [cfg.email], body: `${CHECK_TEXT} (Email delivery isn't set up in this build; shown in the app instead.)` }, ["ui"]);
+        this.record(owner, { ...check("Check: email"), to: [cfg.email], body: `${CHECK_TEXT} (Email isn't sent in this build; the check is shown here instead.)` }, ["ui"]);
       else if (step === "telegram" && this.deps.telegram?.isLinked(owner)) {
         if (!this.firstTelegramThisSilence(owner, "check", will.last_alive_at)) {
-          this.record(owner, check("Check: Telegram (not resent: already asked during this silence)"), ["ui"]);
+          this.record(owner, check("Check: Telegram (not sent again: already asked during this silence)"), ["ui"]);
           continue;
         }
         try {
