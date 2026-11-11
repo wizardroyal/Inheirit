@@ -56,7 +56,7 @@ export async function signInWithGoogle(idToken: string, key: GoogleKey): Promise
   const { accountId, existed } = await create({ kind: "google", idToken }, key.kp);
   if (existed && !keys.secret(accountId)) {
     throw new Error(
-      `Your Google account already has the testnet account ${accountId}, created in another browser. Restore it there from the key backup file (we never keep your key).`,
+      "Your Google account is already set up in another browser. Open Inheirit there: its key lives only in that browser, and we never keep a copy.",
     );
   }
   return accountId;

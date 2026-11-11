@@ -2,8 +2,8 @@
 // Sign-in (CLAUDE.md §13A.1): a NEAR testnet wallet, Google (an app-created testnet account whose key
 // stays in this browser), or a demo account with no sign-in at all.
 import { useEffect, useRef, useState } from "react";
-import { createDemoAccount, googleKey, onboardInfo, restoreKeyBackup, signInWithGoogle, type OnboardInfo } from "@/lib/onboard";
-import { ensureName } from "@/lib/names";
+import { createDemoAccount, googleKey, onboardInfo, signInWithGoogle, type OnboardInfo } from "@/lib/onboard";
+import { ensureName, rememberOwner } from "@/lib/names";
 import { connectWallet } from "@/lib/wallet";
 import { ActionButton, Card, ErrorNote } from "./ui";
 
@@ -66,9 +66,10 @@ function GoogleButton({ clientId, onAccount, onError }: { clientId: string; onAc
 }
 
 export function SignIn({ onSignedIn: signedIn }: { onSignedIn: (accountId: string) => void }) {
-  // Everyone who signs in gets a random three-word username, changeable later.
+  // Everyone who signs in gets a random three-word username, and is remembered as an owner in this browser.
   const onSignedIn = (id: string) => {
     ensureName(id);
+    rememberOwner(id);
     signedIn(id);
   };
   const [info, setInfo] = useState<OnboardInfo | null>(null);
@@ -78,50 +79,31 @@ export function SignIn({ onSignedIn: signedIn }: { onSignedIn: (accountId: strin
   }, []);
   return (
     <Card title="Sign in">
-      <div className="grid gap-5 sm:grid-cols-3">
-        <div className="space-y-2">
+      <div className="grid gap-6 sm:grid-cols-3">
+        <div className="space-y-3">
           <p className="font-medium">NEAR wallet</p>
-          <p className="text-xs text-muted">MyNearWallet, Meteor or Intear, on testnet. You confirm every action in your wallet.</p>
           <ActionButton onClick={async () => onSignedIn(await connectWallet())}>Connect a wallet</ActionButton>
         </div>
-        <div className="space-y-2">
+        <div className="space-y-3">
           <p className="font-medium">Google</p>
-          <p className="text-xs text-muted">
-            We create a free testnet account for you. Its key is made and kept in this browser, so download a backup afterwards. Your email never
-            goes on-chain.
-          </p>
           {info?.enabled && info.googleClientId ? (
             <GoogleButton clientId={info.googleClientId} onAccount={onSignedIn} onError={setError} />
           ) : (
-            <p className="text-xs text-muted">{info ? "Not available on this deployment." : "…"}</p>
+            <p className="text-sm text-muted">{info ? "Not available here." : "…"}</p>
           )}
         </div>
-        <div className="space-y-2">
+        <div className="space-y-3">
           <p className="font-medium">No sign-in</p>
-          <p className="text-xs text-muted">A fresh, funded testnet account in this browser. The quickest way to try everything.</p>
           <ActionButton tone="quiet" disabled={info !== null && !info.enabled} onClick={async () => onSignedIn(await createDemoAccount())}>
             Try with a demo account
           </ActionButton>
         </div>
       </div>
-      <label className="mt-4 block text-xs text-muted">
-        Have a key backup from another browser?{" "}
-        <input
-          type="file"
-          accept="application/json"
-          className="text-xs"
-          onChange={(e) => {
-            const f = e.target.files?.[0];
-            if (f) restoreKeyBackup(f).then(onSignedIn, (err) => setError(err instanceof Error ? err.message : String(err)));
-          }}
-        />
-      </label>
       {error && (
-        <div className="mt-3">
+        <div className="mt-4">
           <ErrorNote>{error}</ErrorNote>
         </div>
       )}
-      <p className="mt-3 text-xs text-muted">Testnet only: nothing you do here touches real money.</p>
     </Card>
   );
 }

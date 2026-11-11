@@ -45,12 +45,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         </header>
         <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">{children}</main>
         <footer className="border-t border-line">
-          <div className="border-b border-line px-4 py-2 text-center text-xs text-muted">
-            Built at NEAR HACKATHON. The will runs on NEAR testnet, so trying it costs nothing. The Shade Agent Framework is experimental.
-          </div>
           <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-6 text-sm text-muted">
             <span>
-              <span className="font-serif text-ink">Inheirit</span> · a will that doesn&apos;t make you prove you&apos;re alive
+              <span className="font-serif text-ink">Inheirit</span> · built at NEAR HACKATHON · runs on NEAR testnet, so trying it costs nothing
             </span>
             <span className="flex gap-5">
               <a href={REPO_URL} target="_blank" rel="noreferrer" className="hover:text-ink">

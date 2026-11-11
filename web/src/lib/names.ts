@@ -45,6 +45,35 @@ export function ensureName(account: string): string {
   return m[account];
 }
 
+const OWNERS = "inheirit:owners";
+
+/** Remembers an account someone signed in as here, so "Continue as" lists owners, not the test people they made. */
+export function rememberOwner(account: string): void {
+  try {
+    const list: string[] = JSON.parse(window.localStorage.getItem(OWNERS) ?? "[]");
+    if (!list.includes(account)) window.localStorage.setItem(OWNERS, JSON.stringify([...list, account]));
+  } catch {
+    // storage blocked
+  }
+  window.dispatchEvent(new Event(EVENT));
+}
+
+/** Accounts signed in as in this browser (newest last). */
+export function useOwners(): string[] {
+  const raw = useSyncExternalStore(
+    subscribe,
+    () => {
+      try {
+        return window.localStorage.getItem(OWNERS) ?? "[]";
+      } catch {
+        return "[]";
+      }
+    },
+    () => "[]",
+  );
+  return JSON.parse(raw) as string[];
+}
+
 /** The account's username in this browser, if it has one (outside React). */
 export function nameOf(account: string): string | undefined {
   return load()[account];

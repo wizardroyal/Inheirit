@@ -1,9 +1,8 @@
 "use client";
-import { ensureName, humanize, useAccountLabel, useNames } from "@/lib/names";
+import { accountLabel, ensureName, humanize, rememberOwner, useAccountLabel, useNames, useOwners } from "@/lib/names";
 import { summarizePolicy, type Policy } from "@agent/policy/policy";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
-import { ActAs } from "@/components/ActAs";
 import { AgentBadge, AiBadge } from "@/components/Attestation";
 import { Ladder } from "@/components/Ladder";
 import { ActionButton, Card, CopyLink, Details, ErrorNote, Field, inputCls, Pill } from "@/components/ui";
@@ -19,8 +18,7 @@ import { DEMO_SCHEDULE, REAL_SCHEDULE } from "@/lib/config";
 import { stagesFor, summarize } from "@agent/policy/schedule";
 import { addSealedNote, createWill, generateWillAndCast } from "@/lib/demo";
 import { useKeys, usePoll, useWill } from "@/lib/hooks";
-import { keys } from "@/lib/keys";
-import { downloadKeyBackup, topUpAccount } from "@/lib/onboard";
+import { topUpAccount } from "@/lib/onboard";
 import { disconnectWallet, walletAccountId } from "@/lib/wallet";
 import { balanceOf, call, formatNear, nearToYocto, signRequest } from "@/lib/near";
 import { ago, duration, isArmed, schedule, stateName, type Will } from "@/lib/will";
@@ -44,22 +42,44 @@ function Owner() {
   const showSignIn = signingIn || !owner;
   // Accounts signed in before usernames existed get one now, so no ".testnet" id is ever shown.
   useEffect(() => {
-    if (owner) ensureName(owner);
+    if (owner) {
+      ensureName(owner);
+      rememberOwner(owner);
+    }
   }, [owner]);
+  const names = useNames();
+  const remembered = useOwners();
+  // Your own sign-ins in this browser (not the test people a will created). Accounts from before this list
+  // existed are recognised by their three-word username.
+  const mine = accounts.filter((a) => remembered.includes(a) || /^([A-Z][a-z]+){3}$/.test(names[a] ?? "") || casts.some((c) => c.owner === a));
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3">
         <h1 className="font-serif text-4xl sm:text-5xl">Your will</h1>
-        {accounts.length > 0 && (
-          <div className={`flex flex-wrap items-center gap-3 ${owner ? "" : "order-last"}`}>
-            <ActAs
-              value={owner}
-              onChange={setOwner}
-              suggested={casts.map((c) => c.owner)}
-              label={owner ? "Acting as" : "Or continue as an account in this browser"}
-            />
-            {owner && <AccountActions owner={owner} onSignIn={() => setSigningIn(true)} onSignedOut={() => setOwner("")} />}
+        {owner && !signingIn && (
+          <div className="flex flex-wrap items-center gap-3 text-sm">
+            <span className="text-muted">Signed in as</span>
+            <span className="font-medium">{accountLabel(owner, names)}</span>
+            <AccountActions owner={owner} onSignIn={() => setSigningIn(true)} onSignedOut={() => setOwner("")} />
+          </div>
+        )}
+        {showSignIn && mine.length > 0 && (
+          <div className="order-last flex flex-wrap items-center gap-2 text-sm">
+            <span className="text-muted">Welcome back:</span>
+            {mine.map((a) => (
+              <button
+                key={a}
+                type="button"
+                className="rounded-full border border-line bg-card px-3 py-1 hover:bg-accent-soft"
+                onClick={() => {
+                  setOwner(a);
+                  setSigningIn(false);
+                }}
+              >
+                {accountLabel(a, names)}
+              </button>
+            ))}
           </div>
         )}
         {showSignIn && (
@@ -95,18 +115,12 @@ function LowBalance({ owner }: { owner: string }) {
   );
 }
 
-/** Key backup for accounts whose key lives in this browser; sign-out for a wallet; another sign-in. */
+/** Sign-out for a wallet; another sign-in. */
 function AccountActions({ owner, onSignIn, onSignedOut }: { owner: string; onSignIn: () => void; onSignedOut: () => void }) {
   useKeys(); // re-render when the wallet or the key store changes
-  const local = !!owner && !!keys.secret(owner);
   const wallet = !!owner && walletAccountId() === owner;
   return (
     <div className="flex flex-wrap items-center gap-3 text-xs">
-      {local && (
-        <button type="button" className="text-accent underline" onClick={() => downloadKeyBackup(owner)}>
-          Download key backup
-        </button>
-      )}
       {wallet && (
         <button type="button" className="text-accent underline" onClick={() => disconnectWallet().then(onSignedOut)}>
           Disconnect wallet
