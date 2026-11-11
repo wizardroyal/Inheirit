@@ -1,5 +1,5 @@
 "use client";
-import { accountLabel, ensureName, humanize, rememberOwner, useAccountLabel, useNames, useOwners } from "@/lib/names";
+import { accountLabel, ensureName, humanize, rememberOwner, useAccountLabel, useNames } from "@/lib/names";
 import { summarizePolicy, type Policy } from "@agent/policy/policy";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
@@ -17,7 +17,7 @@ import { agent, type DraftResult } from "@/lib/agent";
 import { DEMO_SCHEDULE, REAL_SCHEDULE } from "@/lib/config";
 import { stagesFor, summarize } from "@agent/policy/schedule";
 import { addSealedNote, createWill, generateWillAndCast } from "@/lib/demo";
-import { useKeys, usePoll, useWill } from "@/lib/hooks";
+import { useKeys, useMyAccounts, usePoll, useWill } from "@/lib/hooks";
 import { topUpAccount } from "@/lib/onboard";
 import { disconnectWallet, walletAccountId } from "@/lib/wallet";
 import { balanceOf, call, formatNear, nearToYocto, signRequest } from "@/lib/near";
@@ -33,7 +33,6 @@ export default function OwnerPage() {
 
 function Owner() {
   const params = useSearchParams();
-  const { accounts, casts } = useKeys();
   const [owner, setOwner] = useState(params.get("as") ?? "");
   const [signingIn, setSigningIn] = useState(false);
   const { data: will, loaded, refresh } = useWill(owner || null);
@@ -48,10 +47,7 @@ function Owner() {
     }
   }, [owner]);
   const names = useNames();
-  const remembered = useOwners();
-  // Your own sign-ins in this browser (not the test people a will created). Accounts from before this list
-  // existed are recognised by their three-word username.
-  const mine = accounts.filter((a) => remembered.includes(a) || /^([A-Z][a-z]+){3}$/.test(names[a] ?? "") || casts.some((c) => c.owner === a));
+  const mine = useMyAccounts();
 
   return (
     <div className="space-y-6">

@@ -1,7 +1,7 @@
 "use client";
 // Demo tooling (CLAUDE.md §8 /demo): a throwaway cast of testnet accounts created in this browser,
 // and a pre-seeded will with the compressed demo clock. Clearly demo-only.
-import { nameAccounts, nameOf, randomPeople } from "./names";
+import { nameAccounts, nameOf, randomPeople, rememberOwner } from "./names";
 import { checkPolicy, nearShareBps, policyHash, type Policy } from "@agent/policy/policy";
 import { agent } from "./agent";
 import { stagesFor, type SchedulePreset } from "@agent/policy/schedule";
@@ -40,10 +40,14 @@ export async function createCast(progress: Progress): Promise<Cast> {
     progress(`Creating ${name}.${funder}…`);
     return createSubaccount(funder, name, near);
   };
-  const owner = await sub("alice", "0.9");
-  const heir = await sub("bola", "0.08");
+  const owner = await sub("owner", "0.9");
+  const heir = await sub("heir", "0.08");
   const guardians = [await sub("g1", "0.08"), await sub("g2", "0.08"), await sub("g3", "0.08")];
   const contact = await sub("friend", "0.08");
+  // New names every time, as in the guided flow; the owner counts as one of this browser's sign-ins.
+  const [o, h, g1, g2, g3, f] = randomPeople(6);
+  nameAccounts({ [owner]: o, [heir]: h, [guardians[0]]: g1, [guardians[1]]: g2, [guardians[2]]: g3, [contact]: f });
+  rememberOwner(owner);
   const cast: Cast = { funder, owner, heir, guardians, contact, createdAt: new Date().toISOString() };
   keys.addCast(cast);
   return cast;
@@ -58,11 +62,11 @@ export function demoPolicy(cast: Cast, receive: { eth: string; btc: string }, op
   const check = checkPolicy({
     version: 1,
     owner: cast.owner,
-    heirs: [{ id: "bola", name: "Bola", near_account: cast.heir, receive }],
+    heirs: [{ id: "h1", name: nameOf(cast.heir) ?? "Heir", near_account: cast.heir, receive }],
     allocations: [
-      { asset: "NEAR", shares: { bola: 100 } },
-      { asset: "ETH", shares: { bola: 100 } },
-      { asset: "BTC", shares: { bola: 100 } },
+      { asset: "NEAR", shares: { h1: 100 } },
+      { asset: "ETH", shares: { h1: 100 } },
+      { asset: "BTC", shares: { h1: 100 } },
     ],
     stages_pct: [10, 20, 30, 40],
     guardians: cast.guardians,

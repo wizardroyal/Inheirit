@@ -1,4 +1,5 @@
 "use client";
+import { useNames, useOwners } from "./names";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { agent } from "./agent";
@@ -146,4 +147,15 @@ export function useKeys(): { accounts: string[]; casts: Cast[] } {
   );
   const [accounts, casts] = JSON.parse(snap) as [string[], Cast[]];
   return { accounts, casts };
+}
+
+/**
+ * Accounts someone signed in as in this browser (not the test people a will created): remembered at
+ * sign-in, plus older ones recognised by their three-word username, plus control-panel cast owners.
+ */
+export function useMyAccounts(): string[] {
+  const { accounts, casts } = useKeys();
+  const names = useNames();
+  const remembered = useOwners();
+  return accounts.filter((a) => remembered.includes(a) || /^([A-Z][a-z]+){3}$/.test(names[a] ?? "") || casts.some((c) => c.owner === a));
 }

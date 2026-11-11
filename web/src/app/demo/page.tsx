@@ -1,5 +1,6 @@
 "use client";
 // Demo control panel for judges (CLAUDE.md §8): demo tooling, not part of the product.
+import { accountLabel, useAccountLabel, useNames } from "@/lib/names";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { AgentBadge } from "@/components/Attestation";
@@ -33,31 +34,44 @@ export default function DemoPage() {
   const progress = (m: string) => setLog((l) => [...l, m]);
 
   return (
-    <div className="tech space-y-6">
-      <div className="space-y-2">
-        <div className="flex flex-wrap items-center gap-2">
-          <h1 className="font-serif text-4xl">Control panel</h1>
+    <div className="space-y-8">
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <h1 className="font-serif text-4xl sm:text-5xl">Control panel</h1>
           <Pill tone="warn">advanced</Pill>
         </div>
-        <p className="max-w-3xl text-muted">
-          The advanced, hands-on control panel, with throwaway testnet accounts whose keys stay in your browser. The clock is compressed: a will
-          goes quiet after {DEMO_SCHEDULE.timings.quiet_after / 60} minutes of silence instead of weeks. Follow Scenario A (silence doesn&apos;t kill
-          you) or Scenario B (it really executes) from the README. Prefer a guided tour?{" "}
+        <p className="max-w-2xl text-lg text-muted">
+          Drive a will by hand. Make a test cast, write a will, then press the buttons the owner, the guardians and a friend would press, and
+          watch what the agent does. A will goes quiet after {DEMO_SCHEDULE.timings.quiet_after / 60} minutes of silence instead of months.
+        </p>
+        <p className="text-sm text-muted">
+          New here?{" "}
           <Link href="/owner" className="text-accent underline">
-            Sign in with a demo account and set your will in motion
+            The guided version is easier
           </Link>
           .
         </p>
-        <div className="flex flex-wrap gap-2 text-sm">
-          <Pill>contract {CONTRACT_ID}</Pill>
-          {root ? <Pill tone={root.demoMode ? "accent" : "warn"}>agent online{root.demoMode ? ", demo mode" : ", demo mode off"}</Pill> : null}
-          {agentError && <Pill tone="danger">agent unreachable</Pill>}
+        <div className="tech flex flex-wrap gap-2">
+          <span className="rounded border border-line-strong px-2 py-0.5">contract {CONTRACT_ID}</span>
+          {root ? (
+            <span className={`rounded px-2 py-0.5 ${root.demoMode ? "bg-accent-soft text-accent" : "bg-warn-soft text-warn"}`}>
+              ● agent online{root.demoMode ? " · demo mode" : " · demo mode off"}
+            </span>
+          ) : null}
+          {agentError && <span className="rounded bg-danger-soft px-2 py-0.5 text-danger">● agent unreachable</span>}
         </div>
       </div>
 
       <Card title="1 · The cast" aside={casts.length > 1 && <CastPicker casts={casts} value={cast?.owner ?? ""} onChange={setOwnerSel} />}>
-        {cast ? <CastSummary cast={cast} /> : <p className="text-sm text-muted">No demo cast in this browser yet.</p>}
-        <div className="mt-3 flex flex-wrap items-start gap-3">
+        {cast ? (
+          <CastSummary cast={cast} />
+        ) : (
+          <p className="text-muted">
+            Six test people, each with a funded testnet account and a random name: an owner, an heir, three guardians and a friend. Their keys stay
+            in this browser, so you can act as any of them. It takes about 20 seconds.
+          </p>
+        )}
+        <div className="mt-4">
           <ActionButton
             tone={cast ? "quiet" : "primary"}
             onClick={async () => {
@@ -67,11 +81,8 @@ export default function DemoPage() {
               progress("Cast ready.");
             }}
           >
-            {cast ? "Create another cast" : "Create a demo cast"}
+            {cast ? "Make another cast" : "Make a test cast"}
           </ActionButton>
-          <span className="max-w-md text-xs text-muted">
-            Makes a funded testnet account, then Alice (owner), Bola (heir), three guardians and a friend under it. About 20 seconds.
-          </span>
         </div>
         <ProgressLog lines={log} />
       </Card>
@@ -82,31 +93,37 @@ export default function DemoPage() {
 }
 
 function CastPicker({ casts, value, onChange }: { casts: Cast[]; value: string; onChange: (o: string) => void }) {
+  const label = useAccountLabel();
   return (
     <select value={value} onChange={(e) => onChange(e.target.value)} className="w-full max-w-xs rounded-lg border border-line bg-bg px-2 py-1 text-sm">
       {casts.map((c) => (
         <option key={c.owner} value={c.owner}>
-          {c.owner} ({ago(c.createdAt)})
+          {label(c.owner)}&apos;s will ({ago(c.createdAt)})
         </option>
       ))}
     </select>
   );
 }
 
+/** Who's who: names for people, the account ids (with explorer links) in the technical column. */
 function CastSummary({ cast }: { cast: Cast }) {
+  const label = useAccountLabel();
   const rows: [string, string][] = [
     ["Owner", cast.owner],
     ["Heir", cast.heir],
     ...cast.guardians.map((g, i) => [`Guardian ${i + 1}`, g] as [string, string]),
-    ["Welfare contact", cast.contact],
+    ["Friend", cast.contact],
   ];
   return (
-    <dl className="grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
+    <dl className="grid gap-x-8 gap-y-1 sm:grid-cols-2">
       {rows.map(([k, v]) => (
-        <div key={k} className="flex min-w-0 justify-between gap-2 border-b border-line py-1">
-          <dt className="text-muted">{k}</dt>
-          <dd className="min-w-0 truncate">
-            <ExtLink href={explorer.nearAccount(v)}>{v}</ExtLink>
+        <div key={k} className="flex min-w-0 items-baseline justify-between gap-3 border-b border-line py-1.5">
+          <dt className="text-sm text-muted">{k}</dt>
+          <dd className="min-w-0 truncate text-right">
+            <span className="font-medium">{label(v)}</span>{" "}
+            <ExtLink href={explorer.nearAccount(v)}>
+              <span className="tech">account</span>
+            </ExtLink>
           </dd>
         </div>
       ))}
@@ -116,6 +133,9 @@ function CastSummary({ cast }: { cast: Cast }) {
 
 function WillPanel({ cast }: { cast: Cast }) {
   const { data: will, loaded, refresh } = useWill(cast.owner);
+  const label = useAccountLabel();
+  const ownerN = label(cast.owner);
+  const heirN = label(cast.heir);
   const [chains, setChains] = useState<{ Eth: boolean; Btc: boolean }>({ Eth: true, Btc: true });
   const [withNote, setWithNote] = useState(true);
   const [stable, setStable] = useState(false);
@@ -131,9 +151,9 @@ function WillPanel({ cast }: { cast: Cast }) {
     return (
       <Card title="2 · Write the demo will">
         <p className="text-sm text-muted">
-          Alice leaves everything to Bola, released in four stages (10%, 20%, 30%, 40%) with the longest wait after the first. Two of three
-          guardians must confirm. 0.5 NEAR goes into the NEAR vault; the Sepolia and Bitcoin vaults are addresses derived by Chain Signatures, and
-          the demo faucet funds them.
+          {ownerN} leaves everything to {heirN}, released in four stages (10%, 20%, 30%, 40%) with the longest wait after the first. Two of three
+          guardians must confirm. 0.5 NEAR goes into the NEAR vault; the Sepolia and Bitcoin vaults are addresses derived by Chain Signatures,
+          and the demo faucet funds them.
         </p>
         <div className="mt-3 flex flex-wrap gap-4 text-sm">
           {(["Eth", "Btc"] as const).map((c) => (
@@ -144,11 +164,11 @@ function WillPanel({ cast }: { cast: Cast }) {
           ))}
           <label className="flex items-center gap-2">
             <input type="checkbox" checked={withNote} onChange={(e) => setWithNote(e.target.checked)} />
-            Seal a note for Bola
+            Seal a note for {heirN}
           </label>
-          <label className="flex items-center gap-2" title="NEAR Intents converts each released slice to USDC on the chain Bola chooses">
+          <label className="flex items-center gap-2" title={`NEAR Intents converts each released slice to USDC on the chain ${heirN} chooses`}>
             <input type="checkbox" checked={stable} onChange={(e) => setStable(e.target.checked)} />
-            Pay Bola in dollars (USDC, stable value)
+            Pay {heirN} in dollars (USDC, stable value)
           </label>
         </div>
         <div className="mt-3">
@@ -201,7 +221,7 @@ function WillPanel({ cast }: { cast: Cast }) {
       <SignsOfLife owner={cast.owner} will={will} />
       <div className="grid gap-6 lg:grid-cols-[1fr_1.1fr]">
       <div className="min-w-0 space-y-6">
-        <Card title="Where the will stands" aside={<Link href={`/owner?as=${cast.owner}`} className="text-sm text-accent underline">Alice&apos;s own view</Link>}>
+        <Card title="Where the will stands" aside={<Link href={`/owner?as=${cast.owner}`} className="text-sm text-accent underline">{ownerN}&apos;s own view</Link>}>
           <WatchStatus owner={cast.owner} will={will} canSign />
           <Ladder will={will} compact />
           <div className="mt-3 flex flex-wrap gap-2">
@@ -212,14 +232,14 @@ function WillPanel({ cast }: { cast: Cast }) {
           <p className="mt-2 text-xs text-muted">The agent moves the will on by itself every 15 seconds. Anyone may press this too; it only moves once the wait is over.</p>
         </Card>
 
-        <Card title="Signs of life">
+        <Card title="Send a sign of life">
           <p className="mb-3 text-sm text-muted">Do nothing and the will climbs the ladder. Then try to stop it:</p>
           <div className="flex flex-wrap gap-2">
             <ActionButton disabled={done} onClick={async () => agent.heartbeat(await signRequest(cast.owner, "heartbeat"))}>
-              Heartbeat (real, signed by Alice)
+              Heartbeat (real, signed by {ownerN})
             </ActionButton>
             <ActionButton tone="quiet" disabled={done} onClick={() => call(cast.owner, "i_am_alive").then(refresh)}>
-              Alice: “I&apos;m alive” on-chain
+              {ownerN}: “I&apos;m alive” on-chain
             </ActionButton>
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -246,7 +266,7 @@ function WillPanel({ cast }: { cast: Cast }) {
               return (
                 <li key={g} className="flex flex-wrap items-center justify-between gap-2">
                   <span>
-                    {short(g, 14)} {a && <Pill tone={a.kind === "Deceased" ? "danger" : "accent"}>{a.kind === "Deceased" ? "confirmed passing" : "says alive"}</Pill>}
+                    {label(g)} {a && <Pill tone={a.kind === "Deceased" ? "danger" : "accent"}>{a.kind === "Deceased" ? "confirmed passing" : "says alive"}</Pill>}
                   </span>
                   <span className="flex gap-2">
                     <ActionButton tone="danger" disabled={s !== "GuardianVote" || !!a} onClick={() => call(g, "attest", { owner: cast.owner, kind: "Deceased", evidence_hash: null }, 0n, ROLE_TGAS).then(refresh)}>
@@ -260,9 +280,9 @@ function WillPanel({ cast }: { cast: Cast }) {
               );
             })}
             <li className="flex flex-wrap items-center justify-between gap-2 border-t border-line pt-2">
-              <span>Friend {short(cast.contact, 14)}</span>
+              <span>Friend: {label(cast.contact)}</span>
               <ActionButton tone="quiet" disabled={s !== "Quiet" && s !== "WelfareCheck"} onClick={() => call(cast.contact, "contact_confirm_alive", { owner: cast.owner }, 0n, ROLE_TGAS).then(refresh)}>
-                “I heard from Alice”
+                “I heard from {ownerN}”
               </ActionButton>
             </li>
           </ul>
@@ -283,7 +303,7 @@ function WillPanel({ cast }: { cast: Cast }) {
           title="Payouts to heirs (NEAR Intents)"
           aside={
             <Link href={`/heir/${cast.owner}`} className="text-sm text-accent underline">
-              Bola chooses here
+              {heirN} chooses here
             </Link>
           }
         >
@@ -303,7 +323,7 @@ function WillPanel({ cast }: { cast: Cast }) {
           }
         >
           {events.length === 0 && <p className="text-sm text-muted">Nothing has happened since you opened this page.</p>}
-          <ul className="space-y-1 text-sm">
+          <ul className="tech space-y-1">
             {[...events].reverse().map((e, i) => (
               <li key={i} className="flex gap-3">
                 <span className="w-16 shrink-0 text-xs text-muted">{e.at}</span>
@@ -329,6 +349,7 @@ function WillPanel({ cast }: { cast: Cast }) {
 
 /** Turns successive will snapshots into a readable log of what changed. */
 function useEventLog(will: Will | null) {
+  const names = useNames();
   const prev = useRef<Will | null>(null);
   const [events, setEvents] = useState<{ at: string; text: string; tech?: string }[]>([]);
   useEffect(() => {
@@ -344,15 +365,15 @@ function useEventLog(will: Will | null) {
       // No new sign of life: the vote period ran out short of the threshold (§5.3 vote_failed)
       if (a === "GuardianVote" && b === "Active" && will.last_alive_at === p.last_alive_at)
         out.push({ text: "The guardian vote expired without enough confirmations. The owner is still silent, so the ladder starts again", tech });
-      else out.push({ text: describeTransition(a, b, will), tech });
+      else out.push({ text: describeTransition(a, b, will, accountLabel(will.owner, names)), tech });
     }
     if (will.last_alive_at > p.last_alive_at) out.push({ text: "Sign of life recorded on-chain", tech: "record_liveness" });
     for (const x of will.attestations.slice(p.attestations.length))
-      out.push({ text: `${short(x.guardian, 10)} confirmed ${x.kind === "Deceased" ? "a passing" : "they're alive"}`, tech: `attest(${x.kind})` });
+      out.push({ text: `${accountLabel(x.guardian, names)} confirmed ${x.kind === "Deceased" ? "a passing" : "they're alive"}`, tech: `attest(${x.kind})` });
     for (const x of will.executions.slice(p.executions.length))
-      out.push({ text: `Stage ${x.stage + 1} sent on ${x.chain === "Near" ? "NEAR" : x.chain === "Eth" ? "Sepolia" : "Bitcoin testnet"} to ${short(x.to, 8)}`, tech: "record_execution" });
+      out.push({ text: `Stage ${x.stage + 1} sent on ${x.chain === "Near" ? "NEAR" : x.chain === "Eth" ? "Sepolia" : "Bitcoin testnet"} to ${/\.testnet$/.test(x.to) ? accountLabel(x.to, names) : short(x.to, 8)}`, tech: "record_execution" });
     for (const x of will.released_notes.slice(p.released_notes.length))
-      out.push({ text: `Sealed note "${x.label}" released to ${short(x.heir, 10)}`, tech: "store_released_note" });
+      out.push({ text: `Sealed note "${x.label}" released to ${accountLabel(x.heir, names)}`, tech: "store_released_note" });
     for (const x of will.halted.slice(p.halted.length)) out.push({ text: `Remaining stages and sealed notes stopped: ${haltReason(x.reason)}`, tech: `halt(${x.reason})` });
     if (out.length) {
       const at = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
@@ -363,8 +384,7 @@ function useEventLog(will: Will | null) {
 }
 
 /** The ladder in plain words for the timeline; raw state names stay in the technical view. */
-function describeTransition(a: StateName, b: StateName, will: Will): string {
-  const who = short(will.owner, 14);
+function describeTransition(a: StateName, b: StateName, will: Will, who: string): string {
   if (b === "Active") return `Sign of life: back to All good`;
   switch (b) {
     case "Quiet":
