@@ -4,6 +4,7 @@
 //  3. notify the right people when the will enters a new state;
 //  4. hand Executing wills to the executor (on its own queue, so signing never blocks other wills);
 //  5. release sealed notes to heirs once the will reaches SecretsReleased (secrets last, §5.5).
+import { RateLimiter } from "../auth/rate-limit";
 import { config } from "../config";
 import { type Observation, scoreAlive } from "../liveness/score";
 import {
@@ -211,6 +212,7 @@ export class Driver {
   private readonly ownerRuns = new Map<string, Promise<void>>();
   private readonly pokes = new Map<string, Promise<void>>();
   private readonly lastPoke = new Map<string, number>();
+  private readonly advanceBudget = new RateLimiter({ perKey: 60, global: 20_000, windowMs: 24 * 3_600_000 });
   constructor(private readonly deps: DriverDeps) {
     this.now = deps.now ?? (() => new Date());
     this.log = deps.log ?? ((m) => console.log(m));
@@ -320,13 +322,18 @@ export class Driver {
         // anyone with a free account could burn the agent's gas with a heartbeat every few seconds.
         const active = stateName(will.state) === "Active";
         const minStep = active ? Math.max(60, Math.floor(will.timings.quiet_after / 10)) : 1;
-        if (atS - will.last_alive_at >= minStep) {
+        // ...unless a step is due now: then any newer sign of life is recorded, so the will never goes Quiet
+        // on an owner who just tapped the heartbeat (audit round 3).
+        const stepDue = active && isAdvanceDue(will, nowS);
+        if (atS - will.last_alive_at >= minStep || (stepDue && atS > will.last_alive_at)) {
           await contract.recordLiveness(cfg.owner, atS);
           this.log(`[driver] ${cfg.owner}: alive at ${new Date(atS * 1000).toISOString()} (${verdict.basis.join("+")})`);
           will = (await contract.getWill(cfg.owner))!;
         }
       }
-      if (isAdvanceDue(will, nowS) && (await contract.advance(cfg.owner))) {
+      // Each will gets a daily budget of agent-paid advances: a full speedrun needs about a dozen, while a will
+      // set to cycle the ladder every few seconds would otherwise drain the agent's gas (audit round 3).
+      if (isAdvanceDue(will, nowS) && this.advanceBudget.take(cfg.owner) === 0 && (await contract.advance(cfg.owner))) {
         will = (await contract.getWill(cfg.owner))!;
         this.log(`[driver] ${cfg.owner}: advanced to ${stateName(will.state)}`);
       }
