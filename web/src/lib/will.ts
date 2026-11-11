@@ -157,7 +157,8 @@ export function duration(seconds: number): string {
 
 export function ago(iso: string | number): string {
   const ms = typeof iso === "number" ? iso * 1000 : Date.parse(iso);
-  return `${duration((Date.now() - ms) / 1000)} ago`;
+  const s = (Date.now() - ms) / 1000;
+  return s < 10 ? "just now" : `${duration(s)} ago`;
 }
 
 export const SOURCE_LABELS: Record<string, string> = {
