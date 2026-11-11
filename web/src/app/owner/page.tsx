@@ -19,6 +19,7 @@ import { stagesFor, summarize } from "@agent/policy/schedule";
 import { addSealedNote, createWill, generateWillAndCast } from "@/lib/demo";
 import { useKeys, usePoll, useWill } from "@/lib/hooks";
 import { keys } from "@/lib/keys";
+import { randomName, setName, useDisplayName } from "@/lib/names";
 import { downloadKeyBackup, topUpAccount } from "@/lib/onboard";
 import { disconnectWallet, walletAccountId } from "@/lib/wallet";
 import { balanceOf, call, formatNear, nearToYocto, signRequest } from "@/lib/near";
@@ -45,7 +46,7 @@ function Owner() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3">
-        <h1 className="font-serif text-3xl">Your will</h1>
+        <h1 className="font-serif text-4xl sm:text-5xl">Your will</h1>
         {accounts.length > 0 && (
           <div className={`flex flex-wrap items-center gap-3 ${owner ? "" : "order-last"}`}>
             <ActAs
@@ -97,7 +98,8 @@ function AccountActions({ owner, onSignIn, onSignedOut }: { owner: string; onSig
   const local = !!owner && !!keys.secret(owner);
   const wallet = !!owner && walletAccountId() === owner;
   return (
-    <div className="flex flex-wrap gap-3 text-xs">
+    <div className="flex flex-wrap items-center gap-3 text-xs">
+      <Username account={owner} />
       {local && (
         <button type="button" className="text-accent underline" onClick={() => downloadKeyBackup(owner)}>
           Download key backup
@@ -112,6 +114,47 @@ function AccountActions({ owner, onSignIn, onSignedOut }: { owner: string; onSig
         Use another account
       </button>
     </div>
+  );
+}
+
+/** The signed-in person's username (random at sign-in) with an inline rename. */
+function Username({ account }: { account: string }) {
+  const name = useDisplayName(account);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+  if (editing)
+    return (
+      <form
+        className="flex items-center gap-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          setName(account, draft);
+          setEditing(false);
+        }}
+      >
+        <input className={`${inputCls} w-40 py-1`} value={draft} onChange={(e) => setDraft(e.target.value)} maxLength={32} autoFocus aria-label="Username" />
+        <button type="submit" className="border-2 border-line bg-accent-soft px-2 py-1 text-ink">
+          Save
+        </button>
+        <button type="button" className="text-muted underline" onClick={() => setDraft(randomName())}>
+          Shuffle
+        </button>
+      </form>
+    );
+  return (
+    <span className="flex items-center gap-2">
+      <span className="border-2 border-line bg-accent-soft px-1.5 py-0.5 text-sm font-extrabold text-ink">{name}</span>
+      <button
+        type="button"
+        className="text-accent underline"
+        onClick={() => {
+          setDraft(name === account ? randomName() : name);
+          setEditing(true);
+        }}
+      >
+        {name === account ? "Pick a username" : "Rename"}
+      </button>
+    </span>
   );
 }
 

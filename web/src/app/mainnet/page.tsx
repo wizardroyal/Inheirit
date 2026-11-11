@@ -2,6 +2,7 @@
 // with scripts/mainnet-payout.ts, each approved by a person before it was sent. Read from a committed
 // JSON file, so the page needs no backend.
 import Link from "next/link";
+import { MainnetQuote } from "@/components/MainnetQuote";
 import mainnetPayouts from "@/data/mainnet-payouts.json";
 
 type MainnetRecord = {
@@ -25,37 +26,43 @@ export default function MainnetPage() {
   return (
     <div className="max-w-3xl space-y-8">
       <div className="space-y-3">
-        <h1 className="font-serif text-3xl">On mainnet</h1>
+        <h1 className="font-serif text-5xl">On mainnet</h1>
         <p className="text-muted">
-          The will itself runs on NEAR testnet, and anyone can use it there end to end. NEAR Intents has no testnet, so the last step, paying each
-          heir in the asset and chain they chose, is shown here for real with small amounts.
+          The will itself runs on NEAR testnet, and anyone can use it there end to end. NEAR Intents has no testnet, so the last step, paying each heir in the asset and chain they chose, is priced
+          here live, on mainnet.
         </p>
       </div>
 
       <section className="grid gap-4 sm:grid-cols-2">
         <div className="rounded-xl border border-line bg-card p-4">
-          <div className="font-serif text-lg">Testnet: open to everyone</div>
+          <div className="font-serif text-xl">Testnet: open to everyone</div>
           <p className="mt-1 text-sm text-muted">
             Sign in, write a will, set it in motion and play every role: owner, guardians, lawyer, heir. Testnet slices are paid onward by a SIMULATED
             NEAR Intents client priced with live quotes.
           </p>
         </div>
         <div className="rounded-xl border border-line bg-card p-4">
-          <div className="font-serif text-lg">Mainnet: a showcase, not a service</div>
+          <div className="font-serif text-xl">Mainnet: a showcase, not a service</div>
           <p className="mt-1 text-sm text-muted">
-            Heirs see live mainnet quotes, public and confidential, when they choose how to be paid. Real payouts below were sent from our demo vault
-            on Base by a local script that a person approved, one transaction at a time, with a $5 cap each.
+            Heirs see live mainnet quotes from NEAR Intents, public and confidential, when they choose how to be paid: open an heir&apos;s page and
+            press &ldquo;Get live quotes&rdquo;. Real payouts go out from our demo vault on Base through a script that a person approves one
+            transaction at a time, capped at $5 each{records.length ? "; they are listed below" : ""}.
           </p>
         </div>
       </section>
 
       <section className="space-y-3">
-        <h2 className="font-serif text-2xl">Payouts sent</h2>
-        {records.length === 0 ? (
-          <p className="rounded-xl border border-line bg-card p-4 text-sm text-muted">
-            None yet. Each payout is listed here with explorer links for both sides as soon as it lands.
-          </p>
-        ) : (
+        <h2 className="font-serif text-3xl">Try a live quote</h2>
+        <p className="text-sm text-muted">The same quote an heir sees when choosing how to be paid, straight from NEAR Intents on mainnet.</p>
+        <div className="border border-line bg-card p-4">
+          <MainnetQuote />
+        </div>
+      </section>
+
+      {records.length > 0 && (
+      <section className="space-y-3">
+        <h2 className="font-serif text-3xl">Payouts sent</h2>
+        {(
           <ul className="space-y-3">
             {records.map((r) => (
               <li key={r.from.tx} className="rounded-xl border border-line bg-card p-4 text-sm">
@@ -86,9 +93,10 @@ export default function MainnetPage() {
           </ul>
         )}
       </section>
+      )}
 
       <section className="space-y-2 text-sm text-muted">
-        <h2 className="font-serif text-2xl text-ink">Why not open mainnet to everyone?</h2>
+        <h2 className="font-serif text-3xl text-ink">Why not open mainnet to everyone?</h2>
         <p>
           The agent that would sign mainnet releases runs on the Shade Agent Framework, which is experimental and, per NEAR&apos;s own docs, testnet
           only. A public vault holding other people&apos;s money needs a production TEE framework and an audit first.

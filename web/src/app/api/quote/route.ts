@@ -93,8 +93,7 @@ const settle = (p: Promise<LiveQuote>) => p.then((quote) => ({ quote }), (e: unk
 export async function POST(req: Request) {
   const ip = req.headers.get("x-real-ip") ?? req.headers.get("x-forwarded-for")?.split(",")[0].trim() ?? "unknown";
   if (limited(ip)) return Response.json({ error: "Too many quotes from this address. Try again in a few minutes." }, { status: 429 });
-  const body = (await req.json().catch(() => ({}))) as { destination_asset?: unknown; recipient?: unknown; usd?: unknown };
-  const dest = typeof body.destination_asset === "string" ? body.destination_asset : "";
+  const body = (await req.json().catch(() => ({}))) as { destination_asset?: unknown; blockchain?: unknown; symbol?: unknown; recipient?: unknown; usd?: unknown };
   const recipient = typeof body.recipient === "string" ? body.recipient.trim() : "";
   const usd = Math.min(1000, Math.max(1, Number(body.usd) || 10));
   if (!recipient || recipient.length > 128 || !/^[A-Za-z0-9._:-]+$/.test(recipient)) return Response.json({ error: "Enter your address first." }, { status: 400 });
@@ -105,7 +104,12 @@ export async function POST(req: Request) {
     return Response.json({ error: e instanceof Error ? e.message : String(e) }, { status: 502 });
   }
   const origin = list.find((t) => t.assetId === ORIGIN);
-  const destination = list.find((t) => t.assetId === dest);
+  // Either an exact asset id, or a chain and symbol (the /mainnet page doesn't load the token list).
+  const destination =
+    typeof body.destination_asset === "string"
+      ? list.find((t) => t.assetId === body.destination_asset)
+      : list.find((t) => t.blockchain === body.blockchain && t.symbol === body.symbol);
+  const dest = destination?.assetId ?? "";
   if (!origin || !destination) return Response.json({ error: "Unknown asset." }, { status: 400 });
   // $usd of NEAR in the origin's smallest units, rounded to 6 decimals first to stay exact.
   const amount = (BigInt(Math.round((usd / origin.price) * 1e6)) * 10n ** BigInt(origin.decimals - 6)).toString();

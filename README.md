@@ -2,11 +2,11 @@
 
 Built at **NEAR HACKATHON** (November 2026).
 
-**Testnet: fully self-serve. Mainnet: live NEAR Intents quotes, plus real payouts sent from our demo vault. Public mainnet vaults wait for a production TEE framework and an audit.**
+**Testnet: fully self-serve. Mainnet: live NEAR Intents quotes, and real payouts only through a script a person approves one transaction at a time. Public mainnet vaults wait for a production TEE framework and an audit.**
 
 Inheirit notices the signs of life you already give off, privately, and only reaches out when you've gone quiet for longer than usual. It **never acts on silence alone**: people have to confirm you're gone, and you get a loud challenge period to say otherwise. Only then does it hand your assets on across **NEAR, Ethereum and Bitcoin**, in small, reversible slices. Sealed instructions for everything else reach the right heir **last**.
 
-**Try it:** https://inheirit.vercel.app · Mainnet proof: https://inheirit.vercel.app/mainnet · Agent (TEE): https://d5b714731becca502b6bd054a5cf6ffa5ce71f61-3000.dstack-pha-prod9.phala.network · Contract: [`inheirit.testnet`](https://testnet.nearblocks.io/address/inheirit.testnet)
+**Try it:** https://inheirit.vercel.app · Live mainnet quotes: https://inheirit.vercel.app/mainnet · Agent (TEE): https://d5b714731becca502b6bd054a5cf6ffa5ce71f61-3000.dstack-pha-prod9.phala.network · Contract: [`inheirit.testnet`](https://testnet.nearblocks.io/address/inheirit.testnet)
 
 ## Four ideas the design rests on
 
@@ -32,24 +32,30 @@ Billions in crypto are lost when holders die or become incapacitated. Earlier at
 | Secrets in a public will | A seed phrase can't go into a will that becomes public. | Sealed notes, encrypted in the browser to a TEE key and re-sealed to the heir only after distribution completes. |
 | No undo | Once triggered, everything moves at once. | 10% → 20% → 30% → 40%, with the longest wait after the first slice. Any sign of life stops the rest, and the secrets. |
 
-## Try it in 15 minutes (no wallet, no money)
+## Try it in 3 minutes (no wallet, no money)
 
-Everything runs on testnet. You play every role yourself: owner, guardians, lawyer, friend and heir.
+Everything runs on testnet. One path, start to finish:
 
-1. Open **https://inheirit.vercel.app/owner** and click **Try with a demo account**. You get a fresh, funded testnet account whose key stays in your browser. (A NEAR testnet wallet or Google sign-in works too.)
-2. Click **Generate a sample will for me**, leave the defaults, then **Generate my will** (about a minute). It creates an heir (Ada), three guardians, a friend and a lawyer, writes a will (everything to Ada, 10% → 20% → 30% → 40%), has the guardians accept (so the will is **armed**), funds the vaults (0.5 NEAR, plus Sepolia ETH and testnet BTC from a demo pool while it lasts) and seals a note for Ada.
-   → The dashboard opens at **All good**. The *Signs of life* panel shows the ladder, a countdown, the agent's plain-English verdict and "What the agent saw: timestamps only". The *Will strength* card says **armed**.
-3. In **Set your will in motion**, pick a scenario. A generated will already runs on demo timings (quiet after 2 minutes instead of 90 days), so the card goes straight to a checklist with a button for each step you need to take. (A will on real timings shows **Start the speedrun** first.)
-   - **a · The owner comes back.** Do nothing for about 2 minutes. → The ladder climbs to **Quiet**, and the checks appear under *Messages sent* (heartbeat app, email, Telegram if linked, a SIMULATED DM), then **Welfare check**. Click **I'm here (send a heartbeat)**. → Within seconds the ladder **snaps back to All good**, and the verdict says nothing moved.
-   - **b · The will is carried out.** Click **Create Ada's key**, wait for **Guardian vote** (about 4 minutes), then click **Both guardians confirm**. → **Challenge period** (2 minutes), then **Releasing in stages**: 10% lands on NEAR, Sepolia and BTC testnet4, with explorer links under *Released so far*. The next slice waits **3 minutes**, the longest wait; then 20%, 30%, 40% a minute apart; then **Waiting before secrets**, then **Secrets released**. Click **Open Ada's view** → **Open the note**: *"The Ledger is in the blue folder in the study…"*, sealed in your browser and opened only with Ada's key.
-   - **c · A lawyer speeds it up.** Once the guardian vote has started, click **File the death certificate** (the evidence is SIMULATED), then **Both guardians confirm**. → The challenge period still runs in full; the release then follows the faster 10% → 30% → 60% schedule.
-   - **d · The heir chooses late.** Don't set Ada's payout. → After the release starts, *Payouts to heirs* says Ada's inheritance is waiting. Open Ada's view, choose e.g. **USDC on Base** with an address, and **Save** → the waiting slices pay out together (SIMULATED NEAR Intents on testnet, priced live).
-4. **View as** (on the speedrun card) opens the guardian, heir, friend and lawyer pages as those accounts; each page links back to the owner. On Ada's page, once an address is entered, **Get live quotes** shows real NEAR Intents quotes from mainnet, public and confidential side by side. They are dry runs, so no money moves.
-5. Afterwards: **Back to real timings**, or, once Completed, **Start over with the same people**.
+1. Open **https://inheirit.vercel.app/owner** and click **Try with a demo account**. You get a fresh, funded testnet account whose key stays in your browser, and a random username such as *HatYoungRace* (click **Rename** to change it). A NEAR testnet wallet or Google sign-in works too.
+2. Click **Generate a sample will for me**, then **Generate my will** (under a minute). It creates an heir (Ada), three guardians, a friend and a lawyer, writes the will (everything to Ada, 10% → 20% → 30% → 40%), has the guardians accept (the will is now **armed**), funds the vaults and seals a note for Ada.
+   → The dashboard opens at **All good**: the *Signs of life* panel shows the ladder, a countdown, the agent's plain-English verdict and "What the agent saw: timestamps only".
+3. **Set your will in motion** is already on scenario **a · The owner comes back**, with demo timings (quiet after 2 minutes instead of 90 days). Do nothing for about 2 minutes.
+   → The ladder climbs to **Quiet**, and the checks appear under *Messages sent* (heartbeat app, email, Telegram if linked, a SIMULATED DM), then **Welfare check**.
+4. Click **I'm here (send a heartbeat)**.
+   → Within seconds the ladder **snaps back to All good**, and the verdict says nothing moved. That's the whole idea: signals can stop it; only people can start it.
 
-**At any step, try to break the rule "signals stop it, people start it":** on the [demo panel](https://inheirit.vercel.app/demo), a lone **X post** (SIMULATED) is ignored on purpose, and the verdict says why (*"ignored on its own because posts can be scheduled or run by someone else"*). Two weak sources within 24 hours, or any strong one, do count. A will whose guardians haven't accepted never leaves All good, however long the silence.
+## Then the full run (about 15 minutes)
 
-The [demo panel](https://inheirit.vercel.app/demo) (`/demo`) is a lower-level control room for the same flow: **Create a demo cast**, **Create the demo will**, then the guardian and signal buttons. Scenario A and B there match `scripts/demo-cancel.ts` and `scripts/demo-execute.ts`.
+Pick another scenario on the same card. The card shows a checklist with a button for each step you take.
+- **b · The will is carried out.** Click **Create Ada's key**, wait for **Guardian vote** (about 4 minutes), then **Both guardians confirm**. → **Challenge period** (2 minutes), then **Releasing in stages**: 10% lands on NEAR, Sepolia and BTC testnet4, with explorer links under *Released so far*. The next slice waits **3 minutes**, the longest wait; then 20%, 30%, 40% a minute apart; then **Waiting before secrets**, then **Secrets released**. Click **Open Ada's view** → **Open the note**: *"The Ledger is in the blue folder in the study…"*, sealed in your browser and opened only with Ada's key.
+- **c · A lawyer speeds it up.** Once the guardian vote has started, click **File the death certificate** (the evidence is SIMULATED), then **Both guardians confirm**. → The challenge period still runs in full; the release then follows the faster 10% → 30% → 60% schedule.
+- **d · The heir chooses late.** Don't set Ada's payout. → After the release starts, *Payouts to heirs* says Ada's inheritance is waiting. Open Ada's view, choose e.g. **USDC on Base** with an address, and **Save** → the waiting slices pay out together (SIMULATED NEAR Intents on testnet, priced live).
+
+**View as** (on the same card) opens the guardian, heir, friend and lawyer pages as those accounts; each links back to the owner. On Ada's page, once an address is entered, **Get live quotes** shows real NEAR Intents quotes from mainnet, public and confidential side by side (dry runs: no money moves). The same quote is on **https://inheirit.vercel.app/mainnet**. Afterwards: **Back to real timings**, or, once Completed, **Start over with the same people**.
+
+**At any step, try to break the rule "signals stop it, people start it":** on the [control panel](https://inheirit.vercel.app/demo), a lone **X post** (SIMULATED) is ignored on purpose, and the verdict says why (*"ignored on its own because posts can be scheduled or run by someone else"*). Two weak sources within 24 hours, or any strong one, do count. A will whose guardians haven't accepted never leaves All good, however long the silence.
+
+**Advanced:** the [control panel](https://inheirit.vercel.app/demo) (`/demo`) is a lower-level control room for the same flow: **Create a demo cast**, **Create the demo will**, then the guardian and signal buttons. Scenario A and B there match `scripts/demo-cancel.ts` and `scripts/demo-execute.ts`.
 
 **Your own will** (`/owner`): instead of generating one, use **Quick setup (3 steps)** (signals, people, vault; a live "who gets what" preview; "if you go quiet, the earliest anything moves is about…") or **Write it in plain English** (a private NEAR AI model drafts it, our code checks it, and you approve a summary that code, not the model, wrote). The **Will strength** checklist shows what arms the will and what makes it stronger, including **Link Telegram**: if you go quiet, the bot checks in, and any reply cancels. Guardians accept at `/guardian/<owner>`; `/heartbeat` is an installable app.
 
@@ -139,8 +145,9 @@ See [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md). In short:
   - enforcing policy `conditions` (e.g. "not before 2031"), which are parsed and shown;
   - an adaptive "your normal" baseline: the quiet threshold is a fixed setting per will.
 - **Expired guardian votes restart the ladder.** If guardians don't vote, the will returns to All good without a new sign of life, so the ladder starts again at once (about every 7 minutes on demo timings). The repeated checks and welfare messages appear in the app, but Telegram sends each of them only once per silence. The challenge alarm is always sent.
-- **NEAR Intents is SIMULATED on testnet.** NEAR Intents has no testnet. The testnet slices are real transfers; the swap that takes them on to the heir's choice runs on a simulated 1Click client (live prices, fake deposit address). On mainnet: heirs see live dry quotes, and real payouts come from our demo vault, signed by a local script (`scripts/mainnet-payout.ts`) that asks a person for approval before every transaction (caps: $5 each, $25 in total). They are listed at `/mainnet`. In production, the attested agent's mainnet contract would sign these legs.
+- **NEAR Intents is SIMULATED on testnet.** NEAR Intents has no testnet. The testnet slices are real transfers; the swap that takes them on to the heir's choice runs on a simulated 1Click client (live prices, fake deposit address). On mainnet: heirs see live dry quotes, and real payouts can be sent from our demo vault only by a local script (`scripts/mainnet-payout.ts`) that asks a person for approval before every transaction (caps: $5 each, $25 in total). Any made are listed at `/mainnet`. In production, the attested agent's mainnet contract would sign these legs.
 - **Payout waiting happens after the vault.** If an heir hasn't chosen how to be paid, their onward payout waits and later slices are paid together. The testnet slice itself still leaves the vault on schedule. Holding it in the vault would need a contract change (roadmap).
+- **Usernames are local.** The random three-word username (and any rename) lives in your browser; the testnet account id stays the on-chain identity, and other browsers see the account id.
 - **Browser-held keys.** Demo and Google accounts keep their key in your browser (back it up with **Download key backup**). A lost browser means a lost testnet account. Wallet users keep their keys in their wallet.
 - **Speedruns expire.** On the hosted demo, the agent stops watching a will on demo timings a few hours after it started (never mid-release, in the guardian vote or in the challenge period). Wills on real timings are watched indefinitely.
 - **Start over clears the old record.** Replacing a Completed will keeps released notes and leftover NEAR, but drops the old will's execution records, so onward payouts still waiting for an heir's choice from that run are dropped too.

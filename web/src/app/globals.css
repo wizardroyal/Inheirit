@@ -1,39 +1,45 @@
 @import "tailwindcss";
 
-/* Calm, paper-like palette; one deep green accent. Dark mode follows the system. */
+/*
+ * Track-and-field brutalism: paper and ink, square edges, thick rules with flat offset shadows, heavy
+ * uppercase display type. One loud action colour (cobalt) and one highlighter (volt) for "you are here".
+ * Dark mode follows the system.
+ */
 :root {
-  --bg: #f7f5f0;
+  --bg: #efede6;
   --card: #ffffff;
-  --ink: #1f2421;
-  --muted: #5f6661;
-  --line: #e2ded5;
-  --accent: #2f5d50;
+  --ink: #0b0b0b;
+  --muted: #55534d;
+  --line: #0b0b0b;
+  --accent: #2626e8;
   --accent-ink: #ffffff;
-  --accent-soft: #e3ece8;
-  --warn: #9a5b13;
-  --warn-soft: #f6ead8;
-  --danger: #a3362a;
-  --danger-soft: #f6e1de;
-  --sim: #6b4fa0;
-  --sim-soft: #ece6f5;
+  --accent-soft: #e2ff3d;
+  --warn: #b33a00;
+  --warn-soft: #ffe1cf;
+  --danger: #d1001f;
+  --danger-soft: #ffdde1;
+  --sim: #6a1fe0;
+  --sim-soft: #ece0ff;
+  --shadow: #0b0b0b;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #141715;
-    --card: #1c201e;
-    --ink: #e6e8e4;
-    --muted: #9aa29c;
-    --line: #2e3430;
-    --accent: #7fb8a6;
-    --accent-ink: #0f1311;
-    --accent-soft: #23302b;
-    --warn: #e0a95c;
-    --warn-soft: #33291b;
-    --danger: #e58a7f;
-    --danger-soft: #3a2320;
-    --sim: #b9a2e6;
-    --sim-soft: #2a2436;
+    --bg: #0b0b0b;
+    --card: #161616;
+    --ink: #f1efe8;
+    --muted: #a5a29a;
+    --line: #f1efe8;
+    --accent: #8f8fff;
+    --accent-ink: #0b0b0b;
+    --accent-soft: #2d3a00;
+    --warn: #ff9a5c;
+    --warn-soft: #3a1d0c;
+    --danger: #ff6b7d;
+    --danger-soft: #3d0d14;
+    --sim: #c3a4ff;
+    --sim-soft: #251a3d;
+    --shadow: #e2ff3d;
   }
 }
 
@@ -54,13 +60,53 @@
   --color-sim-soft: var(--sim-soft);
   --font-sans: var(--font-body);
   --font-serif: var(--font-display);
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-mono: var(--font-code), ui-monospace, SFMono-Regular, Menlo, monospace;
+  /* Square everything; only true circles (status dots, the heartbeat button) stay round. */
+  --radius-sm: 0;
+  --radius-md: 0;
+  --radius-lg: 0;
+  --radius-xl: 0;
+  --radius-2xl: 0;
 }
 
 body {
   background: var(--bg);
   color: var(--ink);
 }
+
+/* Display type: heavy, uppercase, tight. (Components use font-serif for headings.) */
+.font-serif {
+  text-transform: uppercase;
+  letter-spacing: -0.01em;
+  line-height: 0.95;
+}
+
+/* Thick rules. Unlayered, so they win over Tailwind's 1px utilities. */
+.border { border-width: 2px; }
+.border-t { border-top-width: 2px; }
+.border-b { border-bottom-width: 2px; }
+
+/* Cards: a flat offset shadow, like a block print. */
+.bg-card.border { box-shadow: 5px 5px 0 var(--shadow); }
+
+/* Buttons: uppercase, heavy, and they press in. */
+/* Real buttons (bordered or filled), not the small text links that use <button>. */
+button.border, button.bg-accent {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 800;
+}
+button.bg-accent, a.bg-accent { box-shadow: 3px 3px 0 var(--shadow); transition: transform 80ms, box-shadow 80ms; }
+button.bg-accent:hover:not(:disabled), a.bg-accent:hover { transform: translate(-1px, -1px); box-shadow: 4px 4px 0 var(--shadow); }
+button.bg-accent:active:not(:disabled), a.bg-accent:active { transform: translate(3px, 3px); box-shadow: 0 0 0 var(--shadow); }
+
+input, select, textarea { border-width: 2px; }
+input:focus, select:focus, textarea:focus { outline: 3px solid var(--accent-soft); outline-offset: 0; }
+a:focus-visible, button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+/* Landing hero: the ladder climbing and snapping back, on a loop. */
+@keyframes hero-blink { 50% { opacity: 0.2; } }
+.hero-blink { animation: hero-blink 0.9s steps(1) infinite; }
 
 /* Signs-of-life panel (CLAUDE.md §8): a pulse when a signal lands; the ladder snaps back to Active. */
 @keyframes signal-pulse {
@@ -80,6 +126,6 @@ body {
 .snap-flash { animation: snap-flash 3.5s ease-out forwards; }
 
 @media (prefers-reduced-motion: reduce) {
-  .signal-pulse, .snap-flash { animation: none; }
+  .signal-pulse, .snap-flash, .hero-blink { animation: none; }
   .ladder-fill { transition: none; }
 }

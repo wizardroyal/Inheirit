@@ -3,6 +3,7 @@
 // stays in this browser), or a demo account with no sign-in at all.
 import { useEffect, useRef, useState } from "react";
 import { createDemoAccount, googleKey, onboardInfo, restoreKeyBackup, signInWithGoogle, type OnboardInfo } from "@/lib/onboard";
+import { ensureName } from "@/lib/names";
 import { connectWallet } from "@/lib/wallet";
 import { ActionButton, Card, ErrorNote } from "./ui";
 
@@ -64,7 +65,12 @@ function GoogleButton({ clientId, onAccount, onError }: { clientId: string; onAc
   );
 }
 
-export function SignIn({ onSignedIn }: { onSignedIn: (accountId: string) => void }) {
+export function SignIn({ onSignedIn: signedIn }: { onSignedIn: (accountId: string) => void }) {
+  // Everyone who signs in gets a random three-word username, changeable later.
+  const onSignedIn = (id: string) => {
+    ensureName(id);
+    signedIn(id);
+  };
   const [info, setInfo] = useState<OnboardInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {

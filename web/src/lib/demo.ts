@@ -1,12 +1,13 @@
 "use client";
 // Demo tooling (CLAUDE.md §8 /demo): a throwaway cast of testnet accounts created in this browser,
 // and a pre-seeded will with the compressed demo clock. Clearly demo-only.
+import { nameOf } from "./names";
 import { checkPolicy, nearShareBps, policyHash, type Policy } from "@agent/policy/policy";
 import { agent } from "./agent";
 import { stagesFor, type SchedulePreset } from "@agent/policy/schedule";
 import { keys, type Cast } from "./keys";
-import { call, callMany, createFaucetAccount, createSubaccount, createSubaccounts, nearToYocto, ROLE_TGAS, signRequest, view } from "./near";
-import { createCastAccounts } from "./onboard";
+import { call, callMany, createSubaccount, createSubaccounts, nearToYocto, ROLE_TGAS, signRequest, view } from "./near";
+import { createCastAccounts, createDemoAccount } from "./onboard";
 import { sealToBase64 } from "./sealed";
 import type { AgentKey } from "./will";
 
@@ -27,23 +28,22 @@ export const DEMO_NOTE = {
 
 type Progress = (msg: string) => void;
 
-function suffix(): string {
-  return Math.random().toString(36).slice(2, 8);
-}
-
-/** Creates a funder from the testnet faucet, then the owner, heir, guardians and a contact under it. */
+/**
+ * Creates a funder through our onboarding route (sponsored, so it doesn't depend on the public testnet
+ * faucet, which rate-limits when many people use it at once), then the owner, heir, guardians and a
+ * contact under it. The funder gets 2 NEAR; this spends about 1.7.
+ */
 export async function createCast(progress: Progress): Promise<Cast> {
-  const funder = `inheirit-${suffix()}.testnet`;
-  progress(`Creating ${funder} from the testnet faucet…`);
-  await createFaucetAccount(funder);
+  progress("Creating a funded testnet account…");
+  const funder = await createDemoAccount();
   const sub = async (name: string, near: string) => {
     progress(`Creating ${name}.${funder}…`);
     return createSubaccount(funder, name, near);
   };
-  const owner = await sub("alice", "3");
-  const heir = await sub("bola", "0.5");
-  const guardians = [await sub("g1", "0.3"), await sub("g2", "0.3"), await sub("g3", "0.3")];
-  const contact = await sub("friend", "0.2");
+  const owner = await sub("alice", "1.2");
+  const heir = await sub("bola", "0.1");
+  const guardians = [await sub("g1", "0.1"), await sub("g2", "0.1"), await sub("g3", "0.1")];
+  const contact = await sub("friend", "0.1");
   const cast: Cast = { funder, owner, heir, guardians, contact, createdAt: new Date().toISOString() };
   keys.addCast(cast);
   return cast;
@@ -153,7 +153,7 @@ export async function generateWillAndCast(
   const check = checkPolicy({
     version: 1,
     owner,
-    display_name: owner.split(".")[0],
+    display_name: nameOf(owner) ?? owner.split(".")[0],
     heirs: [
       {
         id: "ada",

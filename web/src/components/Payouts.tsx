@@ -132,9 +132,9 @@ interface LiveQuoteResult {
  * Real 1Click quotes on mainnet for this choice (§13A.2 item 1): dry runs only, so no money moves and no
  * deposit address exists. Public and confidential side by side.
  */
-export function LiveQuotes({ assetId, recipient, chain }: { assetId: string; recipient: string; chain: string }) {
+export function LiveQuotes({ assetId, recipient, chain, symbol }: { assetId?: string; recipient: string; chain: string; symbol?: string }) {
   const [result, setResult] = useState<LiveQuoteResult | null>(null);
-  const ready = !!assetId && recipient.length > 3;
+  const ready = !!(assetId || symbol) && recipient.length > 3;
   return (
     <div className="rounded-lg border border-line p-3 text-sm">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -149,7 +149,7 @@ export function LiveQuotes({ assetId, recipient, chain }: { assetId: string; rec
             const res = await fetch("/api/quote", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ destination_asset: assetId, recipient, usd: 10 }),
+              body: JSON.stringify(assetId ? { destination_asset: assetId, recipient, usd: 10 } : { blockchain: chain, symbol, recipient, usd: 10 }),
             });
             const out = await res.json();
             if (!res.ok) throw new Error(out.error ?? `Quote failed (${res.status})`);
@@ -159,7 +159,7 @@ export function LiveQuotes({ assetId, recipient, chain }: { assetId: string; rec
           {result ? "Quote again" : "Get live quotes"}
         </ActionButton>
       </div>
-      {!ready && <p className="mt-1 text-xs text-muted">Enter your {chainLabel(chain)} address to see real prices.</p>}
+      {!ready && <p className="mt-1 text-xs text-muted">Enter a {chainLabel(chain)} address to see real prices.</p>}
       {result && (
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           {(

@@ -9,6 +9,7 @@ import { agent } from "@/lib/agent";
 import { DEMO_SCHEDULE, REAL_SCHEDULE } from "@/lib/config";
 import { createWill } from "@/lib/demo";
 import { useOverview } from "@/lib/hooks";
+import { nameOf } from "@/lib/names";
 import { signRequest } from "@/lib/near";
 import { acceptedGuardians, isArmed, type Will } from "@/lib/will";
 import { TelegramLink } from "./TelegramLink";
@@ -41,7 +42,7 @@ export function QuickSetup({
   onCreated: () => void;
   summary: (stagesPct: number[], demoClock: boolean) => React.ReactNode;
 }) {
-  const [name, setName] = useState("");
+  const [name, setName] = useState(() => nameOf(owner) ?? "");
   const [jurisdiction, setJurisdiction] = useState("");
   const [evm, setEvm] = useState("");
   const [heirs, setHeirs] = useState<HeirRow[]>([{ name: "", account: "", pct: "100", eth: "", btc: "" }]);

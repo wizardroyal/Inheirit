@@ -5,11 +5,13 @@ import Link from "next/link";
 import { useState } from "react";
 import { useKeys } from "@/lib/hooks";
 import { keys } from "@/lib/keys";
+import { useNames } from "@/lib/names";
 import { provider } from "@/lib/near";
 import { ActionButton, Details, inputCls } from "./ui";
 
 export function ActAs({ value, onChange, suggested, label = "Acting as" }: { value: string; onChange: (id: string) => void; suggested?: string[]; label?: string }) {
   const { accounts } = useKeys();
+  const names = useNames();
   const options = suggested?.length ? [...suggested.filter((a) => accounts.includes(a)), ...accounts.filter((a) => !suggested.includes(a))] : accounts;
   return (
     <div className="flex flex-wrap items-center gap-2 text-sm">
@@ -19,7 +21,7 @@ export function ActAs({ value, onChange, suggested, label = "Acting as" }: { val
           <option value="">choose an account…</option>
           {options.map((a) => (
             <option key={a} value={a}>
-              {a}
+              {names[a] ? `${names[a]} · ${a}` : a}
             </option>
           ))}
         </select>

@@ -49,14 +49,14 @@ export default function HeartbeatPage() {
 
   return (
     <div className="mx-auto flex max-w-md flex-col items-center gap-6 py-6 text-center">
-      <h1 className="font-serif text-3xl">Heartbeat</h1>
+      <h1 className="font-serif text-4xl sm:text-5xl">Heartbeat</h1>
       <p className="text-muted">Just opening this app is enough: it tells your will&apos;s agent you&apos;re here, signed with your key.</p>
       <ActAs value={owner} onChange={choose} suggested={casts.map((c) => c.owner)} label="Your account" />
       <button
         type="button"
         disabled={!owner || busy}
         onClick={() => ping(owner)}
-        className="h-48 w-48 rounded-full bg-accent text-2xl font-medium text-accent-ink shadow-lg transition hover:scale-[1.02] disabled:opacity-40"
+        className="h-48 w-48 rounded-full border-4 border-line bg-accent font-serif text-3xl text-accent-ink transition hover:scale-[1.02] disabled:opacity-40"
       >
         {busy ? "…" : "I'm here"}
       </button>

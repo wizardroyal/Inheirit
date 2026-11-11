@@ -5,6 +5,7 @@ import { ActAs } from "@/components/ActAs";
 import { BackToOwner } from "@/components/Speedrun";
 import { ActionButton, Card, NoWill } from "@/components/ui";
 import { useActingAs, useWill } from "@/lib/hooks";
+import { useDisplayName } from "@/lib/names";
 import { call, ROLE_TGAS } from "@/lib/near";
 import { acceptedGuardians, stateName } from "@/lib/will";
 
@@ -12,6 +13,7 @@ export default function ContactPage() {
   const owner = decodeURIComponent(useParams<{ owner: string }>().owner);
   const { data: will, loaded, refresh } = useWill(owner);
   const [me, setMe] = useActingAs();
+  const ownerName = useDisplayName(owner);
   if (!loaded) return <p>Loading…</p>;
   if (!will) return <NoWill owner={owner} />;
   const s = stateName(will.state);
@@ -21,7 +23,7 @@ export default function ContactPage() {
   return (
     <div className="max-w-xl space-y-4">
       <BackToOwner owner={owner} />
-      <h1 className="font-serif text-3xl">Have you heard from {owner}?</h1>
+      <h1 className="font-serif text-4xl">Have you heard from {ownerName}?</h1>
       <p className="text-muted">
         {owner} listed you as someone who&apos;d know if they were okay, and they&apos;ve been quiet for a while. If you&apos;ve heard from them recently,
         say so below and nothing else happens.

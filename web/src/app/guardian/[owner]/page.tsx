@@ -8,6 +8,7 @@ import { ActionButton, Card, ErrorNote, Field, inputCls, Pill, NoWill } from "@/
 import { TelegramLink } from "@/components/TelegramLink";
 import { SignalList } from "@/components/WillParts";
 import { useActingAs, useWill } from "@/lib/hooks";
+import { useDisplayName } from "@/lib/names";
 import { call, ROLE_TGAS } from "@/lib/near";
 import { ago, guardianIds, stateName } from "@/lib/will";
 
@@ -62,6 +63,7 @@ export default function GuardianPage() {
   const { data: will, loaded, refresh } = useWill(owner);
   const [me, setMe] = useActingAs();
   const [evidence, setEvidence] = useState<{ name: string; hash: string } | null>(null);
+  const ownerName = useDisplayName(owner);
 
   if (!loaded) return <p>Loading…</p>;
   if (!will) return <NoWill owner={owner} />;
@@ -75,7 +77,7 @@ export default function GuardianPage() {
     <div className="space-y-6">
       <div className="space-y-2">
         <BackToOwner owner={owner} />
-        <h1 className="font-serif text-3xl">Guardian for {owner}</h1>
+        <h1 className="font-serif text-4xl">Guardian for {ownerName}</h1>
         <p className="max-w-2xl text-muted">
           {owner} chose you because they trust you to tell the truth. Confirm a passing only if you&apos;re sure. If you believe they&apos;re alive,
           say so: one “they&apos;re alive” from any guardian stops everything.

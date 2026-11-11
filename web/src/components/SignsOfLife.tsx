@@ -28,17 +28,17 @@ export function SignsOfLife({ owner, will }: { owner: string; will: Will }) {
   const unseen = SOURCES.filter((s) => !data?.observations[s.source] && !s.simulated);
 
   return (
-    <section className="space-y-4 rounded-2xl border border-line bg-card p-5" aria-label="Signs of life">
+    <section className="space-y-4 border border-line bg-card p-5" aria-label="Signs of life">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="font-serif text-xl">Signs of life</h2>
+        <h2 className="font-serif text-3xl">Signs of life</h2>
         {!isArmed(will) && <Pill tone="warn">not armed yet: guardians haven&apos;t accepted</Pill>}
       </div>
 
       {/* The ladder as a progress bar */}
       <div>
-        <div className="relative h-2 rounded-full bg-line">
+        <div className="relative h-4 border-2 border-line bg-bg">
           <div
-            className="ladder-fill absolute inset-y-0 left-0 rounded-full bg-accent"
+            className="ladder-fill absolute inset-y-0 left-0 bg-accent"
             style={{ width: `${((Math.max(idx, 0) + 1) / LADDER.length) * 100}%` }}
           />
         </div>
@@ -64,7 +64,7 @@ export function SignsOfLife({ owner, will }: { owner: string; will: Will }) {
             </span>
           )}
           {snapped > 0 && (
-            <span key={snapped} className="snap-flash rounded-full bg-accent px-3 py-1 text-xs font-medium text-accent-ink">
+            <span key={snapped} className="snap-flash border-2 border-line bg-accent-soft px-3 py-1 font-mono text-xs font-bold uppercase tracking-wider text-ink">
               Sign of life: back to All good
             </span>
           )}

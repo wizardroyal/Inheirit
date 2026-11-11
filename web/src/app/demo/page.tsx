@@ -36,11 +36,11 @@ export default function DemoPage() {
     <div className="space-y-6">
       <div className="space-y-2">
         <div className="flex flex-wrap items-center gap-2">
-          <h1 className="font-serif text-3xl">Demo control panel</h1>
-          <Pill tone="warn">demo tooling</Pill>
+          <h1 className="font-serif text-4xl">Control panel</h1>
+          <Pill tone="warn">advanced</Pill>
         </div>
         <p className="max-w-3xl text-muted">
-          A hands-on control panel with throwaway testnet accounts made in your browser from the public faucet. The clock is compressed: a will
+          The advanced, hands-on control panel, with throwaway testnet accounts whose keys stay in your browser. The clock is compressed: a will
           goes quiet after {DEMO_SCHEDULE.timings.quiet_after / 60} minutes of silence instead of weeks. Follow Scenario A (silence doesn&apos;t kill
           you) or Scenario B (it really executes) from the README. Prefer a guided tour?{" "}
           <Link href="/owner" className="text-accent underline">
@@ -70,8 +70,7 @@ export default function DemoPage() {
             {cast ? "Create another cast" : "Create a demo cast"}
           </ActionButton>
           <span className="max-w-md text-xs text-muted">
-            Makes a funded account from the testnet faucet, then Alice (owner), Bola (heir), three guardians and a friend under it. About 20
-            seconds.
+            Makes a funded testnet account, then Alice (owner), Bola (heir), three guardians and a friend under it. About 20 seconds.
           </span>
         </div>
         <ProgressLog lines={log} />
@@ -133,7 +132,7 @@ function WillPanel({ cast }: { cast: Cast }) {
       <Card title="2 · Write the demo will">
         <p className="text-sm text-muted">
           Alice leaves everything to Bola, released in four stages (10%, 20%, 30%, 40%) with the longest wait after the first. Two of three
-          guardians must confirm. 1 NEAR goes into the NEAR vault; the Sepolia and Bitcoin vaults are addresses derived by Chain Signatures, and
+          guardians must confirm. 0.5 NEAR goes into the NEAR vault; the Sepolia and Bitcoin vaults are addresses derived by Chain Signatures, and
           the demo faucet funds them.
         </p>
         <div className="mt-3 flex flex-wrap gap-4 text-sm">
@@ -166,7 +165,7 @@ function WillPanel({ cast }: { cast: Cast }) {
                   contacts: [cast.contact],
                   schedule: DEMO_SCHEDULE,
                   foreignChains: (["Eth", "Btc"] as const).filter((c) => chains[c]),
-                  depositNear: "1",
+                  depositNear: "0.5",
                 },
                 progress,
               );

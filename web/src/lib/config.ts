@@ -14,3 +14,7 @@ export const explorer = {
 
 // Release schedules and timings (CLAUDE.md §5.5) are shared with the agent: @agent/policy/schedule.
 export { DEMO_SCHEDULE, REAL_SCHEDULE } from "@agent/policy/schedule";
+
+/** Public links judges should be one click from. The X post URL is set once the post exists. */
+export const REPO_URL = "https://github.com/wizardroyal/Inheirit";
+export const X_POST_URL = process.env.NEXT_PUBLIC_X_POST_URL || "";

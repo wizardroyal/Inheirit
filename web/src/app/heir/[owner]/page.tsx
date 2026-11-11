@@ -8,6 +8,7 @@ import { ActionButton, Card, inputCls, Pill, NoWill } from "@/components/ui";
 import { Releases } from "@/components/WillParts";
 import { HeirPayoutList, IntentsSimTag, PayoutChoice } from "@/components/Payouts";
 import { useActingAs, useKeys, usePoll, useWill } from "@/lib/hooks";
+import { useDisplayName } from "@/lib/names";
 import { keys } from "@/lib/keys";
 import { agent } from "@/lib/agent";
 import { call, ROLE_TGAS, signRequest, view } from "@/lib/near";
@@ -28,6 +29,7 @@ export default function HeirPage() {
   const owner = decodeURIComponent(useParams<{ owner: string }>().owner);
   const { data: will, loaded, refresh } = useWill(owner);
   const [me, setMe] = useActingAs();
+  const ownerName = useDisplayName(owner);
   useKeys(); // re-render when the local key store changes
 
   if (!loaded) return <p>Loading…</p>;
@@ -43,11 +45,11 @@ export default function HeirPage() {
     <div className="space-y-6">
       <div className="space-y-2">
         <BackToOwner owner={owner} />
-        <h1 className="font-serif text-3xl">For the heirs of {owner}</h1>
+        <h1 className="font-serif text-4xl">For the heirs of {ownerName}</h1>
         <p className="max-w-2xl text-muted">
           {started
-            ? `${owner}'s will is being carried out. This page walks you through what you receive and any private notes left for you.`
-            : `Nothing has been released. ${owner}'s will is at “${stateLabel(s)}”. You can set up your key now, so you're ready if the time comes.`}
+            ? `${ownerName}'s will is being carried out. This page walks you through what you receive and any private notes left for you.`
+            : `Nothing has been released. ${ownerName}'s will is at “${stateLabel(s)}”. You can set up your key now, so you're ready if the time comes.`}
         </p>
       </div>
       <Step n={1} title="Who are you?" done={!!heir}>

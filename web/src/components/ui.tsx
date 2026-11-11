@@ -8,7 +8,7 @@ export function Card({ title, aside, children, className = "" }: { title?: React
     <section className={`rounded-xl border border-line bg-card p-5 ${className}`}>
       {(title || aside) && (
         <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-          {title && <h2 className="font-serif text-lg">{title}</h2>}
+          {title && <h2 className="font-serif text-xl">{title}</h2>}
           {aside}
         </div>
       )}
@@ -19,7 +19,7 @@ export function Card({ title, aside, children, className = "" }: { title?: React
 
 type Tone = "primary" | "quiet" | "danger";
 const TONES: Record<Tone, string> = {
-  primary: "bg-accent text-accent-ink hover:opacity-90",
+  primary: "border border-line bg-accent text-accent-ink",
   quiet: "border border-line bg-card hover:bg-accent-soft",
   danger: "border border-danger text-danger hover:bg-danger-soft",
 };
@@ -67,13 +67,13 @@ export function ActionButton({
 
 export function Pill({ children, tone = "neutral" }: { children: ReactNode; tone?: "neutral" | "accent" | "warn" | "danger" | "sim" }) {
   const cls = {
-    neutral: "bg-bg text-muted border border-line",
-    accent: "bg-accent-soft text-accent",
+    neutral: "bg-bg text-ink border border-line",
+    accent: "bg-accent-soft text-ink",
     warn: "bg-warn-soft text-warn",
     danger: "bg-danger-soft text-danger",
     sim: "bg-sim-soft text-sim",
   }[tone];
-  return <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${cls}`}>{children}</span>;
+  return <span className={`inline-flex items-center px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider ${cls}`}>{children}</span>;
 }
 
 export function SimulatedTag() {
@@ -107,7 +107,7 @@ export const inputCls = "rounded-lg border border-line bg-bg px-3 py-2 text-sm o
 
 export function ExtLink({ href, children }: { href: string; children: ReactNode }) {
   return (
-    <a href={href} target="_blank" rel="noreferrer" className="text-accent underline decoration-dotted underline-offset-2 hover:decoration-solid">
+    <a href={href} target="_blank" rel="noreferrer" className="text-accent underline decoration-2 underline-offset-2 hover:bg-accent-soft">
       {children}
     </a>
   );

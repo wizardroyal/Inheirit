@@ -1,0 +1,91 @@
+"use client";
+// Usernames (human request 2026-11-11): people who sign in get a random three-word name like
+// "HatYoungRace" instead of seeing their testnet account id everywhere, and can rename themselves at any
+// time. Kept in this browser only; the account id stays the on-chain identity.
+import { useSyncExternalStore } from "react";
+
+const KEY = "inheirit:names";
+const EVENT = "inheirit-names";
+
+const A = ["Bold", "Brave", "Calm", "Clever", "Quick", "Quiet", "Swift", "Young", "Wise", "Bright", "Lucky", "Steady", "Golden", "Silver", "Wild", "Gentle", "Noble", "Rapid", "Sunny", "Keen", "Loyal", "Mighty", "Proud", "Sharp", "True", "Warm", "Lively", "Plucky", "Witty", "Daring"];
+const N = ["Hat", "River", "Falcon", "Maple", "Comet", "Harbor", "Lantern", "Meadow", "Otter", "Pine", "Quartz", "Raven", "Summit", "Tiger", "Willow", "Anchor", "Badger", "Cedar", "Ember", "Fox", "Glacier", "Heron", "Iris", "Juniper", "Kite", "Lynx", "Orchid", "Pebble", "Sparrow", "Thistle"];
+const V = ["Race", "Dash", "Run", "Jump", "Climb", "Sprint", "Leap", "Drift", "Glide", "Stride", "Vault", "Swing", "Roll", "Spin", "Rally", "Surge", "Bloom", "Spark", "Quest", "March"];
+
+const pick = <T,>(xs: T[]) => xs[crypto.getRandomValues(new Uint32Array(1))[0] % xs.length];
+
+/** A random three-word name, e.g. "HatYoungRace". */
+export function randomName(): string {
+  return `${pick(N)}${pick(A)}${pick(V)}`;
+}
+
+function load(): Record<string, string> {
+  try {
+    return JSON.parse(window.localStorage.getItem(KEY) ?? "{}");
+  } catch {
+    return {};
+  }
+}
+
+function save(m: Record<string, string>) {
+  try {
+    window.localStorage.setItem(KEY, JSON.stringify(m));
+  } catch {
+    // storage blocked: names last until the page reloads
+  }
+  window.dispatchEvent(new Event(EVENT));
+}
+
+/** Gives a signed-in account a random name if it has none yet; returns its name. */
+export function ensureName(account: string): string {
+  const m = load();
+  if (!m[account]) {
+    m[account] = randomName();
+    save(m);
+  }
+  return m[account];
+}
+
+/** The account's username in this browser, if it has one (outside React). */
+export function nameOf(account: string): string | undefined {
+  return load()[account];
+}
+
+/** Renames an account (letters, digits, spaces, - and _; up to 32 characters). An empty name clears it. */
+export function setName(account: string, name: string): void {
+  const m = load();
+  const clean = name.trim().replace(/[^\p{L}\p{N} _-]/gu, "").slice(0, 32);
+  if (clean) m[account] = clean;
+  else delete m[account];
+  save(m);
+}
+
+function subscribe(cb: () => void) {
+  window.addEventListener(EVENT, cb);
+  window.addEventListener("storage", cb);
+  return () => {
+    window.removeEventListener(EVENT, cb);
+    window.removeEventListener("storage", cb);
+  };
+}
+
+/** Every name in this browser, re-rendering when one changes. */
+export function useNames(): Record<string, string> {
+  const raw = useSyncExternalStore(
+    subscribe,
+    () => {
+      try {
+        return window.localStorage.getItem(KEY) ?? "{}";
+      } catch {
+        return "{}";
+      }
+    },
+    () => "{}",
+  );
+  return JSON.parse(raw) as Record<string, string>;
+}
+
+/** The account's username if this browser has one, otherwise the account id. */
+export function useDisplayName(account: string | null | undefined): string {
+  const names = useNames();
+  return account ? (names[account] ?? account) : "";
+}
