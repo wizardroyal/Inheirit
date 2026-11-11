@@ -296,7 +296,7 @@ export function StrengthChecklist({ will }: { will: Will }) {
   const watching = (status?.watching ?? {}) as { evm?: boolean; github?: boolean | string; evmAddress?: string };
   const accepted = acceptedGuardians(will).length;
   const items: { label: string; done: boolean; required?: boolean; hint?: string }[] = [
-    { label: `Guardians accepted (${accepted} of the ${will.guardian_threshold} needed)`, done: isArmed(will), required: true, hint: "Send each guardian the invitation link shown under People" },
+    { label: `Enough guardians accepted (${accepted} accepted, ${will.guardian_threshold} needed)`, done: isArmed(will), required: true, hint: "Send each guardian the invitation link shown under People" },
     { label: "At least one heir", done: will.heirs.length > 0, required: true },
     { label: "A strong sign-of-life source (your NEAR account)", done: true, required: true },
     { label: "Heartbeat app opened once", done: !!signals?.heartbeat, hint: "Open the heartbeat app on your phone and add it to your home screen" },

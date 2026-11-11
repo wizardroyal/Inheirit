@@ -11,7 +11,7 @@ const STEPS = [
 ];
 
 const PROBLEMS = [
-  ["Check-in fatigue", "Dead-man's switches make you prove you're alive. People forget.", "No check-ins. Passive signals only."],
+  ["Check-in fatigue", "Dead-man's switches make you prove you're alive. People forget.", "No routine check-ins. It notices activity you already produce, and asks only once you've gone quiet."],
   ["False triggers", "A hospital stay or a lost phone shouldn't hand over your savings.", "Silence alone never triggers anything. It takes enough guardians agreeing, then a challenge period."],
   ["One chain only", "Bitcoin-only or EVM-only tools leave the rest behind.", "One will across NEAR, Ethereum and Bitcoin via Chain Signatures."],
   ["Heirs can't claim", "Heirs don't have a wallet on the right chain, or don't know the assets exist.", "Each heir picks the asset and chain they're paid in (USDC on Base, SOL, NEAR…) via NEAR Intents, with a guided claim page."],
