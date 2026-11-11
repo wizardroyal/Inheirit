@@ -1,6 +1,7 @@
 "use client";
 // "Set your will in motion" (CLAUDE.md §13A.1 items 5–6): a scenario picker and a live checklist on the
 // owner's own will, plus a role switcher so one person can play owner, guardians, heir, lawyer and friend.
+import { useAccountLabel } from "@/lib/names";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useKeys } from "@/lib/hooks";
@@ -147,12 +148,13 @@ export function BackToOwner({ owner }: { owner: string }) {
 /** "View as": every role in this will that this browser can sign for. */
 export function RoleSwitcher({ will }: { will: Will }) {
   useKeys();
+  const label = useAccountLabel();
   const o = will.owner;
   const roles: { label: string; href: string; account: string }[] = [
-    ...will.guardians.map((g, i) => ({ label: `Guardian ${i + 1}`, href: `/guardian/${o}?as=${g.account_id}`, account: g.account_id })),
+    ...will.guardians.map((g) => ({ label: `Guardian: ${label(g.account_id)}`, href: `/guardian/${o}?as=${g.account_id}`, account: g.account_id })),
     ...will.heirs.map((h) => ({ label: `Heir: ${h.name}`, href: `/heir/${o}?as=${h.account_id}`, account: h.account_id })),
-    ...will.contacts.map((c) => ({ label: "Friend", href: `/contact/${o}?as=${c}`, account: c })),
-    ...(will.lawyer ? [{ label: "Lawyer", href: `/guardian/${o}?as=${will.lawyer}`, account: will.lawyer }] : []),
+    ...will.contacts.map((c) => ({ label: `Friend: ${label(c)}`, href: `/contact/${o}?as=${c}`, account: c })),
+    ...(will.lawyer ? [{ label: `Lawyer: ${label(will.lawyer)}`, href: `/guardian/${o}?as=${will.lawyer}`, account: will.lawyer }] : []),
   ].filter((r) => keys.secret(r.account));
   if (!roles.length) return null;
   return (
@@ -282,7 +284,7 @@ function ScenarioPicker({ value, onChange }: { value: Scenario; onChange: (s: Sc
       {SCENARIOS.map((sc) => (
         <label
           key={sc.id}
-          className={`cursor-pointer rounded-lg border p-3 text-sm ${value === sc.id ? "border-accent bg-accent-soft" : "border-line hover:bg-accent-soft"}`}
+          className={`cursor-pointer rounded-lg border p-3 text-sm has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent ${value === sc.id ? "border-accent bg-accent-soft" : "border-line hover:bg-accent-soft"}`}
         >
           <input type="radio" name="scenario" className="sr-only" checked={value === sc.id} onChange={() => onChange(sc.id)} />
           <span className="font-medium">{sc.title}</span>

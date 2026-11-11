@@ -15,7 +15,7 @@ import { humanize, nameOf, useAccountLabel, useNames } from "@/lib/names";
 import { signRequest } from "@/lib/near";
 import { acceptedGuardians, isArmed, type Will } from "@/lib/will";
 import { TelegramLink } from "./TelegramLink";
-import { ActionButton, Card, ErrorNote, Field, inputCls, Pill, SimulatedTag } from "./ui";
+import { ActionButton, Card, Field, inputCls, Pill, SimulatedTag } from "./ui";
 
 const ACCOUNT = /^[a-z0-9._-]{2,64}$/;
 
@@ -121,7 +121,7 @@ function PeopleField({
               }
             }}
             onBlur={() => add(draft)}
-            placeholder={`Their NEAR account, or ⚡ for a test ${what}`}
+            aria-label={`Add a ${what} by NEAR account`} placeholder={`Their NEAR account, or ⚡ for a test ${what}`}
           />
           <GenerateButton owner={owner} what={what} onMade={(p) => add(p.accountId)} />
         </span>
@@ -234,12 +234,12 @@ export function QuickSetup({
         <div className="space-y-3">
           {heirs.map((h, i) => (
             <div key={i} className="grid gap-2 rounded-lg border border-line p-3 sm:grid-cols-[1fr_1.4fr_5rem_auto]">
-              <input className={inputCls} value={h.name} onChange={(e) => setHeir(i, { name: e.target.value })} placeholder="Heir's name" />
+              <input className={inputCls} value={h.name} onChange={(e) => setHeir(i, { name: e.target.value })} aria-label="Heir's name" placeholder="Heir's name" />
               <span className="flex gap-2">
                 {h.account && keys.secret(h.account) ? (
                   <Chip label={`${label(h.account)} · test account`} onRemove={() => setHeir(i, { account: "" })} />
                 ) : (
-                  <input className={`${inputCls} min-w-0 flex-1`} value={h.account} onChange={(e) => setHeir(i, { account: e.target.value.trim() })} placeholder="Their NEAR account" />
+                  <input className={`${inputCls} min-w-0 flex-1`} value={h.account} onChange={(e) => setHeir(i, { account: e.target.value.trim() })} aria-label="Heir's NEAR account" placeholder="Their NEAR account" />
                 )}
                 <GenerateButton
                   owner={owner}
@@ -259,10 +259,10 @@ export function QuickSetup({
                 <span />
               )}
               {assets.ETH && (
-                <input className={`${inputCls} sm:col-span-2`} value={h.eth} onChange={(e) => setHeir(i, { eth: e.target.value })} placeholder="Receives ETH at 0x…" />
+                <input className={`${inputCls} sm:col-span-2`} value={h.eth} onChange={(e) => setHeir(i, { eth: e.target.value })} aria-label="Heir's Ethereum address" placeholder="Receives ETH at 0x…" />
               )}
               {assets.BTC && (
-                <input className={`${inputCls} sm:col-span-2`} value={h.btc} onChange={(e) => setHeir(i, { btc: e.target.value })} placeholder="Receives BTC at tb1…" />
+                <input className={`${inputCls} sm:col-span-2`} value={h.btc} onChange={(e) => setHeir(i, { btc: e.target.value })} aria-label="Heir's Bitcoin address" placeholder="Receives BTC at tb1…" />
               )}
             </div>
           ))}
@@ -274,16 +274,16 @@ export function QuickSetup({
           </div>
         </div>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          <Field label="Guardians" hint="At least two. Add their NEAR accounts, or generate test people. Heirs can't be guardians.">
+          <Field label="Guardians" group hint="At least two. Add their NEAR accounts, or generate test people. Heirs can't be guardians.">
             <PeopleField owner={owner} what="guardian" value={guardians} onChange={setGuardians} label={label} />
           </Field>
           <Field label="How many must confirm">
             <input className={inputCls} value={threshold} onChange={(e) => setThreshold(e.target.value)} />
           </Field>
-          <Field label="Lawyer (optional)" hint="Can speed up the release with a death certificate, but never skips the challenge period.">
+          <Field label="Lawyer (optional)" group hint="Can speed up the release with a death certificate, but never skips the challenge period.">
             <PeopleField owner={owner} what="lawyer" value={lawyer} onChange={setLawyer} label={label} single />
           </Field>
-          <Field label="Friends for a welfare check (optional)" hint="They can only stop things, never start them.">
+          <Field label="Friends for a welfare check (optional)" group hint="They can only stop things, never start them.">
             <PeopleField owner={owner} what="friend" value={contacts} onChange={setContacts} label={label} />
           </Field>
         </div>
@@ -431,7 +431,7 @@ export function StrengthChecklist({ will }: { will: Will }) {
     { label: "Friends for a welfare check", done: will.contacts.length > 0 },
     { label: "A lawyer (can speed up the release with a death certificate)", done: !!will.lawyer },
     { label: "A sealed note for an heir (optional)", done: will.sealed_notes.length > 0, hint: "Add one under Sealed notes" },
-    { label: "Heirs kept private until the release starts", done: will.heirs_hidden },
+    { label: "Heirs hidden in this app until the release starts (still readable on-chain)", done: will.heirs_hidden },
     { label: "NEAR vault funded", done: BigInt(will.near_balance) > 0n },
   ];
   const optional = items.filter((i) => !i.required);
@@ -442,6 +442,7 @@ export function StrengthChecklist({ will }: { will: Will }) {
       <ul className="space-y-1 text-sm">
         {items.map((i) => (
           <li key={i.label} className="flex items-start gap-2">
+            <span className="sr-only">{i.done ? "Done: " : "To do: "}</span>
             <span aria-hidden className={i.done ? "text-accent" : i.required ? "text-danger" : "text-muted"}>
               {i.done ? "✓" : "○"}
             </span>
@@ -458,7 +459,6 @@ export function StrengthChecklist({ will }: { will: Will }) {
           <TelegramLink account={owner} purpose="Link Telegram so the agent can check in there first if you go quiet." />
         </div>
       )}
-      {!armed && <ErrorNote>Not armed yet: until {will.guardian_threshold} guardians accept, nothing can ever start.</ErrorNote>}
     </Card>
   );
 }

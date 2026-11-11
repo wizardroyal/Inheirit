@@ -82,6 +82,8 @@ export interface Overview {
   signals: Signals;
   notifications: Notification[];
   telegram: TelegramStatus;
+  /** The owner's chosen display name (older agents omit it). */
+  display_name?: string | null;
 }
 
 /** NEAR Intents (agent §J). The agent's 1Click client is SIMULATED: NEAR Intents has no testnet. */

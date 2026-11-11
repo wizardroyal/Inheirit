@@ -7,8 +7,8 @@ import { AiBadge } from "@/components/Attestation";
 import { ActionButton, Card, inputCls, Pill, NoWill } from "@/components/ui";
 import { Releases } from "@/components/WillParts";
 import { HeirPayoutList, IntentsSimTag, PayoutChoice } from "@/components/Payouts";
-import { useActingAs, useKeys, usePoll, useWill } from "@/lib/hooks";
-import { useAccountLabel, useDisplayName } from "@/lib/names";
+import { useActingAs, useKeys, usePoll, useWill, useOwnerName } from "@/lib/hooks";
+import { useAccountLabel } from "@/lib/names";
 import { keys } from "@/lib/keys";
 import { agent } from "@/lib/agent";
 import { call, ROLE_TGAS, signRequest, view } from "@/lib/near";
@@ -29,7 +29,7 @@ export default function HeirPage() {
   const owner = decodeURIComponent(useParams<{ owner: string }>().owner);
   const { data: will, loaded, refresh } = useWill(owner);
   const [me, setMe] = useActingAs();
-  const ownerName = useDisplayName(owner);
+  const ownerName = useOwnerName(owner);
   const ownerLabel = useAccountLabel();
   useKeys(); // re-render when the local key store changes
 
@@ -37,7 +37,9 @@ export default function HeirPage() {
   if (!will) return <NoWill owner={owner} />;
   const heir = will.heirs.find((h) => h.account_id === me);
   const s = stateName(will.state);
-  const started = executionStarted(will.state) || will.execution_round > 0;
+  const started = executionStarted(will.state);
+  // Released, then stopped by a sign of life: the owner is alive, so no condolences.
+  const halted = !started && will.execution_round > 0 && will.halted.some((h) => h.round === will.execution_round);
   // Heirs hidden (CLAUDE.md §8): don't list who inherits to visitors before execution. The contract
   // state itself stays readable on-chain; this is a UI-level limit.
   const suggested = will.heirs_hidden && !started ? [] : will.heirs.map((h) => h.account_id);
@@ -50,7 +52,9 @@ export default function HeirPage() {
         <p className="max-w-2xl text-muted">
           {started
             ? `We're sorry for your loss. ${ownerName}'s will is being carried out, and this page walks you through it one step at a time: what you receive, how you'd like to receive it, and any private notes left for you. There's no rush.`
-            : `Nothing has been released, and nothing will be unless ${ownerName}'s guardians confirm they have passed away. Right now the will is at “${stateLabel(s)}”. If you like, you can set up your key now, so you're ready if that day comes.`}
+            : halted
+              ? `Part of ${ownerName}'s will was released, then stopped because ${ownerName} showed a sign of life. Nothing more will move unless the guardians confirm again.`
+              : `Nothing has been released, and nothing will be unless ${ownerName}'s guardians confirm they have passed away. Right now the will is at “${stateLabel(s)}”. If you like, you can set up your key now, so you're ready if that day comes.`}
         </p>
       </div>
       <Step n={1} title="Who you are" done={!!heir}>
@@ -62,7 +66,7 @@ export default function HeirPage() {
       {heir && (
         <Step n={3} title="What you receive">
           <p className="mb-3 text-sm text-muted">
-            What you receive arrives in stages ({schedule(will).map((st) => `${st.pct}%`).join(", ")}), with the longest wait after the first. If it
+            What you receive arrives in stages ({schedule(will).map((st) => `${st.pct}%`).join(", ")}){will.accelerated ? "" : ", with the longest wait after the first"}. If it
             turns out {ownerName} is alive after all, everything stops. Private notes come last, after everything else has been handed over.
           </p>
           <Releases will={will} />
@@ -76,7 +80,7 @@ export default function HeirPage() {
 }
 
 function PayoutStep({ owner, heir }: { owner: string; heir: string }) {
-  const ownerName = useDisplayName(owner);
+  const ownerName = useOwnerName(owner);
   const { data, refresh } = usePoll(() => agent.payouts(owner, heir), 6000, [owner, heir]);
   const mine = data?.heirs[heir];
   return (
@@ -152,26 +156,36 @@ function KeyStep({ owner, heir, refresh }: { owner: string; heir: Will["heirs"][
 }
 
 function RestoreKey({ owner, heir }: { owner: string; heir: string }) {
+  const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null);
   return (
-    <label className="cursor-pointer rounded-lg border border-line px-4 py-2 text-sm hover:bg-accent-soft">
-      Restore from backup
-      <input
-        type="file"
-        accept="application/json"
-        className="hidden"
-        onChange={async (e) => {
-          const f = e.target.files?.[0];
-          if (!f) return;
-          const j = JSON.parse(await f.text()) as { x25519_seed_hex?: string };
-          if (j.x25519_seed_hex && /^[0-9a-f]{64}$/.test(j.x25519_seed_hex)) keys.setHeirSeed(owner, heir, j.x25519_seed_hex);
-        }}
-      />
-    </label>
+    <span className="inline-flex flex-col gap-1">
+      <label className="cursor-pointer rounded-lg border border-line px-4 py-2 text-sm hover:bg-accent-soft focus-within:ring-2 focus-within:ring-accent">
+        Restore from backup
+        <input
+          type="file"
+          accept="application/json"
+          className="sr-only"
+          onChange={async (e) => {
+            const f = e.target.files?.[0];
+            if (!f) return;
+            try {
+              const j = JSON.parse(await f.text()) as { x25519_seed_hex?: string };
+              if (!j.x25519_seed_hex || !/^[0-9a-f]{64}$/.test(j.x25519_seed_hex)) throw new Error("no key");
+              keys.setHeirSeed(owner, heir, j.x25519_seed_hex);
+              setResult({ ok: true, text: "Key restored." });
+            } catch {
+              setResult({ ok: false, text: "That file isn't an Inheirit key backup." });
+            }
+          }}
+        />
+      </label>
+      {result && <span className={`text-xs ${result.ok ? "text-accent" : "text-danger"}`}>{result.text}</span>}
+    </span>
   );
 }
 
 function NotesStep({ owner, will, heir }: { owner: string; will: Will; heir: string }) {
-  const ownerName = useDisplayName(owner);
+  const ownerName = useOwnerName(owner);
   const { data: released } = usePoll(() => view<Released[]>("get_released_notes", { owner, heir }), 15_000, [owner, heir]);
   const [opened, setOpened] = useState<Record<number, string>>({});
   const waiting = will.sealed_notes.filter((n) => n.heir === heir && !(released ?? []).some((r) => r.note_id === n.id));
@@ -227,7 +241,7 @@ function GuideChat({ owner, heir }: { owner: string; heir: string }) {
     setQ("");
     try {
       const r = await agent.heirGuide(await signRequest(heir, "heir_guide", { owner, question, history }));
-      setTurns([...history, { role: "user", content: question }, { role: "assistant", content: r.ok ? r.answer! : `(${r.error})` }]);
+      setTurns([...history, { role: "user", content: question }, { role: "assistant", content: r.ok ? r.answer! : "The guide couldn't answer just now. Please try again in a minute." }]);
     } catch (e) {
       setTurns(history);
       setQ(question);
@@ -252,7 +266,7 @@ function GuideChat({ owner, heir }: { owner: string; heir: string }) {
           className={`${inputCls} min-w-0 flex-1`}
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="What happens next? What's a sealed note?"
+          aria-label="Your question" placeholder="What happens next? How do I open a private note?"
           maxLength={1000}
         />
         <ActionButton disabled={!q.trim()} onClick={ask}>

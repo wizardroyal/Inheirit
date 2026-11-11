@@ -11,7 +11,7 @@
 // Usage: AGENT_CONTRACT_ID=inheirit-dev.testnet DEMO_OWNER=dora npx tsx scripts/demo-sealed-note.ts
 import sodium from "libsodium-wrappers";
 import { checkPolicy, policyHash, type Policy } from "../src/policy/policy";
-import { keypairFromSeed, openSealed, sealTo, toHex } from "../src/sealed/crypto";
+import { bindNote, keypairFromSeed, openSealed, sealTo, toHex } from "../src/sealed/crypto";
 import { loadKeys, saveKey } from "./demo-keys";
 import { acceptGuardians, call, CONTRACT, ensureSubaccount, NEAR, nearblocks, signedRequest, sleep, stateName, view, willConfig } from "./lib/near";
 
@@ -77,7 +77,7 @@ for (let i = 0; i < 12 && !agentKey; i++) {
 }
 if (!agentKey) throw new Error("the agent has not published its sealed-notes key on this contract");
 console.log(`agent sealed-notes key ${agentKey.x25519_pubkey.slice(0, 16)}… (app_id ${agentKey.app_id})`);
-const ciphertext = Buffer.from(await sealTo(NOTE, agentKey.x25519_pubkey)).toString("base64");
+const ciphertext = Buffer.from(await sealTo(bindNote(owner, heir, NOTE), agentKey.x25519_pubkey)).toString("base64");
 const added = await call(owner, "add_sealed_note", { heir, label: "Where the Ledger is", ciphertext }, NEAR / 20n);
 console.log(`sealed note added (${ciphertext.length} base64 chars on-chain, plaintext never sent) ${nearblocks(added.hash)}`);
 

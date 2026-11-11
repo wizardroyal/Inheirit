@@ -2,6 +2,7 @@
 // owner's NEAR account; the agent checks the signature, then asks the chain whether that key really
 // belongs to the account. Full-access keys can do anything; a function-call key limited to the will
 // contract (a heartbeat device key) can only send heartbeats.
+import { RateLimiter } from "./rate-limit";
 import { PublicKey } from "@near-js/crypto";
 import { serialize } from "borsh";
 import { createHash } from "node:crypto";
@@ -71,6 +72,7 @@ export class Nep413Verifier {
   private readonly seen = new Map<string, number>();
   /** Keys recently found missing on their account, by "account/public_key". */
   private readonly missing = new Map<string, number>();
+  private readonly lookups = new RateLimiter({ perKey: 60, global: 20_000, windowMs: 60_000 });
   private lastPrune = 0;
   constructor(private readonly deps: AuthDeps) {}
 
@@ -99,6 +101,12 @@ export class Nep413Verifier {
     // Claimed before the key lookup, so two concurrent replays of one request can't both pass.
     this.seen.set(req.nonce, now);
 
+    // Fresh self-made keys each miss the cache below, so the on-chain lookups themselves are capped per
+    // account (audit round 2): a script can't turn signed junk into unlimited RPC calls.
+    if (this.lookups.take(req.account_id)) {
+      this.seen.delete(req.nonce);
+      throw new AuthError("too many requests for this account; try again in a minute");
+    }
     const keyId = `${req.account_id}/${req.public_key}`;
     const missingSince = this.missing.get(keyId);
     const permission = missingSince !== undefined && now - missingSince < MISSING_KEY_CACHE_MS ? null : await this.deps.accessKey(req.account_id, req.public_key);

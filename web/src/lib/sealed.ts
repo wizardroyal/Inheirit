@@ -13,6 +13,14 @@ export async function ready() {
   return sodium;
 }
 
+/**
+ * The note's text bound to its will (owner) and heir, sealed together: the agent refuses to release a note
+ * that names a different will, so a copied ciphertext is useless. Same shape as bindNote in src/sealed/crypto.ts.
+ */
+export function bindNote(owner: string, heir: string, text: string): string {
+  return JSON.stringify({ v: 2, owner, heir, text });
+}
+
 export async function sealToBase64(plaintext: string, recipientPubHex: string): Promise<string> {
   const s = await ready();
   return s.to_base64(s.crypto_box_seal(plaintext, s.from_hex(recipientPubHex)), s.base64_variants.ORIGINAL);

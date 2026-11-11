@@ -4,6 +4,7 @@
 // - Long polling (getUpdates): outbound calls only, which fits a TEE without an inbound URL.
 // - Privacy: a reply's text is never stored or logged. Only its receive time is kept, and only for
 //   chats linked to an account.
+import { RateLimiter } from "../auth/rate-limit";
 import { randomBytes } from "node:crypto";
 import type { Store } from "../state/store";
 
@@ -58,6 +59,9 @@ export class TelegramBot {
   private readonly now: () => Date;
   private readonly log: (msg: string) => void;
   private readonly onReply?: (accounts: string[]) => void;
+  /** Outgoing messages per account per day, and counted replies per chat per hour (audit round 2). */
+  private readonly sentToday = new RateLimiter({ perKey: 12, global: 5000, windowMs: 24 * 3_600_000 });
+  private readonly replies = new RateLimiter({ perKey: 30, global: 10_000, windowMs: 3_600_000 });
   constructor(
     private readonly api: TelegramApi,
     private readonly store: Store,
@@ -89,6 +93,11 @@ export class TelegramBot {
   async notify(account: string, text: string): Promise<boolean> {
     const chat = this.store.get().telegramChats[account];
     if (!chat) return false;
+    // Anyone can name a linked account in a throwaway will, so no one gets more than a few messages a day.
+    if (this.sentToday.take(account)) {
+      this.log(`[telegram] ${account}: daily message cap reached; not sent`);
+      return false;
+    }
     await this.api.sendMessage(chat.chatId, text);
     return true;
   }
@@ -137,6 +146,8 @@ export class TelegramBot {
       await this.api.sendMessage(chatId, "This chat isn't linked to anyone's will. In Inheirit, choose \"Link Telegram\" to link it.");
       return;
     }
+    // Past the hourly cap, a chat's replies stop counting (each one would cost the agent a transaction).
+    if (this.replies.take(String(chatId))) return;
     // A reply from a linked chat is a sign of life for each account it is linked to. Only the time is kept.
     const at = this.now().toISOString();
     this.store.update((s) => {

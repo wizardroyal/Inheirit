@@ -126,9 +126,11 @@ export function api(deps: ApiDeps): Hono {
     const value = fn();
     cache.set(key, { at: Date.now(), value });
     value.catch(() => cache.delete(key));
-    if (cache.size > 2000) cache.clear();
+    // Bounded: drop the oldest entry, not everyone's cached answers at once.
+    if (cache.size > 2000) cache.delete(cache.keys().next().value!);
     return value;
   }
+  const ACCOUNT_ID = /^[a-z0-9._-]{2,64}$/;
   const tooMany = (waitMs: number) => ({ error: "Too many requests; try again later", retry_after_s: Math.ceil(waitMs / 1000) });
 
   // Notification records are public (the owner's dashboards read them unsigned), so recipients are
@@ -244,6 +246,8 @@ export function api(deps: ApiDeps): Hono {
             }
           : null,
         signals,
+        // The name the owner chose for heirs and guardians to see (from the approved will), if any.
+        display_name: s.policies[owner]?.display_name ?? null,
         notifications: publicNotifications(s.notifications.filter((n) => n.owner === owner).slice(-30), will),
         telegram: deps.telegram ? { enabled: true, bot: deps.telegram.username, linked: deps.telegram.isLinked(owner) } : { enabled: false, linked: false },
       };
@@ -307,6 +311,9 @@ export function api(deps: ApiDeps): Hono {
 
   app.get("/api/vaults/:owner", async (c) => {
     const owner = c.req.param("owner");
+    // Balance lookups cost Sepolia and mempool.space calls: only for wills that exist (audit round 2).
+    if (!ACCOUNT_ID.test(owner)) return c.json({ error: "Not a NEAR account id" }, 400);
+    if (!(await cached(`will:${owner}`, 5_000, () => contract.getWill(owner)).catch(() => null))) return c.json({ error: `No will for ${owner}` }, 404);
     const out = await cached(`vaults:${owner}`, 15_000, async () => {
       const r: Record<string, unknown> = {};
       for (const v of deps.vaults) {

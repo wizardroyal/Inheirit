@@ -2,6 +2,7 @@
 // "Set your will in motion" (CLAUDE.md §13A.1 item 5): the speedrun runs on the owner's own will. It
 // switches the will to compressed (demo) timings with update_will, which keeps accepted guardians,
 // heir keys and notes; afterwards the owner can switch back, or start over once the will is Completed.
+import { nameOf } from "./names";
 import { DEMO_SCHEDULE, REAL_SCHEDULE } from "./config";
 import { agent } from "./agent";
 import { keys } from "./keys";
@@ -54,7 +55,7 @@ export async function startOver(w: Will, progress: (m: string) => void): Promise
   progress("Creating the will again with the same people and shares…");
   await call(w.owner, "create_will", { config: configFromWill(w, isSpeedrun(w) ? DEMO_SCHEDULE : REAL_SCHEDULE) }, nearToYocto("0.1"));
   for (const g of w.guardians.map((x) => x.account_id).filter((g) => keys.secret(g))) {
-    progress(`${g} accepts the guardian role again…`);
+    progress(`${nameOf(g) ?? g.split(".")[0]} accepts the guardian role again…`);
     await call(g, "accept_guardian", { owner: w.owner }, 0n, ROLE_TGAS);
   }
   await agent.registerOwner(await signRequest(w.owner, "register_owner", {}));

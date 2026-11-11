@@ -8,7 +8,7 @@ import { stagesFor, type SchedulePreset } from "@agent/policy/schedule";
 import { keys, type Cast } from "./keys";
 import { call, callMany, createSubaccount, createSubaccounts, nearToYocto, ROLE_TGAS, signRequest, view } from "./near";
 import { createCastAccounts, createDemoAccount } from "./onboard";
-import { sealToBase64 } from "./sealed";
+import { bindNote, sealToBase64 } from "./sealed";
 import type { AgentKey } from "./will";
 
 /**
@@ -125,7 +125,7 @@ export async function createWill(owner: string, o: CreateWillOptions, progress: 
 /** Demo only: the cast's guardians (keys in this browser) accept their role, which arms the will. */
 export async function acceptAsGuardians(owner: string, guardians: string[], progress: Progress): Promise<void> {
   for (const g of guardians) {
-    progress(`${g} accepts the guardian role…`);
+    progress(`${nameOf(g) ?? g.split(".")[0]} accepts the guardian role…`);
     await call(g, "accept_guardian", { owner }, 0n, ROLE_TGAS);
   }
 }
@@ -217,7 +217,7 @@ export function savedPolicy(owner: string): Policy | null {
 export async function addSealedNote(owner: string, heir: string, label: string, text: string): Promise<void> {
   const key = await view<AgentKey | null>("get_agent_pubkey");
   if (!key) throw new Error("The agent hasn't published its sealed-notes key yet, so notes can't be sealed. Try again in a minute.");
-  const ciphertext = await sealToBase64(text, key.x25519_pubkey);
+  const ciphertext = await sealToBase64(bindNote(owner, heir, text), key.x25519_pubkey);
   await call(owner, "add_sealed_note", { heir, label, ciphertext }, nearToYocto("0.05"));
 }
 

@@ -143,9 +143,14 @@ describe("isAdvanceDue", () => {
 
 describe("Driver", () => {
   it("reports a newer strong signal on-chain, kept behind the chain clock", async () => {
-    const t = setup("Active", [adapter("near_onchain", 0.9, () => new Date((T0 + 49) * 1000))]);
+    const t = setup("Active", [adapter("near_onchain", 0.9, () => new Date((T0 + 49) * 1000))], { last_alive_at: T0 - 100 });
     await t.driver.tick();
     expect(t.contract.calls).toEqual([`record_liveness ${T0 + 45}`]);
+  });
+  it("in Active, doesn't pay for a record that barely moves the quiet clock (gas griefing, audit round 2)", async () => {
+    const t = setup("Active", [adapter("phone_heartbeat", 0.9, () => new Date((T0 + 49) * 1000))]);
+    await t.driver.tick();
+    expect(t.contract.calls).toEqual([]);
   });
   it("does not report a lone weak signal", async () => {
     const t = setup("Active", [adapter("x", 0.4, () => new Date((T0 + 40) * 1000))]);

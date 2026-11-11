@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useKeys } from "@/lib/hooks";
 import { accountLabel, useNames } from "@/lib/names";
-import { inputCls } from "./ui";
+import { connectWallet } from "@/lib/wallet";
+import { ActionButton, inputCls } from "./ui";
 
 export function ActAs({ value, onChange, suggested, label = "Acting as" }: { value: string; onChange: (id: string) => void; suggested?: string[]; label?: string }) {
   const { accounts } = useKeys();
@@ -22,9 +23,14 @@ export function ActAs({ value, onChange, suggested, label = "Acting as" }: { val
           ))}
         </select>
       ) : (
-        <span>
-          No accounts in this browser yet. <Link href="/owner" className="text-accent underline">Sign in on Your will</Link> (a free demo account
-          takes a few seconds), or <Link href="/demo" className="text-accent underline">create a demo cast</Link>.
+        <span className="flex flex-wrap items-center gap-2">
+          <span>No account in this browser yet.</span>
+          <ActionButton tone="quiet" onClick={async () => onChange(await connectWallet())}>
+            Connect a wallet
+          </ActionButton>
+          <span className="text-muted">
+            or <Link href="/owner" className="text-accent underline">try with a demo account</Link>
+          </span>
         </span>
       )}
     </div>

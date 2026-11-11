@@ -166,8 +166,3 @@ export function useNames(): Record<string, string> {
   return JSON.parse(raw) as Record<string, string>;
 }
 
-/** The account's username if this browser has one, otherwise its short label (never ".testnet"). */
-export function useDisplayName(account: string | null | undefined): string {
-  const names = useNames();
-  return account ? accountLabel(account, names) : "";
-}

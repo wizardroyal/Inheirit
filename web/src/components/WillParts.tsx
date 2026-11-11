@@ -71,7 +71,7 @@ export function SignalList({ owner, will }: { owner: string; will: Will | null }
         Strong and medium signals count on their own. Weak ones count only when two different sources agree within 24 hours, because posts can be
         scheduled or written by someone else. The agent reads only when something happened, never what it said.
       </p>
-      {error && <p className="text-xs text-danger">Can&apos;t reach the agent right now ({error}). Retrying.</p>}
+      {error && <p className="text-xs text-danger">Can&apos;t reach the will agent right now. Retrying.</p>}
     </div>
   );
 }
@@ -111,7 +111,7 @@ export function NotificationLog({ owner }: { owner: string }) {
           </li>
         ))}
       </ul>
-      {error && <p className="text-xs text-danger">Can&apos;t reach the agent right now ({error}). Retrying.</p>}
+      {error && <p className="text-xs text-danger">Can&apos;t reach the will agent right now. Retrying.</p>}
     </div>
   );
 }

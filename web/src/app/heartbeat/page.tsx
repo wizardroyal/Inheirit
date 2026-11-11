@@ -125,7 +125,7 @@ export default function HeartbeatPage() {
         onClick={() => ping(owner)}
         className="h-52 w-52 rounded-full bg-accent font-serif text-3xl text-accent-ink shadow-lg hover:opacity-95 disabled:opacity-40"
       >
-        {busy ? "…" : "I'm here"}
+        {busy ? "Sending…" : "I'm here"}
       </button>
       <div className="min-h-12 space-y-1">
         {status && <p className={status.ok ? "font-medium text-accent" : "text-danger"}>{status.text}</p>}

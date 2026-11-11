@@ -24,7 +24,7 @@ export function Ladder({ will, compact = false }: { will: Will; compact?: boolea
           return (
             <li key={r.state} className={`flex gap-3 rounded-lg px-3 py-2 ${on ? "bg-accent-soft" : ""}`}>
               <span
-                className={`mt-1 h-3 w-3 shrink-0 rounded-full border-2 ${on ? "border-accent bg-accent" : past ? "border-accent" : "border-line"}`}
+                className={`mt-1 h-3 w-3 shrink-0 rounded-full border ${on ? "border-accent bg-accent" : past ? "border-accent" : "border-line"}`}
                 aria-hidden
               />
               <div>

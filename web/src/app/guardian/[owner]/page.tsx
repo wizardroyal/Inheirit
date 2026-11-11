@@ -7,8 +7,8 @@ import { Ladder } from "@/components/Ladder";
 import { ActionButton, Card, ErrorNote, Field, inputCls, Pill, NoWill } from "@/components/ui";
 import { TelegramLink } from "@/components/TelegramLink";
 import { SignalList } from "@/components/WillParts";
-import { useActingAs, useWill } from "@/lib/hooks";
-import { useAccountLabel, useDisplayName } from "@/lib/names";
+import { useActingAs, useWill, useOwnerName } from "@/lib/hooks";
+import { useAccountLabel } from "@/lib/names";
 import { call, ROLE_TGAS } from "@/lib/near";
 import { ago, guardianIds, stateName } from "@/lib/will";
 
@@ -27,8 +27,9 @@ function LawyerCard({ owner, lawyer, state, accelerated, refresh }: { owner: str
   return (
     <Card title="Lawyer: death certificate" aside={accelerated ? <Pill tone="warn">faster schedule on</Pill> : undefined}>
       <p className="text-sm text-muted">
-        A death certificate shortens the remaining waits (10% → 30% → 60%, 14 days apart for real wills). It never skips the guardian vote or the
-        challenge period, so it can&apos;t be used to rush the will of someone who is still alive.
+        A death certificate shortens the remaining waits (before the release: 10% → 30% → 60%, 14 days apart for real wills; once it has begun,
+        the remaining slices keep their sizes and only the waits get shorter). It never skips the guardian vote or the challenge period, so it
+        can&apos;t be used to rush the will of someone who is still alive.
       </p>
       {accelerated ? (
         <p className="mt-3 text-sm">A death certificate is on record, so the faster schedule applies.</p>
@@ -63,7 +64,7 @@ export default function GuardianPage() {
   const { data: will, loaded, refresh } = useWill(owner);
   const [me, setMe] = useActingAs();
   const [evidence, setEvidence] = useState<{ name: string; hash: string } | null>(null);
-  const ownerName = useDisplayName(owner);
+  const ownerName = useOwnerName(owner);
   const label = useAccountLabel();
 
   if (!loaded) return <p>Loading…</p>;
@@ -78,7 +79,7 @@ export default function GuardianPage() {
     <div className="space-y-6">
       <div className="space-y-2">
         <BackToOwner owner={owner} />
-        <h1 className="font-serif text-4xl">Guardian for {ownerName}</h1>
+        <h1 className="font-serif text-4xl">{me && me === will.lawyer ? "Lawyer" : "Guardian"} for {ownerName}</h1>
         <p className="max-w-2xl text-muted">
           {ownerName} chose you because they trust you to tell the truth. Confirm a passing only if you&apos;re sure. If you believe they&apos;re alive,
           say so: one “they&apos;re alive” from any guardian stops everything.
@@ -111,7 +112,17 @@ export default function GuardianPage() {
           </div>
         </Card>
         <Card title="Your answer" aside={voting ? <Pill tone="warn">vote open</Pill> : <Pill>no vote open</Pill>}>
-          {!voting && <p className="text-sm text-muted">Nothing to do now. Guardians are only asked once the owner has been silent and nobody in the welfare check has heard from them.</p>}
+          {!voting && (
+            <p className="text-sm text-muted">
+              {s === "Challenge"
+                ? `Enough guardians have confirmed. ${ownerName} is being alerted; any sign of life still cancels.`
+                : s === "Completed"
+                  ? "The will has been carried out. Nothing more is needed from you."
+                  : ["Executing", "SecretsBuffer", "SecretsReleased"].includes(s)
+                    ? "The will is being carried out. Nothing is needed from you."
+                    : `Nothing to do now. Guardians are only asked once ${ownerName} has been silent and nobody in the welfare check has heard from them.`}
+            </p>
+          )}
           {voting && (
             <div className="space-y-4">
               <p className="text-sm">

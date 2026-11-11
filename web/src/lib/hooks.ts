@@ -1,5 +1,5 @@
 "use client";
-import { useNames, useOwners } from "./names";
+import { accountLabel, useNames, useOwners } from "./names";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { agent } from "./agent";
@@ -158,4 +158,14 @@ export function useMyAccounts(): string[] {
   const names = useNames();
   const remembered = useOwners();
   return accounts.filter((a) => remembered.includes(a) || /^([A-Z][a-z]+){3}$/.test(names[a] ?? "") || casts.some((c) => c.owner === a));
+}
+
+/**
+ * How to name a will's owner on the guardian, heir and friend pages: this browser's name for them, else the
+ * display name they chose in their will (from the agent), else their account's short label.
+ */
+export function useOwnerName(owner: string): string {
+  const names = useNames();
+  const { data } = useOverview(owner);
+  return names[owner] ?? data?.display_name ?? accountLabel(owner, names);
 }

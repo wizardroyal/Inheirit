@@ -46,7 +46,7 @@ export function SignsOfLife({ owner, will }: { owner: string; will: Will }) {
         </div>
         <ol className="tech mt-2 grid text-[11px] leading-tight text-muted" style={{ gridTemplateColumns: `repeat(${LADDER.length}, minmax(0, 1fr))` }}>
           {LADDER.map((r, i) => (
-            <li key={r.state} className={`pr-1 ${i === idx ? "font-semibold text-ink" : ""} ${i > idx ? "opacity-60" : ""}`}>
+            <li key={r.state} className={`pr-1 ${i === idx ? "font-semibold text-ink" : ""} ${i > idx ? "text-muted" : ""}`}>
               <span className="hidden sm:inline">{r.label}</span>
               <span className="sm:hidden">{i === idx ? r.label : ""}</span>
             </li>
@@ -75,7 +75,7 @@ export function SignsOfLife({ owner, will }: { owner: string; will: Will }) {
 
       {/* Verdict */}
       {data?.verdict && (
-        <div className="rounded-lg bg-accent-soft px-4 py-3">
+        <div className="rounded-lg bg-accent-soft px-4 py-3" role="status" aria-live="polite">
           {/* The agent's verdict can trail the chain by a poll; at the snap-back, say what just happened. */}
           <p className="font-medium">{snapped > 0
               ? movedThisRound
@@ -96,7 +96,7 @@ export function SignsOfLife({ owner, will }: { owner: string; will: Will }) {
           const at = data!.observations[s.source]!.at;
           const st = strength(s.weight);
           return (
-            <li key={`${s.source}-${pulsing[s.source] ?? 0}`} className={`flex items-center justify-between gap-2 rounded-lg border border-line px-3 py-2 text-sm ${pulsing[s.source] ? "signal-pulse" : ""}`}>
+            <li key={`${s.source}-${pulsing[s.source] ?? 0}`} className="flex items-center justify-between gap-2 rounded-lg border border-line px-3 py-2 text-sm">
               <span className="flex flex-wrap items-center gap-2">
                 <span className={`h-2 w-2 rounded-full ${st.label === "weak" ? "bg-muted" : "bg-accent"}`} aria-hidden />
                 {SOURCE_LABELS[s.source]}

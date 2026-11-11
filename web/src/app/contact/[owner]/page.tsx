@@ -4,8 +4,8 @@ import { useParams } from "next/navigation";
 import { ActAs } from "@/components/ActAs";
 import { BackToOwner } from "@/components/Speedrun";
 import { ActionButton, Card, NoWill } from "@/components/ui";
-import { useActingAs, useWill } from "@/lib/hooks";
-import { useAccountLabel, useDisplayName } from "@/lib/names";
+import { useActingAs, useWill, useOwnerName } from "@/lib/hooks";
+import { useAccountLabel } from "@/lib/names";
 import { call, ROLE_TGAS } from "@/lib/near";
 import { acceptedGuardians, stateName } from "@/lib/will";
 
@@ -13,7 +13,7 @@ export default function ContactPage() {
   const owner = decodeURIComponent(useParams<{ owner: string }>().owner);
   const { data: will, loaded, refresh } = useWill(owner);
   const [me, setMe] = useActingAs();
-  const ownerName = useDisplayName(owner);
+  const ownerName = useOwnerName(owner);
   const label = useAccountLabel();
   if (!loaded) return <p>Loading…</p>;
   if (!will) return <NoWill owner={owner} />;
@@ -38,7 +38,11 @@ export default function ContactPage() {
             </ActionButton>
           ) : (
             <p className="text-sm text-muted">
-              {s === "Active" ? "Thanks. No check is needed right now: they're active." : "The welfare check has closed, and the guardians now decide."}
+              {s === "Active"
+                ? `No check is needed right now: ${ownerName} is active.`
+                : s === "GuardianVote" || s === "Challenge"
+                  ? "The welfare check has closed, and the guardians now decide."
+                  : "The will has moved past the welfare check."}
             </p>
           )}
         </div>

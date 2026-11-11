@@ -362,6 +362,21 @@ fn start_over_never_refunds_storage_the_contract_paid_for() {
 }
 
 #[test]
+fn start_over_keeps_only_the_latest_released_notes() {
+    let mut t = T::with_will();
+    t.to_completed();
+    let mut w = t.will();
+    for i in 0..(MAX_NOTES as u32 + 5) {
+        w.released_notes.push(ReleasedNote { note_id: i, heir: acc(H1), label: "n".into(), ciphertext: vec![1u8; 10].into(), at: T0 });
+    }
+    t.c.wills.insert(acc(OWNER), w);
+    t.pay(OWNER, STORAGE_DEPOSIT).create_will(config());
+    let kept = t.will().released_notes;
+    assert_eq!(kept.len(), MAX_NOTES);
+    assert_eq!(kept.last().unwrap().note_id, MAX_NOTES as u32 + 4);
+}
+
+#[test]
 fn start_over_rejected_before_completed() {
     for to_state in states_before_completed() {
         let mut t = T::with_will();

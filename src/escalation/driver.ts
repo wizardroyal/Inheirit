@@ -315,7 +315,12 @@ export class Driver {
       const verdict = scoreAlive(await this.observe(cfg), this.now());
       if (verdict) {
         const atS = Math.min(Math.floor(verdict.at.getTime() / 1000), nowS - CHAIN_CLOCK_MARGIN_S);
-        if (atS > will.last_alive_at) {
+        // Outside Active every newer sign of life is recorded (it's what halts). In Active the record only
+        // keeps the quiet clock fresh, so it's written at most every max(60 s, quiet_after/10): otherwise
+        // anyone with a free account could burn the agent's gas with a heartbeat every few seconds.
+        const active = stateName(will.state) === "Active";
+        const minStep = active ? Math.max(60, Math.floor(will.timings.quiet_after / 10)) : 1;
+        if (atS - will.last_alive_at >= minStep) {
           await contract.recordLiveness(cfg.owner, atS);
           this.log(`[driver] ${cfg.owner}: alive at ${new Date(atS * 1000).toISOString()} (${verdict.basis.join("+")})`);
           will = (await contract.getWill(cfg.owner))!;
@@ -403,7 +408,13 @@ export class Driver {
     const at = this.now().toISOString();
     this.deps.store.update((s) => {
       s.notifications.push({ at, owner, ...m, channels });
-      s.notifications = s.notifications.slice(-500);
+      // Per owner, so one busy (or griefing) will can't push everyone else's history out.
+      const mine = s.notifications.filter((n) => n.owner === owner);
+      if (mine.length > 60) {
+        const drop = new Set(mine.slice(0, mine.length - 60));
+        s.notifications = s.notifications.filter((n) => !drop.has(n));
+      }
+      s.notifications = s.notifications.slice(-5000);
     });
   }
 

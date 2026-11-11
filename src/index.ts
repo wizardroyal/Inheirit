@@ -118,6 +118,29 @@ setInterval(async () => {
   }
 }, SIX_DAYS_MS);
 
+// Gas watchdog: the agent pays for every advance, record and signature. If its balance runs low (heavy
+// use, or someone trying to drain it), top it up from the sponsor, at most a few times a day so a drain
+// can't empty the sponsor either (audit round 2).
+const GAS_FLOOR = 0.25;
+const GAS_TOP_UPS_PER_DAY = 4;
+let gasTopUps: number[] = [];
+setInterval(async () => {
+  try {
+    if ((await agent.balance()) >= GAS_FLOOR) return;
+    const dayAgo = Date.now() - 24 * 3_600_000;
+    gasTopUps = gasTopUps.filter((t) => t > dayAgo);
+    if (gasTopUps.length >= GAS_TOP_UPS_PER_DAY) {
+      console.error(`Agent balance below ${GAS_FLOOR} NEAR and today's ${GAS_TOP_UPS_PER_DAY} top-ups are used`);
+      return;
+    }
+    gasTopUps.push(Date.now());
+    console.log(`Agent balance below ${GAS_FLOOR} NEAR; topping up 0.5 from the sponsor`);
+    await agent.fund(0.5);
+  } catch (error) {
+    console.error("Gas watchdog:", error instanceof Error ? error.message : error);
+  }
+}, 5 * 60_000);
+
 // The will agent
 const store = Store.inDir(config.dataDir());
 const contract = new ShadeWillContract(agent);

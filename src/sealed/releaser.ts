@@ -5,7 +5,7 @@
 // avoid spending gas on calls that would fail.
 import type { WillContract, WillView } from "../near/will-contract";
 import { stateName } from "../near/will-contract";
-import { reseal, toHex, type SealedKeypair } from "./crypto";
+import { reseal, toHex, UnboundNoteError, type SealedKeypair } from "./crypto";
 
 export class NoteReleaser {
   /** Notes this key cannot open (sealed to another key); logged once, not retried every tick. */
@@ -34,10 +34,14 @@ export class NoteReleaser {
 
       let ciphertext: Uint8Array;
       try {
-        ciphertext = await reseal(Buffer.from(note.ciphertext, "base64"), this.keypair, heirKey);
-      } catch {
+        ciphertext = await reseal(Buffer.from(note.ciphertext, "base64"), this.keypair, heirKey, { owner: will.owner, heir: note.heir });
+      } catch (e) {
         this.unopenable.add(ref);
-        this.log(`[notes] ${will.owner}: note ${note.id} can't be opened with this agent's key; the owner must re-seal it`);
+        this.log(
+          e instanceof UnboundNoteError
+            ? `[notes] ${will.owner}: note ${note.id} refused (${e.message}); it is never released`
+            : `[notes] ${will.owner}: note ${note.id} can't be opened with this agent's key; the owner must re-seal it`,
+        );
         continue;
       }
       await this.contract.storeReleasedNote(will.owner, note.id, note.heir, Buffer.from(ciphertext).toString("base64"));

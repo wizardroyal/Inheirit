@@ -1,7 +1,7 @@
 import sodium from "libsodium-wrappers";
 import { beforeAll, describe, expect, it } from "vitest";
 import type { WillContract, WillState, WillView } from "../src/near/will-contract";
-import { keypairFromSeed, openSealed, reseal, sealTo, toHex, type SealedKeypair } from "../src/sealed/crypto";
+import { bindNote, keypairFromSeed, openSealed, reseal, sealTo, toHex, UnboundNoteError, type SealedKeypair } from "../src/sealed/crypto";
 import { ensureAgentKey, NoteReleaser } from "../src/sealed/releaser";
 
 let agent: SealedKeypair;
@@ -61,10 +61,18 @@ const RELEASED: WillState = { SecretsReleased: { since: 0 } };
 
 describe("sealed note crypto", () => {
   it("re-seals a note from the agent key to the heir key", async () => {
-    const note = await sealTo("The Ledger is in the blue folder in the study", toHex(agent.publicKey));
-    const released = await reseal(note, agent, toHex(heir.publicKey));
+    const note = await sealTo(bindNote("alice.testnet", "bola.testnet", "The Ledger is in the blue folder in the study"), toHex(agent.publicKey));
+    const released = await reseal(note, agent, toHex(heir.publicKey), { owner: "alice.testnet", heir: "bola.testnet" });
     expect(await openSealed(released, heir)).toBe("The Ledger is in the blue folder in the study");
     await expect(openSealed(released, agent)).rejects.toThrow();
+  });
+
+  it("refuses a note written for another will or heir, and an unbound (pre-v2) note", async () => {
+    const note = await sealTo(bindNote("victim.testnet", "kid.testnet", "seed words"), toHex(agent.publicKey));
+    await expect(reseal(note, agent, toHex(heir.publicKey), { owner: "attacker.testnet", heir: "kid.testnet" })).rejects.toThrow(UnboundNoteError);
+    await expect(reseal(note, agent, toHex(heir.publicKey), { owner: "victim.testnet", heir: "bola.testnet" })).rejects.toThrow(UnboundNoteError);
+    const legacy = await sealTo("seed words", toHex(agent.publicKey));
+    await expect(reseal(legacy, agent, toHex(heir.publicKey), { owner: "victim.testnet", heir: "kid.testnet" })).rejects.toThrow(UnboundNoteError);
   });
 
   it("derives the same keypair from the same seed", async () => {
@@ -78,9 +86,20 @@ describe("sealed note crypto", () => {
 });
 
 describe("NoteReleaser", () => {
-  async function noteFor(heirAccount = "bola.testnet", id = 0, text = "secret") {
-    return { id, heir: heirAccount, label: "where", ciphertext: b64(await sealTo(text, toHex(agent.publicKey))) };
+  async function noteFor(heirAccount = "bola.testnet", id = 0, text = "secret", owner = "alice.testnet") {
+    return { id, heir: heirAccount, label: "where", ciphertext: b64(await sealTo(bindNote(owner, heirAccount, text), toHex(agent.publicKey))) };
   }
+
+  it("never re-seals a note copied from someone else's will (audit round 2)", async () => {
+    const c = new FakeContract();
+    const logs: string[] = [];
+    const r = new NoteReleaser(c as unknown as WillContract, agent, (m) => logs.push(m));
+    // The attacker's will (alice.testnet here) holds a ciphertext copied from victim.testnet's will.
+    const copied = await noteFor("bola.testnet", 0, "victim's seed words", "victim.testnet");
+    expect(await r.run(will(RELEASED, { sealed_notes: [copied] }))).toBe(0);
+    expect(c.stored).toHaveLength(0);
+    expect(logs.join()).toMatch(/refused/);
+  });
 
   it("releases each note to its heir once the will reaches SecretsReleased", async () => {
     const c = new FakeContract();

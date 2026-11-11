@@ -1,4 +1,5 @@
 "use client";
+import { stateLabel, type StateName } from "./will";
 import { boostPolling, shared } from "./boost";
 import { Account } from "@near-js/accounts";
 import { KeyPair, type KeyPairString } from "@near-js/crypto";
@@ -103,7 +104,9 @@ function failureMessage(f: unknown): string {
 export function errorText(e: unknown): string {
   const msg = e instanceof Error ? e.message : String(e);
   const m = msg.match(/Smart contract panicked: ([^"\\\n]+)/);
-  if (m) return m[1];
+  // Contract messages name states as code does ("only during GuardianVote"); say them as the ladder does.
+  if (m) return m[1].replace(/\b(Active|Quiet|WelfareCheck|GuardianVote|Challenge|Executing|SecretsBuffer|SecretsReleased|Completed)\b/g, (st) => `“${stateLabel(st as StateName)}”`);
+  if (/expired|InvalidNonce/i.test(msg)) return "The network was slow and the request timed out. Please press the button again.";
   if (/failed to fetch|networkerror|load failed/i.test(msg)) return "Couldn't reach the server. Check your connection and try again in a moment.";
   if (/NotEnoughBalance|LackBalanceForState|not enough balance/i.test(msg)) return "This account doesn't have enough testnet NEAR for that. Use “Get free testnet NEAR” on Your will.";
   if (/rejected|User closed|cancel/i.test(msg) && /wallet|user|request/i.test(msg)) return "The wallet request was cancelled.";

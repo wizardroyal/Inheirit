@@ -105,7 +105,7 @@ Pick another scenario on the same card. The card shows a checklist with a button
 
 | Tech | Used for | Code |
 |---|---|---|
-| NEAR smart contract (Rust, near-sdk 5) | Will state machine (stage waits, secrets buffer, guardian consent, lawyer acceleration, Start over), NEAR vault, signing gate, sealed-note storage, NEP-297 events | `agent-contract/src/will/` (161 unit tests, sandbox tests in `agent-contract/tests/will_flow_tests.rs`) |
+| NEAR smart contract (Rust, near-sdk 5) | Will state machine (stage waits, secrets buffer, guardian consent, lawyer acceleration, Start over), NEAR vault, signing gate, sealed-note storage, NEP-297 events | `agent-contract/src/will/` (162 unit tests, sandbox tests in `agent-contract/tests/will_flow_tests.rs`) |
 | **Chain Signatures** (`v1.signer-prod.testnet`) | Vault addresses on Sepolia and BTC testnet4, derived from the contract account (`heirloom/<owner>/eth\|btc`); release and withdrawal signatures | gate: `agent-contract/src/will/agent.rs`; tx building: `src/chains/evm.ts`, `src/chains/btc.ts` (chainsig.js) |
 | **Shade Agent Framework** (TEE on Phala) | The will agent: liveness scoring and verdict, escalation and checks, execution, sealed-note crypto, Telegram bot. Registered with a real TDX attestation; measurements approved on-chain. | `src/index.ts`, `src/escalation/`, `src/liveness/`, `src/executor/`, `src/sealed/`, `src/telegram/`, `scripts/tee-agent.ts` |
 | **NEAR AI Cloud** (private inference) | Plain-English will → structured policy; heir claim guide. Will text goes only to a model whose attestation passes (TDX quote, NVIDIA GPU, signer bound to a fresh nonce; checked at startup and before each use), and every answer's signature must recover to the attested signer. | `src/ai/attestation.ts`, `src/ai/nearai.ts`, `src/ai/policy-parser.ts`, `src/ai/heir-guide.ts` |
@@ -184,7 +184,7 @@ The agent and its tests:
 
 ```bash
 npm ci                                  # repo root
-npm test                                # agent tests (220)
+npm test                                # agent tests (223)
 cp .env.example .env                    # AGENT_CONTRACT_ID, SPONSOR_*, NEARAI_API_KEY, DEMO_MODE=true (TELEGRAM_* optional)
 npm run dev                             # agent on :3000
 ```

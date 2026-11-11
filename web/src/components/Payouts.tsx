@@ -405,8 +405,9 @@ export function FundAnywhere({ owner, vaults }: { owner: string; vaults: ("Near"
       {quote && (
         <div className="rounded-lg bg-accent-soft p-3">
           <p>
-            Send <b>{quote.quote.amountInFormatted} {quote.origin.symbol}</b> on {chainLabel(quote.origin.blockchain)} to{" "}
-            <span className="break-all font-mono text-xs">{quote.quote.depositAddress}</span>
+            {quote.simulated ? "On mainnet you'd send" : "Send"} <b>{quote.quote.amountInFormatted} {quote.origin.symbol}</b> on{" "}
+            {chainLabel(quote.origin.blockchain)} to {quote.simulated ? "a one-time deposit address" : <span className="break-all font-mono text-xs">{quote.quote.depositAddress}</span>}
+            {quote.simulated && ". Here it's SIMULATED: don't send anything."}
           </p>
           <p className="mt-1">
             Your {VAULT_LABEL[quote.vault as "Near"]} receives ≈ <b>{quote.quote.amountOutFormatted}</b> (${Number(quote.quote.amountOutUsd).toFixed(2)}) in about{" "}

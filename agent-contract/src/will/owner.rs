@@ -24,7 +24,9 @@ impl Contract {
             will.execution_round = old.execution_round;
             will.next_note_id = old.next_note_id;
             // Notes already released to heirs stay readable: an heir may not have opened them yet.
-            will.released_notes = old.released_notes.clone();
+            // At most the latest MAX_NOTES: repeated Start overs must not grow contract-paid storage forever.
+            let keep = old.released_notes.len().saturating_sub(MAX_NOTES);
+            will.released_notes = old.released_notes[keep..].to_vec();
         }
         emit(
             "will_created",

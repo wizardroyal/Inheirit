@@ -259,7 +259,7 @@ function WillPanel({ cast }: { cast: Cast }) {
           </div>
         </Card>
 
-        <Card title="Guardians and contacts">
+        <Card title="Guardians and a friend">
           <ul className="space-y-2 text-sm">
             {cast.guardians.map((g) => {
               const a = will.attestations.find((x) => x.guardian === g);
@@ -390,7 +390,7 @@ function describeTransition(a: StateName, b: StateName, will: Will, who: string)
     case "Quiet":
       return `${who} went quiet. Checking in: heartbeat app, email, Telegram, DMs`;
     case "WelfareCheck":
-      return "No reply to the checks. Guardians, friends and the lawyer are asked";
+      return "No reply to the checks. The guardians and the friend are asked";
     case "GuardianVote":
       return "Nobody has heard from them. Guardians are asked to vote";
     case "Challenge":

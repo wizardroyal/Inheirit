@@ -16,6 +16,8 @@
   --muted: #5a605b;
   --line: #e3ddd2;
   --line-strong: #cbc3b4;
+  /* Input borders need 3:1 against the card (WCAG 1.4.11); --line is decorative only. */
+  --field: #8a8275;
   --accent: #2f5d50;
   --accent-ink: #ffffff;
   --accent-soft: #e3ece6;
@@ -38,6 +40,7 @@
     --muted: #aaa294;
     --line: #3a352f;
     --line-strong: #514a41;
+    --field: #857c6f;
     --accent: #8cc0ac;
     --accent-ink: #13201b;
     --accent-soft: #283530;
@@ -58,6 +61,7 @@
   --color-muted: var(--muted);
   --color-line: var(--line);
   --color-line-strong: var(--line-strong);
+  --color-field: var(--field);
   --color-accent: var(--accent);
   --color-accent-ink: var(--accent-ink);
   --color-accent-soft: var(--accent-soft);

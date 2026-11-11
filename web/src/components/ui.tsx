@@ -1,4 +1,5 @@
 "use client";
+import { useAccountLabel } from "@/lib/names";
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
 import { errorText } from "@/lib/near";
@@ -93,7 +94,19 @@ export function Details({ summary, children }: { summary: ReactNode; children: R
   );
 }
 
-export function Field({ label, children, hint }: { label: string; children: ReactNode; hint?: string }) {
+/**
+ * A labelled field. `group` renders a fieldset for groups of controls (chips with × buttons): a <label>
+ * would forward a click on its text to the first button inside it.
+ */
+export function Field({ label, children, hint, group }: { label: string; children: ReactNode; hint?: string; group?: boolean }) {
+  if (group)
+    return (
+      <fieldset className="flex min-w-0 flex-col gap-1 text-sm">
+        <legend className="mb-1 font-medium">{label}</legend>
+        {children}
+        {hint && <span className="text-xs text-muted">{hint}</span>}
+      </fieldset>
+    );
   return (
     <label className="flex flex-col gap-1 text-sm">
       <span className="font-medium">{label}</span>
@@ -103,7 +116,7 @@ export function Field({ label, children, hint }: { label: string; children: Reac
   );
 }
 
-export const inputCls = "rounded-lg border border-line bg-bg px-3 py-2 text-sm outline-none focus:border-accent";
+export const inputCls = "rounded-lg border border-field bg-card px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent";
 
 export function ExtLink({ href, children }: { href: string; children: ReactNode }) {
   return (
@@ -145,11 +158,12 @@ export function ErrorNote({ children }: { children: ReactNode }) {
 
 /** Empty state for a page addressed to an owner whose will doesn't exist (yet) on this contract. */
 export function NoWill({ owner }: { owner: string }) {
+  const label = useAccountLabel();
   return (
     <Card title="No will found">
       <div className="space-y-2 text-sm">
         <p>
-          There&apos;s no will for <span className="font-mono">{owner}</span> yet. Check the account name in the link you were sent. If the will was
+          There&apos;s no will for <span className="font-medium">{label(owner)}</span> yet. Check the account name in the link you were sent. If the will was
           only just created, give it a few seconds and reload.
         </p>
         <p className="text-muted">

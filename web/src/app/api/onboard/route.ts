@@ -45,6 +45,20 @@ function overBudget(amount: bigint): boolean {
   spent.yocto += amount;
   return false;
 }
+// Per network, across every kind: separate per-kind limits added up to ~20 NEAR an hour (audit round 2).
+const perIp = new Map<string, { windowStart: number; yocto: bigint }>();
+function overIpBudget(ip: string, amount: bigint): boolean {
+  const now = Date.now();
+  let b = perIp.get(ip);
+  if (!b || now - b.windowStart >= 3_600_000) b = { windowStart: now, yocto: 0n };
+  if (b.yocto + amount > nearToYocto(env("ONBOARD_IP_HOURLY_NEAR", "6")!)) return true;
+  b.yocto += amount;
+  perIp.set(ip, b);
+  if (perIp.size > 10_000) perIp.delete(perIp.keys().next().value!);
+  return false;
+}
+const IP_BUDGET_GONE = "This network has used its free testnet NEAR for this hour; please try again later";
+
 const BUDGET_GONE = "This hour's free testnet NEAR has run out; please try again in a little while";
 
 // Accounts topped up by this instance in the last day: one top-up per account.
@@ -97,6 +111,8 @@ async function topUp(p: NonNullable<ReturnType<typeof parent>>, ip: string, acco
   if (!/^[a-z0-9._-]{2,64}$/.test(accountId) || (!accountId.endsWith(".testnet") && !/^[0-9a-f]{64}$/.test(accountId))) {
     return Response.json({ error: "accountId must be a testnet account" }, { status: 400 });
   }
+  // Accounts we created were funded at creation; topping them up again would let them be drained and recycled.
+  if (accountId === p.id || accountId.endsWith(`.${p.id}`)) return Response.json({ error: "This account was funded when it was created" }, { status: 409 });
   if (Date.now() - (toppedUp.get(accountId) ?? 0) < 86_400_000) return Response.json({ error: "This account was already topped up today" }, { status: 429 });
   if (limited(`topup:${ip}`, 3, 3_600_000)) return Response.json({ error: "Too many top-ups from this network; try again later" }, { status: 429 });
   let have: bigint;
@@ -112,6 +128,7 @@ async function topUp(p: NonNullable<ReturnType<typeof parent>>, ip: string, acco
   if (BigInt((await p.provider.viewAccount(p.id)).amount) - amount < floor) {
     return Response.json({ error: "Today's free testnet NEAR has run out; please try again later" }, { status: 503 });
   }
+  if (overIpBudget(ip, amount)) return Response.json({ error: IP_BUDGET_GONE }, { status: 429 });
   if (overBudget(amount)) return Response.json({ error: BUDGET_GONE }, { status: 503 });
   toppedUp.set(accountId, Date.now());
   if (toppedUp.size > 10_000) toppedUp.clear();
@@ -135,6 +152,7 @@ async function cast(p: NonNullable<ReturnType<typeof parent>>, ip: string, publi
   if (BigInt((await p.provider.viewAccount(p.id)).amount) - each * BigInt(CAST_ROLES.length) < floor) {
     return Response.json({ error: "Today's free testnet accounts have run out; please try again later" }, { status: 503 });
   }
+  if (overIpBudget(ip, each * BigInt(CAST_ROLES.length))) return Response.json({ error: IP_BUDGET_GONE }, { status: 429 });
   if (overBudget(each * BigInt(CAST_ROLES.length))) return Response.json({ error: BUDGET_GONE }, { status: 503 });
   const tag = randomBytes(4).toString("hex");
   const accounts: Record<string, string> = {};
@@ -155,6 +173,7 @@ async function person(p: NonNullable<ReturnType<typeof parent>>, ip: string, pub
   if (BigInt((await p.provider.viewAccount(p.id)).amount) - each < floor) {
     return Response.json({ error: "Today's free testnet accounts have run out; please try again later" }, { status: 503 });
   }
+  if (overIpBudget(ip, each)) return Response.json({ error: IP_BUDGET_GONE }, { status: 429 });
   if (overBudget(each)) return Response.json({ error: BUDGET_GONE }, { status: 503 });
   const accountId = `p-${randomBytes(5).toString("hex")}.${p.id}`;
   await createFunded(p, accountId, publicKey, each);
@@ -230,6 +249,7 @@ export async function POST(req: Request) {
   const floor = nearToYocto(env("ONBOARD_PARENT_FLOOR_NEAR", "3")!);
   const balance = BigInt((await p.provider.viewAccount(p.id)).amount);
   if (balance - amount < floor) return Response.json({ error: "Today's free testnet accounts have run out; please try again later" }, { status: 503 });
+  if (overIpBudget(ip, amount)) return Response.json({ error: IP_BUDGET_GONE }, { status: 429 });
   if (overBudget(amount)) return Response.json({ error: BUDGET_GONE }, { status: 503 });
 
   await createFunded(p, id, publicKey, amount);

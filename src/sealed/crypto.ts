@@ -34,13 +34,43 @@ export async function openSealed(ciphertext: Uint8Array, kp: SealedKeypair): Pro
   return sodium.to_string(sodium.crypto_box_seal_open(ciphertext, kp.publicKey, kp.privateKey));
 }
 
-/** Opens a note sealed to `kp` and seals it to the heir. The plaintext buffer is zeroed after use. */
-export async function reseal(ciphertext: Uint8Array, kp: SealedKeypair, heirPubHex: string): Promise<Uint8Array> {
+/**
+ * What the owner's browser seals (v2): the note's text together with the will it belongs to. Without
+ * this binding anyone could copy a note's public ciphertext into a throwaway will of their own, rush it
+ * to SecretsReleased, and have the agent re-seal the plaintext to them (audit round 2, 2026-11-11).
+ */
+export interface BoundNote {
+  v: 2;
+  owner: string;
+  heir: string;
+  text: string;
+}
+
+export function bindNote(owner: string, heir: string, text: string): string {
+  return JSON.stringify({ v: 2, owner, heir, text } satisfies BoundNote);
+}
+
+/** Thrown for a note that doesn't name this will's owner and heir (copied, or sealed before v2). */
+export class UnboundNoteError extends Error {}
+
+/**
+ * Opens a note sealed to `kp`, checks it was written for `expect.owner`'s will and `expect.heir`, and
+ * seals only its text to the heir. The plaintext buffer is zeroed after use.
+ */
+export async function reseal(ciphertext: Uint8Array, kp: SealedKeypair, heirPubHex: string, expect: { owner: string; heir: string }): Promise<Uint8Array> {
   await sodium.ready;
   const heirKey = fromHex32(heirPubHex, "heir key");
   const plaintext = sodium.crypto_box_seal_open(ciphertext, kp.publicKey, kp.privateKey);
   try {
-    return sodium.crypto_box_seal(plaintext, heirKey);
+    let note: Partial<BoundNote>;
+    try {
+      note = JSON.parse(sodium.to_string(plaintext));
+    } catch {
+      throw new UnboundNoteError("not a bound (v2) note");
+    }
+    if (note?.v !== 2 || typeof note.text !== "string") throw new UnboundNoteError("not a bound (v2) note");
+    if (note.owner !== expect.owner || note.heir !== expect.heir) throw new UnboundNoteError("note was written for another will or heir");
+    return sodium.crypto_box_seal(note.text, heirKey);
   } finally {
     sodium.memzero(plaintext);
   }

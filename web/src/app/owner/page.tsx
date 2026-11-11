@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { AgentBadge, AiBadge } from "@/components/Attestation";
 import { Ladder } from "@/components/Ladder";
-import { ActionButton, Card, CopyLink, Details, ErrorNote, Field, inputCls, Pill } from "@/components/ui";
+import { ActionButton, Card, CopyLink, Details, ErrorNote, Field, inputCls, Pill, short } from "@/components/ui";
 import { QuickSetup, StrengthChecklist } from "@/components/Onboarding";
 import { FundAnywhere, PayoutsPanel } from "@/components/Payouts";
 import { SignIn } from "@/components/SignIn";
@@ -31,9 +31,31 @@ export default function OwnerPage() {
   );
 }
 
+const CURRENT = "inheirit:current-owner";
+
 function Owner() {
   const params = useSearchParams();
-  const [owner, setOwner] = useState(params.get("as") ?? "");
+  const [owner, setOwnerState] = useState(params.get("as") ?? "");
+  // Coming back to this page reopens the account used last, instead of the sign-in screen.
+  useEffect(() => {
+    if (!params.get("as")) {
+      try {
+        const last = window.localStorage.getItem(CURRENT) ?? "";
+        if (last) setOwnerState(last);
+      } catch {
+        // storage blocked: sign in again
+      }
+    }
+  }, [params]);
+  const setOwner = (id: string) => {
+    setOwnerState(id);
+    try {
+      if (id) window.localStorage.setItem(CURRENT, id);
+      else window.localStorage.removeItem(CURRENT);
+    } catch {
+      // storage blocked
+    }
+  };
   const [signingIn, setSigningIn] = useState(false);
   const { data: will, loaded, refresh } = useWill(owner || null);
   // Keep the writing view until every creation step has finished, even after the will shows up on-chain
@@ -58,7 +80,7 @@ function Owner() {
           <div className="flex flex-wrap items-center gap-3 text-sm">
             <span className="text-muted">{canSign(owner) ? "Signed in as" : "Viewing"}</span>
             <span className="font-medium">{accountLabel(owner, names)}</span>
-            <AccountActions owner={owner} onSignIn={() => setSigningIn(true)} onSignedOut={() => setOwner("")} />
+            <AccountActions owner={owner} onSignIn={() => (setSigningIn(true), setOwner(""))} onSignedOut={() => setOwner("")} />
           </div>
         )}
         {showSignIn && mine.length > 0 && (
@@ -135,16 +157,24 @@ function CreateWill(props: { owner: string; onCreating: (b: boolean) => void; on
   const [mode, setMode] = useState<"generate" | "quick" | "english">("quick");
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap gap-2 text-sm">
-        <ActionButton tone={mode === "quick" ? undefined : "quiet"} onClick={async () => setMode("quick")}>
-          My will
-        </ActionButton>
-        <ActionButton tone={mode === "english" ? undefined : "quiet"} onClick={async () => setMode("english")}>
-          Will in plain English
-        </ActionButton>
-        <ActionButton tone={mode === "generate" ? undefined : "quiet"} onClick={async () => setMode("generate")}>
-          Generate sample will
-        </ActionButton>
+      <div className="flex flex-wrap gap-2 text-sm" role="group" aria-label="How to write your will">
+        {(
+          [
+            ["quick", "My will"],
+            ["english", "Will in plain English"],
+            ["generate", "Generate sample will"],
+          ] as const
+        ).map(([m, label]) => (
+          <button
+            key={m}
+            type="button"
+            aria-pressed={mode === m}
+            onClick={() => setMode(m)}
+            className={`rounded-lg px-4 py-2 font-medium ${mode === m ? "bg-accent text-accent-ink" : "border border-line bg-card hover:bg-accent-soft"}`}
+          >
+            {label}
+          </button>
+        ))}
       </div>
       {mode === "generate" ? (
         <GenerateWill {...props} />
@@ -264,6 +294,7 @@ function WriteWill({ owner, onCreating, onCreated }: { owner: string; onCreating
           until you approve the summary.
         </p>
         <textarea
+          aria-label="Your will in plain English"
           className={`${inputCls} h-40 w-full`}
           value={text}
           onChange={(e) => setText(e.target.value)}
@@ -448,7 +479,7 @@ function Dashboard({ will, refresh }: { will: Will; refresh: () => void }) {
             <ul className="mt-2 space-y-1 text-xs text-muted">
               {will.pending_withdrawals.map((w) => (
                 <li key={w.id}>
-                  Withdrawal to {w.to} on {w.chain === "Eth" ? "Sepolia" : w.chain === "Btc" ? "Bitcoin testnet" : "NEAR"}: the agent is sending it
+                  Withdrawal to {w.chain === "Near" ? label(w.to) : short(w.to, 8)} on {w.chain === "Eth" ? "Sepolia" : w.chain === "Btc" ? "Bitcoin testnet" : "NEAR"}: the agent is sending it
                 </li>
               ))}
             </ul>
@@ -482,7 +513,7 @@ function NearVaultActions({ owner, refresh }: { owner: string; refresh: () => vo
   const [amount, setAmount] = useState("0.1");
   return (
     <div className="mt-3 flex flex-wrap items-start gap-2">
-      <input className={`${inputCls} w-24`} value={amount} onChange={(e) => setAmount(e.target.value)} />
+      <input className={`${inputCls} w-24`} aria-label="Amount in NEAR" value={amount} onChange={(e) => setAmount(e.target.value)} />
       <ActionButton tone="quiet" onClick={() => call(owner, "deposit_near", {}, nearToYocto(amount)).then(refresh)}>
         Deposit
       </ActionButton>
@@ -521,7 +552,7 @@ function ForeignWithdraw({ owner, will, refresh }: { owner: string; will: Will; 
             </option>
           ))}
         </select>
-        <input className={`${inputCls} w-28`} placeholder={`amount (${unit})`} value={amount} onChange={(e) => setAmount(e.target.value)} />
+        <input className={`${inputCls} w-28`} aria-label={`Amount in ${unit}`} placeholder={`amount (${unit})`} value={amount} onChange={(e) => setAmount(e.target.value)} />
         <input className={`${inputCls} min-w-0 flex-1`} placeholder={chain === "Eth" ? "0x… your address" : "tb1… your address"} value={to} onChange={(e) => setTo(e.target.value.trim())} />
         <ActionButton
           tone="quiet"
@@ -602,16 +633,16 @@ function SealedNotes({ will, refresh }: { will: Will; refresh: () => void }) {
       {active && (
         <div className="mt-4 space-y-2">
           <div className="grid gap-2 sm:grid-cols-2">
-            <select className={inputCls} value={heir} onChange={(e) => setHeir(e.target.value)}>
+            <select className={inputCls} aria-label="Heir the note is for" value={heir} onChange={(e) => setHeir(e.target.value)}>
               {will.heirs.map((h) => (
                 <option key={h.account_id} value={h.account_id}>
                   for {h.name}
                 </option>
               ))}
             </select>
-            <input className={inputCls} placeholder="Title (anyone can see it on-chain)" value={label} onChange={(e) => setLabel(e.target.value)} maxLength={64} />
+            <input className={inputCls} aria-label="Note title" placeholder="Title (anyone can see it on-chain)" value={label} onChange={(e) => setLabel(e.target.value)} maxLength={64} />
           </div>
-          <textarea className={`${inputCls} h-24 w-full`} placeholder="What should they know? (Encrypted before it leaves this page.)" value={text} onChange={(e) => setText(e.target.value)} />
+          <textarea className={`${inputCls} h-24 w-full`} aria-label="Note text" placeholder="What should they know? (Encrypted before it leaves this page.)" value={text} onChange={(e) => setText(e.target.value)} />
           <ActionButton
             disabled={!label || !text}
             onClick={async () => {
