@@ -63,6 +63,11 @@ export function PayoutChoice({ owner, heir, current, onSaved }: { owner: string;
         <ActionButton tone="quiet" onClick={async () => setEditing(true)}>
           Change
         </ActionButton>
+        {!saved.address.includes("…") && (
+          <div className="w-full">
+            <LiveQuotes assetId={saved.assetId} recipient={saved.address} chain={saved.blockchain} />
+          </div>
+        )}
       </div>
     );
   }
@@ -107,8 +112,87 @@ export function PayoutChoice({ owner, heir, current, onSaved }: { owner: string;
         Save, signed as {heir}
       </ActionButton>
       <p className="text-xs text-muted">
-        Checked against NEAR Intents before it&apos;s saved: only routes that quote are accepted. You can change it until each slice is paid.
+        Before saving, the agent checks that NEAR Intents can actually route to this choice. You can change it until each slice is paid.
       </p>
+      <LiveQuotes assetId={assetId} recipient={address} chain={chain} />
+    </div>
+  );
+}
+
+type QuoteSide = { quote: { amountOut: string; amountOutUsd: string; minAmountOut: string; timeEstimate: number } } | { error: string };
+interface LiveQuoteResult {
+  origin: { symbol: string; amount: number; usd: number };
+  destination: { symbol: string; blockchain: string };
+  public: QuoteSide;
+  confidential: QuoteSide;
+  at: string;
+}
+
+/**
+ * Real 1Click quotes on mainnet for this choice (§13A.2 item 1): dry runs only, so no money moves and no
+ * deposit address exists. Public and confidential side by side.
+ */
+export function LiveQuotes({ assetId, recipient, chain }: { assetId: string; recipient: string; chain: string }) {
+  const [result, setResult] = useState<LiveQuoteResult | null>(null);
+  const ready = !!assetId && recipient.length > 3;
+  return (
+    <div className="rounded-lg border border-line p-3 text-sm">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="font-medium">
+          What $10 of NEAR would get you today <Pill tone="accent">live mainnet quote</Pill> <Pill>quote only</Pill>
+        </span>
+        <ActionButton
+          tone="quiet"
+          disabled={!ready}
+          onClick={async () => {
+            setResult(null);
+            const res = await fetch("/api/quote", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ destination_asset: assetId, recipient, usd: 10 }),
+            });
+            const out = await res.json();
+            if (!res.ok) throw new Error(out.error ?? `Quote failed (${res.status})`);
+            setResult(out);
+          }}
+        >
+          {result ? "Quote again" : "Get live quotes"}
+        </ActionButton>
+      </div>
+      {!ready && <p className="mt-1 text-xs text-muted">Enter your {chainLabel(chain)} address to see real prices.</p>}
+      {result && (
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          {(
+            [
+              ["Public", result.public, "A normal NEAR Intents swap."],
+              ["Confidential", result.confidential, "The same swap with NEAR Intents' confidential handling (\"basic\" mode)."],
+            ] as const
+          ).map(([title, side, note]) => (
+            <div key={title} className="rounded-lg bg-bg p-3">
+              <p className="text-xs text-muted">{title}</p>
+              {"quote" in side ? (
+                <>
+                  <p className="mt-1">
+                    ≈ <b>{side.quote.amountOut}</b> {result.destination.symbol} on {chainLabel(result.destination.blockchain)}
+                  </p>
+                  <p className="text-xs text-muted">
+                    at least {side.quote.minAmountOut} · about {side.quote.timeEstimate} s
+                  </p>
+                </>
+              ) : (
+                <p className="mt-1 text-xs text-warn">{side.error}</p>
+              )}
+              <p className="mt-1 text-xs text-muted">{note}</p>
+            </div>
+          ))}
+        </div>
+      )}
+      {result && (
+        <p className="mt-2 text-xs text-muted">
+          Quoted {new Date(result.at).toLocaleTimeString()} from NEAR Intents (1Click) on mainnet for {result.origin.amount} NEAR. This is a dry run:
+          nothing is sent. Your testnet inheritance itself is paid out by the SIMULATED client.
+        </p>
+      )}
     </div>
   );
 }
@@ -121,8 +205,8 @@ const STATUS_TEXT: Record<string, string> = {
   INCOMPLETE_DEPOSIT: "deposit incomplete",
   PROCESSING: "swapping",
   SUCCESS: "arrived",
-  REFUNDED: "refunded to the vault, will retry",
-  FAILED: "failed, will retry",
+  REFUNDED: "refunded, retrying",
+  FAILED: "failed, retrying",
 };
 
 function BatchRow({ b }: { b: PayoutBatch }) {
@@ -171,13 +255,13 @@ export function HeirPayoutList({ p, minUsd, mine }: { p: HeirPayouts; minUsd: nu
       {waiting.length > 0 && (
         <p className="rounded-lg bg-warn-soft px-3 py-2 text-sm text-warn">
           {p.pref
-            ? `${waiting.length} slice${waiting.length > 1 ? "s" : ""} (≈ $${usd.toFixed(2)}) waiting: payouts below $${minUsd} are combined with the next slice, and the rest goes out when the release ends.`
+            ? `${waiting.length} slice${waiting.length > 1 ? "s" : ""} (≈ $${usd.toFixed(2)}) waiting: payouts under $${minUsd} are combined with the next slice, and whatever is left goes out when the release ends.`
             : mine
               ? `Your inheritance is waiting (${waiting.length} slice${waiting.length > 1 ? "s" : ""}, ≈ $${usd.toFixed(2)}): choose how you'd like to receive it.`
-              : `${waiting.length} slice${waiting.length > 1 ? "s" : ""} (≈ $${usd.toFixed(2)}) waiting for this heir to choose how to receive.`}
+              : `${waiting.length} slice${waiting.length > 1 ? "s" : ""} (≈ $${usd.toFixed(2)}) waiting for this heir to choose how to be paid.`}
         </p>
       )}
-      {p.waiting.some((w) => w.exhausted) && <p className="text-xs text-danger">Some slices failed to pay out three times and need attention.</p>}
+      {p.waiting.some((w) => w.exhausted) && <p className="text-xs text-danger">Some slices failed to pay out three times and need a person to look at them.</p>}
       <ul className="space-y-2">
         {[...p.batches].reverse().map((b) => (
           <BatchRow key={b.id} b={b} />
@@ -194,15 +278,16 @@ export function PayoutsPanel({ owner }: { owner: string }) {
   if (!data.started)
     return (
       <p className="text-sm text-muted">
-        Nothing released yet. When slices are released, each heir&apos;s share goes on through NEAR Intents to the asset and chain they chose
-        {data.value_mode === "stable" ? ", converted to US dollars (stable value)" : ""}.
+        Nothing released yet. As slices are released, each heir&apos;s share goes on through NEAR Intents to the asset and chain they chose
+        {data.value_mode === "stable" ? ", converted to US dollars" : ""}.
       </p>
     );
   return (
     <div className="space-y-4">
       {data.simulated && (
         <p className="text-xs text-muted">
-          <IntentsSimTag /> NEAR Intents has no testnet. The testnet slices above are real; their onward swap is simulated with live 1Click prices.
+          <IntentsSimTag /> NEAR Intents has no testnet. The testnet slices are real; the swap that takes them on to each heir is simulated with
+          live 1Click prices. <a href="/mainnet" className="text-accent underline">Real payouts on mainnet</a>.
         </p>
       )}
       {Object.entries(data.heirs).map(([heir, p]) => (
@@ -235,7 +320,7 @@ export function MainnetPayouts() {
         On mainnet <Pill tone="accent">real</Pill>
       </p>
       <p className="mb-2 text-xs text-muted">
-        The same payout, done for real with small amounts from a demo vault on Base (a Chain Signatures address), signed by a local script.
+        The same payout done for real, with small amounts, from our demo vault on Base. Each one was approved by a person before it was sent.
       </p>
       <ul className="space-y-1 text-sm">
         {records.map((r, i) => (
@@ -279,8 +364,8 @@ export function FundAnywhere({ owner, vaults }: { owner: string; vaults: ("Near"
   return (
     <div className="space-y-3 text-sm">
       <p className="text-muted">
-        Hold USDC on Arbitrum, SOL, or something else? NEAR Intents swaps it into your vault&apos;s asset. You send from your own wallet; the app never
-        holds your keys. <IntentsSimTag /> on testnet: no coins arrive, use the demo faucet for those.
+        Holding USDC on Arbitrum, SOL or something else? NEAR Intents swaps it into your vault&apos;s asset. You send from your own wallet; the app
+        never holds your keys. <IntentsSimTag /> on testnet: no coins actually arrive, so use the demo faucet to fund testnet vaults.
       </p>
       <div className="grid gap-3 sm:grid-cols-[1fr_7rem_9rem]">
         <Field label="Pay with">
@@ -313,7 +398,7 @@ export function FundAnywhere({ owner, vaults }: { owner: string; vaults: ("Near"
           setQuote(await agent.fundQuote(owner, vault, origin, amount));
         }}
       >
-        Get a deposit address
+        Get a quote and deposit address
       </ActionButton>
       {quote && (
         <div className="rounded-lg bg-accent-soft p-3">
