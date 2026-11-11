@@ -31,7 +31,7 @@ type Progress = (msg: string) => void;
 /**
  * Creates a funder through our onboarding route (sponsored, so it doesn't depend on the public testnet
  * faucet, which rate-limits when many people use it at once), then the owner, heir, guardians and a
- * contact under it. The funder gets 2 NEAR; this spends about 1.7.
+ * contact under it. The funder gets 1.5 NEAR; this spends about 1.3.
  */
 export async function createCast(progress: Progress): Promise<Cast> {
   progress("Creating a funded testnet account…");
@@ -40,10 +40,10 @@ export async function createCast(progress: Progress): Promise<Cast> {
     progress(`Creating ${name}.${funder}…`);
     return createSubaccount(funder, name, near);
   };
-  const owner = await sub("alice", "1.2");
-  const heir = await sub("bola", "0.1");
-  const guardians = [await sub("g1", "0.1"), await sub("g2", "0.1"), await sub("g3", "0.1")];
-  const contact = await sub("friend", "0.1");
+  const owner = await sub("alice", "0.9");
+  const heir = await sub("bola", "0.08");
+  const guardians = [await sub("g1", "0.08"), await sub("g2", "0.08"), await sub("g3", "0.08")];
+  const contact = await sub("friend", "0.08");
   const cast: Cast = { funder, owner, heir, guardians, contact, createdAt: new Date().toISOString() };
   keys.addCast(cast);
   return cast;

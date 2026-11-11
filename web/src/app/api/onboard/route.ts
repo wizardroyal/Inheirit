@@ -105,7 +105,7 @@ async function topUp(p: NonNullable<ReturnType<typeof parent>>, ip: string, acco
   } catch {
     return Response.json({ error: `${accountId} doesn't exist on testnet` }, { status: 404 });
   }
-  const target = nearToYocto(env("ONBOARD_FUND_NEAR", "2")!);
+  const target = nearToYocto(env("ONBOARD_FUND_NEAR", "1.5")!);
   if (have >= nearToYocto("0.5")) return Response.json({ error: "This account already has testnet NEAR; top-ups are for empty accounts" }, { status: 409 });
   const amount = target - have;
   const floor = nearToYocto(env("ONBOARD_PARENT_FLOOR_NEAR", "3")!);
@@ -116,7 +116,7 @@ async function topUp(p: NonNullable<ReturnType<typeof parent>>, ip: string, acco
   toppedUp.set(accountId, Date.now());
   if (toppedUp.size > 10_000) toppedUp.clear();
   await p.account.transfer({ receiverId: accountId, amount });
-  return Response.json({ accountId, toppedUpTo: env("ONBOARD_FUND_NEAR", "2") });
+  return Response.json({ accountId, toppedUpTo: env("ONBOARD_FUND_NEAR", "1.5") });
 }
 
 const CAST_ROLES = ["heir", "g1", "g2", "g3", "friend", "lawyer"] as const;
@@ -225,12 +225,12 @@ export async function POST(req: Request) {
     return Response.json({ error: 'kind must be "google", "demo", "topup", "cast" or "person"' }, { status: 400 });
   }
 
-  const amount = nearToYocto(env("ONBOARD_FUND_NEAR", "2")!);
+  const amount = nearToYocto(env("ONBOARD_FUND_NEAR", "1.5")!);
   const floor = nearToYocto(env("ONBOARD_PARENT_FLOOR_NEAR", "3")!);
   const balance = BigInt((await p.provider.viewAccount(p.id)).amount);
   if (balance - amount < floor) return Response.json({ error: "Today's free testnet accounts have run out; please try again later" }, { status: 503 });
   if (overBudget(amount)) return Response.json({ error: BUDGET_GONE }, { status: 503 });
 
   await createFunded(p, id, publicKey, amount);
-  return Response.json({ accountId: id, existed: false, fundedNear: env("ONBOARD_FUND_NEAR", "2") });
+  return Response.json({ accountId: id, existed: false, fundedNear: env("ONBOARD_FUND_NEAR", "1.5") });
 }
