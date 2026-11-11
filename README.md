@@ -8,6 +8,40 @@ Inheirit notices the signs of life you already give off, privately, and only rea
 
 **Try it:** https://inheirit.vercel.app · Live mainnet quotes: https://inheirit.vercel.app/mainnet · Agent (TEE): https://d5b714731becca502b6bd054a5cf6ffa5ce71f61-3000.dstack-pha-prod9.phala.network (if it doesn't answer, the enclave is paused to save credit) · Contract: [`inheirit.testnet`](https://testnet.nearblocks.io/address/inheirit.testnet)
 
+<p>
+  <img src="docs/screenshots/landing.png" alt="The landing page: a will that doesn't make you prove you're alive" width="49%">
+  <img src="docs/screenshots/snapback.png" alt="Signs of life: one sign of life snaps the ladder back to All good" width="49%">
+</p>
+<p>
+  <img src="docs/screenshots/checks.png" alt="Gone quiet: checks go out and the ladder climbs" width="49%">
+  <img src="docs/screenshots/heir-quotes.png" alt="An heir chooses how to be paid, with live NEAR Intents quotes from mainnet" width="49%">
+</p>
+
+<sub>Screenshots from a local run (its trust badge reads "local development agent"; the hosted app's agent runs in the enclave). More in <a href="docs/screenshots">docs/screenshots</a>.</sub>
+
+## For judges, in one minute
+
+| What to check | Where |
+|---|---|
+| The core moment: silence climbs the ladder, one sign of life snaps it back | [Try it in 3 minutes](#try-it-in-3-minutes-no-wallet-no-money) on the live app |
+| Real cross-chain execution: NEAR, Ethereum (Sepolia) and Bitcoin (testnet4) released in stages, with explorer links | [Then the full run](#then-the-full-run-about-15-minutes) |
+| An attested TEE agent and private AI, verifiable on-chain | [`docs/VERIFY.md`](docs/VERIFY.md): read-only calls that check it yourself; the trust badges under *Signs of life*; [`deploy/tee-agent.json`](deploy/tee-agent.json) lists every deployed compose hash |
+| NEAR Intents on mainnet | live quotes (public and confidential) on [`/mainnet`](https://inheirit.vercel.app/mainnet) and the heir page; the payout runbook in [`docs/MAINNET.md`](docs/MAINNET.md) |
+| Tests and security work | 228 agent tests, 163 contract unit tests plus sandbox flows, run on every push ([CI](.github/workflows/ci.yml)); five adversarial review rounds logged finding by finding in [`CLAUDE.md`](CLAUDE.md) (Decision log) and summarised in [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md) |
+| What's real and what's simulated | [Real vs simulated](#real-vs-simulated) |
+
+### Real vs simulated
+
+| Real | Simulated (labelled SIMULATED in the app) |
+|---|---|
+| The will contract, guardians, challenge period and staged release on NEAR testnet | Social and work signals: X, Instagram, TikTok, Facebook, WhatsApp, LinkedIn, Gmail, Calendar |
+| NEAR, Sepolia ETH and testnet4 BTC payouts, signed by Chain Signatures (MPC) | DM check messages |
+| The agent in an Intel TDX enclave on Phala, attested on-chain | The onward NEAR Intents swap on testnet (NEAR Intents has no testnet; priced with live quotes) |
+| Signs of life: NEAR and Sepolia transactions, the signed heartbeat, Telegram replies, GitHub | Email checks are shown in the app, not sent |
+| Sealed notes encrypted in the browser, re-sealed inside the enclave | |
+| Plain-English drafting and the heir guide on an attested NEAR AI Cloud model | |
+| Live NEAR Intents quotes from mainnet, public and confidential | |
+
 ## Four ideas the design rests on
 
 1. **Passive liveness is safe only because of an asymmetry.** Signals can stop the will. Only people can start it: a quorum of guardians who accepted the role, then a challenge period.
@@ -101,6 +135,13 @@ Pick another scenario on the same card. The card shows a checklist with a button
 
 **Acceleration.** A lawyer, or the guardian quorum with evidence, can attest a death certificate. That switches the remaining stages to a faster schedule (10/30/60, shorter waits). It never skips the guardian vote, the challenge period or a stage.
 
+## NEAR Intents on mainnet
+
+On testnet the onward swap to each heir runs on a SIMULATED 1Click client, because NEAR Intents has no testnet. On mainnet:
+- heirs see **live quotes**, public and confidential side by side, for the asset and chain they choose (`/api/quote`, dry runs);
+- **real payouts** go out from a demo vault on Base, a Chain Signatures address derived from a NEAR mainnet account and signed by the MPC network, through `scripts/mainnet-payout.ts`, which a person approves one transaction at a time (caps: $5 each, $25 in total). Payouts made are listed on [`/mainnet`](https://inheirit.vercel.app/mainnet) with explorer links on both sides;
+- the step-by-step, including a read-only `preflight` check, is [`docs/MAINNET.md`](docs/MAINNET.md).
+
 ## NEAR technology used, and where
 
 | Tech | Used for | Code |
@@ -112,6 +153,24 @@ Pick another scenario on the same card. The card shows a checklist with a button
 | **NEAR Intents** (1Click API) | Universal payout: each released slice goes on to the heir's chosen asset and chain; stable value (USDC); fund from anywhere. On testnet the agent uses a SIMULATED 1Click client with live prices. Heirs see live mainnet dry quotes, public and confidential. Real mainnet payouts can be sent from a Chain Signatures-derived Base vault, only through an approval-gated script (none yet; see `/mainnet`). | `src/intents/oneclick.ts`, `src/intents/payout.ts`, `web/src/app/api/quote/route.ts`, `web/src/components/Payouts.tsx`, `web/src/app/mainnet/page.tsx`, `scripts/mainnet-payout.ts` |
 | NEAR Wallet Selector + named accounts | Sign in with MyNearWallet, Meteor or Intear; Google and demo users get `<id>.inheirit-users.testnet` accounts whose key is generated in their browser | `web/src/lib/wallet.ts`, `web/src/lib/onboard.ts`, `web/src/app/api/onboard/route.ts` |
 | NEP-413 signed messages | Owner-signed requests to the agent (heartbeat, watch settings, Telegram link, drafting, guide, demo faucet), and heir-signed payout choices, checked against the account's on-chain keys | `src/auth/nep413.ts`, `web/src/lib/near.ts`, `web/src/lib/wallet.ts` |
+
+## Why NEAR
+
+A will has to outlive its owner's devices, and Inheirit needs four things that are rare to find on one chain:
+- **One account that signs on every chain.** Chain Signatures let a single NEAR contract hold and release ETH and BTC, with no bridges and no keys for anyone to lose.
+- **An agent you don't have to trust.** Shade Agents run the liveness logic in a TEE and register with an attestation the contract checks, so the code that can move money is the code that was approved.
+- **Private AI.** NEAR AI Cloud serves attested models, so the wording of a will can be drafted with AI without becoming training data or a leak.
+- **Payouts in what heirs use.** NEAR Intents turns a release into whatever asset and chain each heir wants, which is the difference between an heir being paid and an heir being stuck.
+
+Named accounts and function-call keys make the human side workable: readable names for guardians and heirs, and limited keys for a heartbeat device.
+
+## Sustainability: who pays, and why it lasts
+
+- **The product:** a will people set up once and forget, priced like insurance: a small yearly fee per will (covering the agent's gas, hosting and AI), free to set up.
+- **A fee on the release, not the savings:** a small percentage of each slice when it's paid out through NEAR Intents (the 1Click partner fee), so the service earns when it actually delivers, and nothing while the owner is alive.
+- **Professionals:** estate lawyers and family offices manage wills for clients; the lawyer role and death-certificate path are already built for them.
+- **Beyond wills:** the same engine (conditions attested by people, a challenge window, staged release) fits conditional gifts and trusts; see the roadmap.
+- **Running costs today:** about $0.06 an hour for the TEE and a few NEAR a month in gas; per-will budgets stop any one will from running costs up.
 
 ## Privacy
 

@@ -236,10 +236,10 @@ function GenerateWill({ owner, onCreating, onCreated }: { owner: string; onCreat
           onClick={async () => {
             setLog([]);
             setFailed(false);
+            // Nothing is created while the agent is down: a will without it would be left half-made.
+            await agent.info();
             onCreating(true);
             try {
-              // Nothing is created while the agent is down: a will without it would be left half-made.
-              await agent.info();
               await generateWillAndCast(
                 owner,
                 {

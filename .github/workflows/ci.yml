@@ -1,0 +1,43 @@
+# Tests on every push: the agent (TypeScript, vitest), the web app (type check) and the will contract
+# (Rust unit tests). The sandbox tests need a built wasm and a NEAR sandbox, so they run locally
+# (see README, "Run it yourself").
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  agent-and-web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Agent
+        run: |
+          npm ci
+          npx tsc --noEmit -p .
+          npx tsc --noEmit -p test
+          npx vitest run
+      - name: Web app
+        working-directory: web
+        run: |
+          npm ci
+          npx tsc --noEmit -p .
+
+  contract:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: agent-contract
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.86.0
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: agent-contract
+      - name: Contract unit tests
+        run: cargo test --lib

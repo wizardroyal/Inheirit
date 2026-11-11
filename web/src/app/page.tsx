@@ -124,6 +124,10 @@ export default function Home() {
           Code on GitHub
         </a>{" "}
         ·{" "}
+        <a href={`${REPO_URL}/blob/main/docs/VERIFY.md`} target="_blank" rel="noreferrer" className="text-accent underline">
+          Verify it yourself
+        </a>{" "}
+        ·{" "}
         <Link href="/mainnet" className="text-accent underline">
           Mainnet
         </Link>

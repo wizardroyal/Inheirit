@@ -5,6 +5,7 @@
 // The demo vault is a Chain Signatures address on Base, derived from the human's NEAR mainnet account
 // (MAINNET_DEMO_ACCOUNT) and path, signed by v1.signer. Fallback: a plain EVM key (MAINNET_DEMO_EVM_KEY).
 //
+//   npx tsx scripts/mainnet-payout.ts preflight [--amount 2]     # go/no-go checklist before any real payout (read-only)
 //   npx tsx scripts/mainnet-payout.ts vault                      # Base vault address + balances (read-only)
 //   npx tsx scripts/mainnet-payout.ts tokens [SYMBOL]            # 1Click tokens (read-only)
 //   npx tsx scripts/mainnet-payout.ts quote --to base:USDC --amount 2 --recipient 0x… [--confidential basic]
@@ -190,9 +191,77 @@ async function quoteFromVault(dry: boolean): Promise<{ q: QuoteResponse; to: Int
   return { q, to, v, usd };
 }
 
+/** Read-only checks before a real payout: each line is OK, or says what to fix. Exits 1 if anything blocks. */
+async function preflight() {
+  const amount = Number(arg("amount") ?? "2");
+  const rows: [boolean, string][] = [];
+  const check = async (label: string, fn: () => Promise<string>) => {
+    try {
+      rows.push([true, `${label}: ${await fn()}`]);
+    } catch (e) {
+      rows.push([false, `${label}: ${e instanceof Error ? e.message : String(e)}`]);
+    }
+  };
+  await check("1Click key", async () => {
+    if (!process.env.ONECLICK_JWT) throw new Error("ONECLICK_JWT is not set in .env (needed for confidential quotes and no partner fee)");
+    return "set";
+  });
+  const v = await vault().catch((e) => {
+    rows.push([false, `vault: ${e.message}`]);
+    return null;
+  });
+  if (v) {
+    rows.push([true, `vault (${v.kind}): ${v.address}  https://basescan.org/address/${v.address}`]);
+    if (v.kind === "chain-signatures") {
+      const id = process.env.MAINNET_DEMO_ACCOUNT!;
+      await check("NEAR mainnet account", async () => {
+        const acct = await nearProvider.viewAccount(id);
+        const near = Number(BigInt(acct.amount)) / 1e24;
+        if (near < 0.05) throw new Error(`${id} holds ${near.toFixed(4)} NEAR; keep ≥ 0.05 for the MPC sign call`);
+        return `${id} holds ${near.toFixed(4)} NEAR`;
+      });
+      await check("account key", async () => {
+        const key = process.env.MAINNET_DEMO_PRIVATE_KEY;
+        if (!key) throw new Error("MAINNET_DEMO_PRIVATE_KEY is not set");
+        const pk = KeyPairSigner.fromSecretKey(key as KeyPairString);
+        const pub = (await pk.getPublicKey()).toString();
+        const keys = await nearProvider.viewAccessKeyList(id);
+        if (!keys.keys.some((k) => k.public_key === pub)) throw new Error(`MAINNET_DEMO_PRIVATE_KEY is not a key on ${id}`);
+        return "matches the account";
+      });
+    }
+    await check("vault balances", async () => {
+      const b = await balances(v.address);
+      const usdc = Number(b.usdc) / 1e6;
+      const eth = Number(formatEther(b.eth));
+      if (usdc < amount) throw new Error(`${usdc} USDC on Base; need ≥ ${amount} for one payout (send USDC on Base to the vault, or use the fund command)`);
+      if (eth < 0.00005) throw new Error(`${eth} ETH on Base; need a little ETH for gas (≈ $0.50 is plenty)`);
+      return `${usdc} USDC, ${eth.toFixed(6)} ETH`;
+    });
+    for (const conf of [undefined, "basic"] as const) {
+      await check(`dry quote ${conf ? "confidential" : "public"} (Base USDC → Arbitrum USDC, $${amount})`, async () => {
+        const arb = await token("arb:USDC");
+        const q = await oneclick.quote(
+          quoteRequest({ dry: true, originAsset: BASE_USDC, destinationAsset: arb.assetId, amount: parseUnits(amount.toString(), 6).toString(), refundTo: v.address, recipient: v.address, confidentiality: conf }),
+        );
+        return `≈ ${q.quote.amountOutFormatted} USDC, about ${q.quote.timeEstimate} s`;
+      });
+    }
+  }
+  const l = ledger();
+  rows.push([l.total_usd + amount <= MAX_TOTAL && amount <= MAX_TX, `caps: $${amount} per payout (max ${MAX_TX}); $${l.total_usd} spent so far of $${MAX_TOTAL}`]);
+  console.log(`\nMainnet preflight (read-only; nothing is sent)\n`);
+  for (const [ok, line] of rows) console.log(`  ${ok ? "OK  " : "FIX "} ${line}`);
+  const blocked = rows.some(([ok]) => !ok);
+  console.log(blocked ? "\nNot ready: fix the lines marked FIX." : "\nReady. Next: the pay command (see docs/MAINNET.md).");
+  if (blocked) process.exitCode = 1;
+}
+
 async function main() {
   const cmd = process.argv[2];
-  if (cmd === "tokens") {
+  if (cmd === "preflight") {
+    await preflight();
+  } else if (cmd === "tokens") {
     const sym = process.argv[3]?.toLowerCase();
     for (const t of await oneclick.tokens()) if (!sym || t.symbol.toLowerCase() === sym) console.log(`${t.blockchain}:${t.symbol}\t${t.assetId}\t$${t.price}`);
   } else if (cmd === "vault") {
