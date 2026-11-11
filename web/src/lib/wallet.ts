@@ -122,7 +122,3 @@ export async function walletSignMessage(accountId: string, message: string, nonc
   return { publicKey: signed.publicKey, signature: signed.signature };
 }
 
-/** Restores a wallet session after a reload (the selector re-reads its own storage). */
-export function resumeWallet(): void {
-  if (walletAccountId()) void selector();
-}

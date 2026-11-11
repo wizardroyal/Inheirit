@@ -8,7 +8,7 @@ const STEPS = [
   ["Welfare check", "Still nothing? Your guardians, friends and lawyer get a friendly message asking whether they've heard from you."],
   ["Guardian vote", "Then it escalates: your guardians are asked whether you've passed away. A single “they're alive” stops everything."],
   ["Challenge period", "If enough guardians confirm your passing, you're alerted on every channel you've linked. Any sign of life cancels."],
-  ["Released in stages", "10% first, then the longest wait, because a slice leaving your vaults is the loudest possible alarm. Then 20%, 30% and 40% across NEAR, Ethereum and Bitcoin. A strong sign of life stops the rest."],
+  ["Released in stages", "10% first, then the longest wait, because a slice leaving your vaults is the loudest possible alarm. Then 20%, 30% and 40% across NEAR, Ethereum and Bitcoin. Any sign of life that counts stops the rest."],
   ["Secrets last", "Sealed notes open for each heir only after everything is handed over and one more waiting period has passed. A note can explain how to reach a cold or hot wallet, a bank account or anything else. A secret can't be taken back, so it goes last."],
 ];
 
@@ -55,7 +55,7 @@ export default function Home() {
             <div className="tech-label">Layer 2</div>
             <div className="mt-1 font-serif text-xl">Checks</div>
             <p className="mt-2 text-sm text-muted">
-              Only when your strong signals have all gone quiet for longer than usual does it reach out: the heartbeat app, Telegram, then the
+              Only when your strong signals have all gone quiet for longer than the quiet period you set does it reach out: the heartbeat app, Telegram, then the
               people you trust. Any reply sends it back to the top.
             </p>
           </div>
@@ -102,7 +102,7 @@ export default function Home() {
       <section className="grid gap-4 sm:grid-cols-2">
         {[
           ["Private by construction", "The agent runs in a secure enclave (Intel TDX on Phala), and its attestation is checked on-chain. Only timestamps leave it, never content. Your will's wording is read only by a private model on NEAR AI Cloud whose Intel TDX and NVIDIA GPU attestation the agent verifies."],
-          ["Staged and reversible", "Releases go out in slices. Any sign of life between stages stops the rest, and you can withdraw at any time while you're alive."],
+          ["Staged and reversible", "Releases go out in slices. Any sign of life between stages stops the rest, and you can withdraw whenever the will is at All good."],
           ["Heirs get what they use", "Each slice goes on to the asset and chain the heir chose (USDC on Base, SOL, NEAR…) through NEAR Intents. Stable-value mode pays in dollars, so a release that takes months doesn't expose heirs to price swings."],
           ["Honest about limits", "The will runs on testnet; heirs see live mainnet quotes from NEAR Intents. Signal sources we can't connect yet are labelled SIMULATED wherever they appear."],
         ].map(([t, d]) => (

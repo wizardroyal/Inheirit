@@ -2,7 +2,7 @@
 
 ## NEAR Intents on mainnet (CLAUDE.md §9A.6)
 
-NEAR Intents has no testnet. These payouts were made with small real amounts from the mainnet demo vault (a Chain Signatures-derived Base address) using `scripts/mainnet-payout.ts`. The human approved each transaction in chat before it was sent. Caps: $5 per transaction, $25 in total. The app lists the same records under "On mainnet" (`web/src/data/mainnet-payouts.json`).
+NEAR Intents has no testnet. Payouts here will be made with small real amounts from the mainnet demo vault (a Chain Signatures-derived Base address) using `scripts/mainnet-payout.ts`. Each transaction needs the human's explicit "yes" in chat before it is sent. Caps: $5 per transaction, $25 in total. The app lists the same records under "On mainnet" (`web/src/data/mainnet-payouts.json`).
 
 | # | Feature | From | To | Deposit tx | Received tx | Status |
 |---|---|---|---|---|---|---|

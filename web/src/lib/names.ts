@@ -106,9 +106,11 @@ const PEOPLE = [
   "Priya", "Arjun", "Mei", "Haruto", "Yuna", "Diego", "Lucía", "Rafael", "Leila", "Omar",
 ];
 
-/** `n` different first names in random order. */
+/** `n` different first names in random order, avoiding names already used in this browser while any remain. */
 export function randomPeople(n: number): string[] {
-  const pool = [...PEOPLE];
+  const used = new Set(Object.values(load()));
+  const fresh = PEOPLE.filter((p) => !used.has(p));
+  const pool = fresh.length >= n ? fresh : [...PEOPLE];
   for (let i = pool.length - 1; i > 0; i--) {
     const j = crypto.getRandomValues(new Uint32Array(1))[0] % (i + 1);
     [pool[i], pool[j]] = [pool[j], pool[i]];
@@ -134,11 +136,12 @@ export function accountLabel(id: string, names: Record<string, string>): string 
   return /^[0-9a-f]{64}$/.test(first) ? `${first.slice(0, 6)}…${first.slice(-4)}` : first;
 }
 
-const ACCOUNT_IN_TEXT = /(?<![\w/.-])[a-z0-9_-]+(?:\.[a-z0-9_-]+)*\.testnet\b/g;
+// No lookbehind (Safari before 16.4 can't parse one): the preceding character is captured and kept.
+const ACCOUNT_IN_TEXT = /(^|[^\w/.-])([a-z0-9_-]+(?:\.[a-z0-9_-]+)*\.testnet)\b/g;
 
 /** Replaces NEAR testnet account ids in a sentence with what a person sees (links are left alone). */
 export function humanize(text: string, names: Record<string, string>): string {
-  return text.replace(ACCOUNT_IN_TEXT, (id) => accountLabel(id, names));
+  return text.replace(ACCOUNT_IN_TEXT, (_, before: string, id: string) => before + accountLabel(id, names));
 }
 
 /** `label(id)` for the accounts on a page, re-rendering when a name changes. */

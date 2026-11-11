@@ -154,11 +154,12 @@ export function QuickSetup({
   const [demoClock, setDemoClock] = useState(true);
   const [stable, setStable] = useState(false);
   const [log, setLog] = useState<string[]>([]);
+  const [failed, setFailed] = useState(false);
 
   const label = useAccountLabel();
   const names = useNames();
   const guardianList = list(guardians);
-  const badAccounts = [...heirs.map((h) => h.account), ...guardianList, ...(lawyer ? [lawyer] : [])].filter((a) => a && !ACCOUNT.test(a));
+  const badAccounts = [...heirs.map((h) => h.account), ...guardianList, ...(lawyer ? [lawyer] : []), ...list(contacts)].filter((a) => a && !ACCOUNT.test(a));
   const ids = heirs.map((_, i) => `h${i + 1}`);
   const shares = Object.fromEntries(heirs.map((h, i) => [ids[i], Number(h.pct) || 0]));
   const check = checkPolicy({
@@ -201,7 +202,7 @@ export function QuickSetup({
       <Card title="About you">
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Display name" hint="How heirs and guardians will see you. Required.">
-            <input className={inputCls} value={name} onChange={(e) => setName(e.target.value)} placeholder="Alice" />
+            <input className={inputCls} value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Sam" />
           </Field>
           <Field label="Country or state (optional)" hint="For a future letter to your lawyer. That's all we ask: no date of birth, nationality or photo.">
             <input className={inputCls} value={jurisdiction} onChange={(e) => setJurisdiction(e.target.value)} placeholder="Nigeria" />
@@ -221,7 +222,7 @@ export function QuickSetup({
           <div className="text-sm">
             <p className="font-medium">Heartbeat app</p>
             <p className="text-muted">
-              Open <a className="text-accent underline" href="/heartbeat">the heartbeat app</a> on your phone and add it to your home screen. Just
+              Open <a className="text-accent underline" href="/heartbeat" target="_blank" rel="noreferrer">the heartbeat app</a> on your phone and add it to your home screen. Just
               opening it is a strong sign of life.
             </p>
           </div>
@@ -341,7 +342,7 @@ export function QuickSetup({
         {errors.length > 0 ? (
           <ul className="list-disc space-y-1 pl-5 text-sm text-danger">
             {errors.map((e) => (
-              <li key={e}>{e}</li>
+              <li key={e}>{humanize(e, names)}</li>
             ))}
           </ul>
         ) : (
@@ -360,6 +361,7 @@ export function QuickSetup({
               setLog([]);
               onCreating(true);
               const progress = (m: string) => setLog((l) => [...l, m]);
+              setFailed(false);
               try {
                 await createWill(
                   owner,
@@ -381,13 +383,21 @@ export function QuickSetup({
                 }
                 progress("Done. Your dashboard has the invitation link to send each guardian.");
                 onCreated();
-              } finally {
                 onCreating(false);
+              } catch (e) {
+                // Stay here with the log and the error; the will may already exist on-chain.
+                setFailed(true);
+                throw e;
               }
             }}
           >
             Approve and create my will
           </ActionButton>
+          {failed && (
+            <ActionButton tone="quiet" className="ml-2" onClick={async () => (onCreating(false), onCreated())}>
+              Go to my dashboard anyway
+            </ActionButton>
+          )}
         </div>
         {log.length > 0 && (
           <ul className="mt-3 font-mono text-xs text-muted">

@@ -158,16 +158,3 @@ export async function createSubaccounts(funder: string, specs: { name: string; n
   return ids;
 }
 
-/** A top-level testnet account funded by the public testnet faucet helper (CORS allows browsers). */
-export async function createFaucetAccount(id: string): Promise<string> {
-  const kp = newKeyPair();
-  const res = await fetch("https://helper.nearprotocol.com/account", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ newAccountId: id, newAccountPublicKey: kp.getPublicKey().toString() }),
-  });
-  if (!res.ok) throw new Error(`Testnet faucet failed (${res.status}): ${await res.text()}`);
-  keys.addAccount(id, kp.toString());
-  for (let i = 0; i < 10 && !(await accountExists(id)); i++) await new Promise((r) => setTimeout(r, 1500));
-  return id;
-}

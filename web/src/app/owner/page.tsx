@@ -20,7 +20,7 @@ import { addSealedNote, createWill, generateWillAndCast } from "@/lib/demo";
 import { useKeys, useMyAccounts, usePoll, useWill } from "@/lib/hooks";
 import { topUpAccount } from "@/lib/onboard";
 import { disconnectWallet, walletAccountId } from "@/lib/wallet";
-import { balanceOf, call, formatNear, nearToYocto, signRequest } from "@/lib/near";
+import { balanceOf, call, canSign, formatNear, nearToYocto, signRequest } from "@/lib/near";
 import { ago, duration, isArmed, schedule, stateName, type Will } from "@/lib/will";
 
 export default function OwnerPage() {
@@ -41,7 +41,8 @@ function Owner() {
   const showSignIn = signingIn || !owner;
   // Accounts signed in before usernames existed get one now, so no ".testnet" id is ever shown.
   useEffect(() => {
-    if (owner) {
+    // Only accounts this browser can sign for: viewing someone else's will (?as=) names and remembers nothing.
+    if (owner && canSign(owner)) {
       ensureName(owner);
       rememberOwner(owner);
     }
@@ -55,7 +56,7 @@ function Owner() {
         <h1 className="font-serif text-4xl sm:text-5xl">Your will</h1>
         {owner && !signingIn && (
           <div className="flex flex-wrap items-center gap-3 text-sm">
-            <span className="text-muted">Signed in as</span>
+            <span className="text-muted">{canSign(owner) ? "Signed in as" : "Viewing"}</span>
             <span className="font-medium">{accountLabel(owner, names)}</span>
             <AccountActions owner={owner} onSignIn={() => setSigningIn(true)} onSignedOut={() => setOwner("")} />
           </div>
@@ -129,7 +130,7 @@ function AccountActions({ owner, onSignIn, onSignedOut }: { owner: string; onSig
   );
 }
 
-/** Quick setup (3 steps) by default; the plain-English route through NEAR AI is the alternative. */
+/** Three tabs: My will (default), Will in plain English (drafted by NEAR AI), Generate sample will. */
 function CreateWill(props: { owner: string; onCreating: (b: boolean) => void; onCreated: () => void }) {
   const [mode, setMode] = useState<"generate" | "quick" | "english">("quick");
   return (
@@ -251,6 +252,7 @@ function WriteWill({ owner, onCreating, onCreated }: { owner: string; onCreating
   const [contacts, setContacts] = useState("");
   const [deposit, setDeposit] = useState("0.5");
   const [log, setLog] = useState<string[]>([]);
+  const [failed, setFailed] = useState(false);
   const policy = draft?.ok ? (draft.policy as Policy) : null;
   const assets = new Set(policy?.allocations.map((a) => a.asset));
 
@@ -265,7 +267,7 @@ function WriteWill({ owner, onCreating, onCreated }: { owner: string; onCreating
           className={`${inputCls} h-40 w-full`}
           value={text}
           onChange={(e) => setText(e.target.value)}
-          placeholder={`I leave all my NEAR to my son Bola (bola.testnet). My guardians are g1.testnet, g2.testnet and g3.testnet; two of them must confirm.`}
+          placeholder={`I leave all my NEAR to my son Tobi (tobi.testnet). My guardians are g1.testnet, g2.testnet and g3.testnet; two of them must confirm.`}
         />
         <div className="mt-3">
           <ActionButton
@@ -316,6 +318,7 @@ function WriteWill({ owner, onCreating, onCreated }: { owner: string; onCreating
             <ActionButton
               onClick={async () => {
                 setLog([]);
+                setFailed(false);
                 onCreating(true);
                 try {
                   await createWill(
@@ -330,13 +333,20 @@ function WriteWill({ owner, onCreating, onCreated }: { owner: string; onCreating
                   (m) => setLog((l) => [...l, m]),
                 );
                   onCreated();
-                } finally {
                   onCreating(false);
+                } catch (e) {
+                  setFailed(true);
+                  throw e;
                 }
               }}
             >
               Approve and create my will
             </ActionButton>
+            {failed && (
+              <ActionButton tone="quiet" className="ml-2" onClick={async () => (onCreating(false), onCreated())}>
+                Go to my dashboard anyway
+              </ActionButton>
+            )}
             <ul className="font-mono text-xs text-muted">
               {log.map((l, i) => (
                 <li key={i}>{l}</li>

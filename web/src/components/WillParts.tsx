@@ -1,10 +1,11 @@
 "use client";
 // Pieces shared by the owner, guardian, heir and demo pages.
+import { savedPolicy } from "@/lib/demo";
 import { accountLabel, humanize, useNames } from "@/lib/names";
 import { useState } from "react";
 import { agent, type SignalSource } from "@/lib/agent";
 import { explorer } from "@/lib/config";
-import { useOverview, usePoll } from "@/lib/hooks";
+import { useOverview } from "@/lib/hooks";
 import { formatNear, signRequest } from "@/lib/near";
 import { ago, haltReason, schedule, SOURCE_LABELS, type Will } from "@/lib/will";
 import { ActionButton, ExtLink, Pill, short, SimulatedTag } from "./ui";
@@ -194,6 +195,11 @@ export function WatchStatus({ owner, will, canSign }: { owner: string; will: Wil
       {!data.watching && <p>The agent isn&apos;t watching this will yet, so it won&apos;t notice signs of life or move the will along.</p>}
       {!data.has_policy && will.foreign_chains.length > 0 && (
         <p>The agent doesn&apos;t have this will&apos;s payout details (the heirs&apos; Sepolia and Bitcoin addresses), so it can&apos;t release those vaults.</p>
+      )}
+      {!data.has_policy && canSign && savedPolicy(owner) && (
+        <ActionButton tone="quiet" onClick={async () => agent.submitPolicy(owner, savedPolicy(owner)!).then(refresh)}>
+          Send the will&apos;s details to the agent
+        </ActionButton>
       )}
       {!data.watching && canSign && (
         <ActionButton tone="quiet" onClick={async () => agent.registerOwner(await signRequest(owner, "register_owner", {})).then(refresh)}>

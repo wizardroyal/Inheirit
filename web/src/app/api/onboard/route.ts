@@ -41,7 +41,7 @@ let spent: { windowStart: number; yocto: bigint } = { windowStart: 0, yocto: 0n 
 function overBudget(amount: bigint): boolean {
   const now = Date.now();
   if (now - spent.windowStart >= 3_600_000) spent = { windowStart: now, yocto: 0n };
-  if (spent.yocto + amount > nearToYocto(env("ONBOARD_HOURLY_NEAR", "40")!)) return true;
+  if (spent.yocto + amount > nearToYocto(env("ONBOARD_HOURLY_NEAR", "80")!)) return true;
   spent.yocto += amount;
   return false;
 }
@@ -219,7 +219,8 @@ export async function POST(req: Request) {
       return Response.json({ accountId: id, existed: true });
     }
   } else if (body.kind === "demo") {
-    if (limited(`demo:${ip}`, 3, 3_600_000)) return Response.json({ error: "Too many demo accounts from this network; try again later" }, { status: 429 });
+    // Judges behind one network share this, and the control panel's casts use it too.
+    if (limited(`demo:${ip}`, 8, 3_600_000)) return Response.json({ error: "Too many demo accounts from this network; try again later" }, { status: 429 });
     id = `demo-${randomBytes(4).toString("hex")}.${p.id}`;
   } else {
     return Response.json({ error: 'kind must be "google", "demo", "topup", "cast" or "person"' }, { status: 400 });

@@ -1,5 +1,6 @@
-export const AGENT_URL = (process.env.NEXT_PUBLIC_AGENT_URL || "http://localhost:3000").replace(/\/$/, "");
-export const CONTRACT_ID = process.env.NEXT_PUBLIC_CONTRACT_ID || "inheirit-dev.testnet";
+// Defaults: the hosted backend (attested TEE agent + its contract), so a fresh clone runs against it.
+export const AGENT_URL = (process.env.NEXT_PUBLIC_AGENT_URL || "https://d5b714731becca502b6bd054a5cf6ffa5ce71f61-3000.dstack-pha-prod9.phala.network").replace(/\/$/, "");
+export const CONTRACT_ID = process.env.NEXT_PUBLIC_CONTRACT_ID || "inheirit.testnet";
 // rpc.testnet.near.org is deprecated and rate-limits
 export const NEAR_RPC = process.env.NEXT_PUBLIC_NEAR_RPC || "https://test.rpc.fastnear.com";
 

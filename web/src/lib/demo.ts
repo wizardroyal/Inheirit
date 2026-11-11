@@ -114,6 +114,8 @@ export async function createWill(owner: string, o: CreateWillOptions, progress: 
     },
     ...(deposit ? [{ methodName: "deposit_near", deposit }] : []),
   ]);
+  // Kept here until the agent has it, so a failed hand-off can be resent from the dashboard.
+  savePolicy(owner, o.policy);
   progress("Giving the agent the approved will (it needs the heirs' receive addresses)…");
   await agent.submitPolicy(owner, o.policy);
   progress("Asking the agent to start watching for signs of life…");
@@ -129,15 +131,16 @@ export async function acceptAsGuardians(owner: string, guardians: string[], prog
 }
 
 /**
- * "Generate a will and cast for me" (CLAUDE.md §13A.1): an heir, three guardians, a friend and a lawyer as
- * subaccounts of the owner (keys in this browser, so one person can play every role), then a full will
- * with a sealed note. The guardians accept at once, so the will is armed.
+ * "Generate sample will" (CLAUDE.md §13A.1): an heir, three guardians, a friend and a lawyer with random names,
+ * as subaccounts of the owner (or /api/onboard "cast" accounts for wallet owners), keys in this browser so one
+ * person can play every role; then a full will with a sealed note. The guardians accept at once, so it's armed.
  */
 export async function generateWillAndCast(
   owner: string,
   o: { schedule: SchedulePreset; foreignChains: ("Eth" | "Btc")[]; depositNear: string; stable?: boolean },
   progress: Progress,
 ): Promise<Cast> {
+  const tag = crypto.getRandomValues(new Uint32Array(1))[0].toString(36).slice(0, 5);
   // Different people every time: names drawn from many cultures, shuffled per generation.
   const [heirName, ...others] = randomPeople(6);
   progress(`Creating the people in your will: ${heirName} (heir), guardians ${others.slice(0, 3).join(", ")}, ${others[3]} (friend) and ${others[4]} (lawyer)…`);
@@ -145,14 +148,11 @@ export async function generateWillAndCast(
   // onboarding route instead; an owner whose key is in this browser makes its own subaccounts.
   const [heir, g1, g2, g3, contact, lawyer] = !keys.secret(owner)
     ? await createCastAccounts().then((a) => [a.heir, a.g1, a.g2, a.g3, a.friend, a.lawyer])
-    : await createSubaccounts(owner, [
-    { name: "heir", near: "0.1" },
-    { name: "g1", near: "0.1" },
-    { name: "g2", near: "0.1" },
-    { name: "g3", near: "0.1" },
-    { name: "friend", near: "0.1" },
-    { name: "lawyer", near: "0.1" },
-  ]);
+    : await createSubaccounts(
+        owner,
+        // A fresh suffix per run, so a retry after a failed run doesn't collide with accounts it already made.
+        ["heir", "g1", "g2", "g3", "friend", "lawyer"].map((r) => ({ name: `${r}-${tag}`, near: "0.1" })),
+      );
   const cast: Cast = { funder: owner, owner, heir, guardians: [g1, g2, g3], contact, lawyer, createdAt: new Date().toISOString() };
   keys.addCast(cast);
   nameAccounts({ [heir]: heirName, [g1]: others[0], [g2]: others[1], [g3]: others[2], [contact]: others[3], [lawyer]: others[4] });
@@ -191,6 +191,26 @@ export async function generateWillAndCast(
     await fundFromFaucet(owner, progress).catch((e) => progress(`The faucet couldn't help (${e instanceof Error ? e.message : e}). Those vaults stay empty; NEAR still moves for real.`));
   }
   return cast;
+}
+
+const POLICY_KEY = (owner: string) => `inheirit:policy:${owner}`;
+
+function savePolicy(owner: string, policy: Policy) {
+  try {
+    window.localStorage.setItem(POLICY_KEY(owner), JSON.stringify(policy));
+  } catch {
+    // storage blocked: the agent copy is the only one
+  }
+}
+
+/** The approved will this browser created, if it still has it (for resending to the agent). */
+export function savedPolicy(owner: string): Policy | null {
+  try {
+    const raw = window.localStorage.getItem(POLICY_KEY(owner));
+    return raw ? (JSON.parse(raw) as Policy) : null;
+  } catch {
+    return null;
+  }
 }
 
 /** Seals a note in this browser to the agent's TEE key; only ciphertext goes on-chain. */

@@ -152,8 +152,8 @@ export function LiveQuotes({ assetId, recipient, chain, symbol }: { assetId?: st
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify(assetId ? { destination_asset: assetId, recipient, usd: 10 } : { blockchain: chain, symbol, recipient, usd: 10 }),
             });
-            const out = await res.json();
-            if (!res.ok) throw new Error(out.error ?? `Quote failed (${res.status})`);
+            const out = await res.json().catch(() => ({ error: `The quote service answered badly (${res.status}); try again.` }));
+            if (!res.ok || out.error) throw new Error(out.error ?? `Quote failed (${res.status})`);
             setResult(out);
           }}
         >

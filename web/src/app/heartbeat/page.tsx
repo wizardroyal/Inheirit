@@ -5,7 +5,8 @@ import { useEffect, useRef, useState } from "react";
 import { agent } from "@/lib/agent";
 import { useMyAccounts } from "@/lib/hooks";
 import { accountLabel, useNames } from "@/lib/names";
-import { errorText, signRequest } from "@/lib/near";
+import { keys } from "@/lib/keys";
+import { errorText, signRequest, view } from "@/lib/near";
 import { ago } from "@/lib/will";
 import { Details } from "@/components/ui";
 
@@ -45,7 +46,11 @@ export default function HeartbeatPage() {
       setLastAt(r.at);
       setStatus({ ok: true, text: "Got it. Your will knows you're here." });
     } catch (e) {
-      setStatus({ ok: false, text: errorText(e) });
+      const msg = errorText(e);
+      setStatus({
+        ok: false,
+        text: /^No will for /.test(msg) ? "You don't have a will yet. Create one on Your will, then come back." : msg,
+      });
     } finally {
       setBusy(false);
     }
@@ -56,9 +61,12 @@ export default function HeartbeatPage() {
     const last = read(LAST);
     setLastAt(read(SENT));
     if (last) setOwner(last);
-    if (last && !autoSent.current) {
+    // Only for an account whose key is here (a wallet would pop up unasked) and that has a will.
+    if (last && !autoSent.current && keys.secret(last)) {
       autoSent.current = true;
-      ping(last);
+      view("get_will", { owner: last })
+        .then((w) => w && ping(last))
+        .catch(() => {});
     }
   }, []);
 

@@ -2,8 +2,8 @@
 // Sign-in without a NEAR wallet (CLAUDE.md §13A.1). The key pair is made here and only the public key
 // goes to /api/onboard, which creates and funds the testnet account; the secret stays in this browser.
 import { keys } from "./keys";
-import { KeyPair, type KeyPairString } from "@near-js/crypto";
-import { createSubaccount, newKeyPair, provider } from "./near";
+import { KeyPair } from "@near-js/crypto";
+import { createSubaccount, newKeyPair } from "./near";
 import { nameAccounts, randomPeople } from "./names";
 
 export interface OnboardInfo {
@@ -109,25 +109,3 @@ export async function createPerson(owner: string): Promise<{ accountId: string; 
   return { accountId, name };
 }
 
-/** Downloads the account's key so it can be restored in another browser. */
-export function downloadKeyBackup(accountId: string): void {
-  const secret = keys.secret(accountId);
-  if (!secret) throw new Error(`This browser has no key for ${accountId}`);
-  const blob = new Blob([JSON.stringify({ network: "testnet", account_id: accountId, private_key: secret }, null, 2)], { type: "application/json" });
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = `inheirit-testnet-${accountId}.json`;
-  a.click();
-  URL.revokeObjectURL(a.href);
-}
-
-/** Restores an account from a backup file made by downloadKeyBackup (or the same JSON shape). */
-export async function restoreKeyBackup(file: File): Promise<string> {
-  const j = JSON.parse(await file.text()) as { account_id?: string; private_key?: string };
-  if (!j.account_id || !j.private_key?.startsWith("ed25519:")) throw new Error("That file isn't an Inheirit key backup");
-  const pk = KeyPair.fromString(j.private_key as KeyPairString).getPublicKey().toString();
-  const { keys: onChain } = await provider.viewAccessKeyList(j.account_id);
-  if (!onChain.some((k) => k.public_key === pk)) throw new Error(`That key is not on ${j.account_id}`);
-  keys.addAccount(j.account_id, j.private_key);
-  return j.account_id;
-}

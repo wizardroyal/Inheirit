@@ -54,7 +54,7 @@ export default function MainnetPage() {
       <section className="space-y-3">
         <h2 className="font-serif text-3xl">Try a live quote</h2>
         <p className="text-sm text-muted">The same quote an heir sees when choosing how to be paid, straight from NEAR Intents on mainnet.</p>
-        <div className="border border-line bg-card p-4">
+        <div className="rounded-2xl border border-line bg-card p-5">
           <MainnetQuote />
         </div>
       </section>
@@ -62,8 +62,7 @@ export default function MainnetPage() {
       {records.length > 0 && (
       <section className="space-y-3">
         <h2 className="font-serif text-3xl">Payouts sent</h2>
-        {(
-          <ul className="space-y-3">
+        <ul className="space-y-3">
             {records.map((r) => (
               <li key={r.from.tx} className="rounded-xl border border-line bg-card p-4 text-sm">
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -90,8 +89,7 @@ export default function MainnetPage() {
                 </p>
               </li>
             ))}
-          </ul>
-        )}
+        </ul>
       </section>
       )}
 

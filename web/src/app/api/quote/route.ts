@@ -36,7 +36,8 @@ function limited(ip: string): boolean {
   if (recent.length >= 20) return true;
   recent.push(now);
   hits.set(ip, recent);
-  if (hits.size > 5000) hits.clear();
+  // Bounded memory: drop the oldest address, not everyone's limits at once.
+  if (hits.size > 5000) hits.delete(hits.keys().next().value!);
   return false;
 }
 
@@ -111,6 +112,7 @@ export async function POST(req: Request) {
       : list.find((t) => t.blockchain === body.blockchain && t.symbol === body.symbol);
   const dest = destination?.assetId ?? "";
   if (!origin || !destination) return Response.json({ error: "Unknown asset." }, { status: 400 });
+  if (!(origin.price > 0)) return Response.json({ error: "NEAR Intents has no NEAR price right now; try again shortly." }, { status: 502 });
   // $usd of NEAR in the origin's smallest units, rounded to 6 decimals first to stay exact.
   const amount = (BigInt(Math.round((usd / origin.price) * 1e6)) * 10n ** BigInt(origin.decimals - 6)).toString();
   const [pub, conf] = await Promise.all([
