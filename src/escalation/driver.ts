@@ -212,7 +212,9 @@ export class Driver {
   private readonly ownerRuns = new Map<string, Promise<void>>();
   private readonly pokes = new Map<string, Promise<void>>();
   private readonly lastPoke = new Map<string, number>();
-  private readonly lapBudget = new RateLimiter({ perKey: 20, global: 20_000, windowMs: 24 * 3_600_000 });
+  // 48 laps ≈ 6 h of an idle speedrun (one lap ≈ 7.5 min), beyond the demo watch period (3 h).
+  private readonly lapBudget = new RateLimiter({ perKey: 48, global: 20_000, windowMs: 24 * 3_600_000 });
+  private readonly activeRecords = new RateLimiter({ perKey: 300, global: 20_000, windowMs: 24 * 3_600_000 });
   constructor(private readonly deps: DriverDeps) {
     this.now = deps.now ?? (() => new Date());
     this.log = deps.log ?? ((m) => console.log(m));
@@ -325,8 +327,11 @@ export class Driver {
         // ...unless a step is due now: then any newer sign of life is recorded, so the will never goes Quiet
         // on an owner who just tapped the heartbeat (audit round 3).
         // Recorded early enough that the quiet clock can't run out first, even if someone else calls advance.
-        const stepSoon = active && nowS - will.last_alive_at >= will.timings.quiet_after - minStep;
-        if (atS - will.last_alive_at >= minStep || (stepSoon && atS > will.last_alive_at)) {
+        // Only for armed wills (an unarmed one never goes Quiet), and with a per-will daily cap on records made
+        // in Active, so a will set to the shortest quiet period can't turn heartbeats into unlimited gas (round 5).
+        const stepSoon = active && isArmed(will) && nowS - will.last_alive_at >= will.timings.quiet_after - minStep;
+        const worth = atS - will.last_alive_at >= minStep || (stepSoon && atS > will.last_alive_at);
+        if (worth && (!active || this.activeRecords.take(cfg.owner) === 0)) {
           await contract.recordLiveness(cfg.owner, atS);
           this.log(`[driver] ${cfg.owner}: alive at ${new Date(atS * 1000).toISOString()} (${verdict.basis.join("+")})`);
           will = (await contract.getWill(cfg.owner))!;
@@ -336,7 +341,16 @@ export class Driver {
       // or needs the guardians. An idle speedrun laps every ~7 min, so 20 laps keep it going for hours, while a
       // will cycling as fast as the contract allows can't drain the agent's gas (audit rounds 3 and 4).
       const newLap = stateName(will.state) === "Active";
-      if (isAdvanceDue(will, nowS) && (!newLap || this.lapBudget.take(cfg.owner) === 0) && (await contract.advance(cfg.owner))) {
+      let advanced = false;
+      if (isAdvanceDue(will, nowS) && (!newLap || this.lapBudget.take(cfg.owner) === 0)) {
+        // A lap is only spent when the advance happens: an RPC outage must not use up a will's day (round 5).
+        try {
+          advanced = await contract.advance(cfg.owner);
+        } finally {
+          if (newLap && !advanced) this.lapBudget.refund(cfg.owner);
+        }
+      }
+      if (advanced) {
         will = (await contract.getWill(cfg.owner))!;
         this.log(`[driver] ${cfg.owner}: advanced to ${stateName(will.state)}`);
       }

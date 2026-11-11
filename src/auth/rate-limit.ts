@@ -33,6 +33,15 @@ export class RateLimiter {
     this.total++;
     return 0;
   }
+
+  /** Gives back one use taken for `key` (the action it paid for didn't happen). */
+  refund(key: string): void {
+    const used = this.counts.get(key) ?? 0;
+    if (used > 0) {
+      this.counts.set(key, used - 1);
+      this.total = Math.max(0, this.total - 1);
+    }
+  }
 }
 
 const HOUR = 60 * 60_000;

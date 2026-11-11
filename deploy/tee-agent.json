@@ -130,7 +130,13 @@
       "compose_hash": "b2cb95eb8384bac102c516caa3117348aba0db7da7620f2b611ea39ec4966840",
       "image": "unwizarding/inheirit-agent@sha256:260a66c6a655bdb4fc0be0c0d1220b355926bee8cc959a3922acdf91b4f53887",
       "at": "2026-11-11T14:44:56.759Z",
-      "note": "v2l: audit round 4 (only a new lap, Active to Quiet, costs from a daily budget of 20 per will, so idle speedruns no longer freeze; a sign of life is recorded within one throttle step of the quiet deadline); registered as d017a9be, same sealed-notes key ae74cf06; live, only approved hash"
+      "note": "v2l: audit round 4 (only a new lap, Active to Quiet, costs from a daily budget of 20 per will, so idle speedruns no longer freeze; a sign of life is recorded within one throttle step of the quiet deadline); registered as d017a9be, same sealed-notes key ae74cf06; retired 2026-11-12 (v2m)"
+    },
+    {
+      "compose_hash": "815ba58a94fd4e6f79b2d861512b2c2bce6182b53ea60517dd402ec94a80766e",
+      "image": "unwizarding/inheirit-agent@sha256:15292c11727f81b04225f38eb35c5bf0202744eca895574fc795e6f4162ba4fb",
+      "at": "2026-11-11T14:54:50.715Z",
+      "note": "v2m: audit round 5 (a lap is spent only when the advance succeeds; 48 laps a day; the early record only for armed wills, plus 300 Active records per will per day); registered as b30f06bc, same sealed-notes key ae74cf06; live, only approved hash"
     }
   ]
 }

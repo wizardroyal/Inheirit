@@ -420,7 +420,28 @@ describe("poke: act on a sign of life at once", () => {
       t.contract.w.state = "Active";
       await t.driver.tick();
     }
-    expect(t.contract.calls.filter((c) => c.startsWith("advance")).length).toBe(20);
+    expect(t.contract.calls.filter((c) => c.startsWith("advance")).length).toBe(25);
+    for (let i = 0; i < 40; i++) {
+      t.contract.w.state = "Active";
+      await t.driver.tick();
+    }
+    expect(t.contract.calls.filter((c) => c.startsWith("advance")).length).toBe(48);
+  });
+  it("doesn't spend a lap on an advance that failed (an RPC outage must not use up the day, round 5)", async () => {
+    const t = setup("Active", [], { last_alive_at: T0 - 10_000 });
+    t.contract.advance = async () => {
+      t.contract.calls.push("advance");
+      throw new Error("RPC timeout");
+    };
+    for (let i = 0; i < 60; i++) await t.driver.tick().catch(() => {});
+    expect(t.contract.calls.filter((c) => c === "advance").length).toBe(60);
+  });
+  it("no early record for an unarmed will, however short its quiet period (round 5)", async () => {
+    const timings = { quiet_after: 20, nudge_period: 20, welfare_period: 20, vote_period: 50, challenge_period: 20, secrets_buffer: 20 };
+    const guardians = [{ account_id: "g1.testnet", accepted: false }, { account_id: "g2.testnet", accepted: false }];
+    const t = setup("Active", [adapter("phone_heartbeat", 0.9, () => new Date((T0 + 49) * 1000))], { timings, guardians });
+    await t.driver.tick();
+    expect(t.contract.calls).toEqual([]);
   });
   it("merges a flood of pokes into one waiting tick, spaced POKE_GAP_MS apart", async () => {
     vi.useFakeTimers();
