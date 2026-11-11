@@ -5,11 +5,11 @@ import { REPO_URL } from "@/lib/config";
 const STEPS = [
   ["All good", "The agent quietly notices the signs of life you already give off: NEAR and Ethereum transactions, the heartbeat app, Telegram, your socials and more. You do nothing."],
   ["Quiet", "Silent for longer than usual? It checks in: a ping in the heartbeat app, a Telegram message. Any reply ends it."],
-  ["Welfare check", "Still nothing? Your guardians, friends and lawyer are asked whether they've heard from you."],
-  ["Guardian vote", "Your guardians are asked whether you've passed away. A single “they're alive” stops everything."],
-  ["Challenge period", "Once enough guardians agree, you're alerted on every channel. Any sign of life cancels."],
-  ["Released in stages", "10% first, then the longest wait, because a slice leaving your vaults is the loudest possible alarm. Then 20%, 30%, 40% across NEAR, Ethereum and Bitcoin. Coming back stops the rest."],
-  ["Secrets last", "Sealed notes open for each heir only after everything is handed over and one more wait has passed. A secret can't be taken back, so it goes last."],
+  ["Welfare check", "Still nothing? Your guardians, friends and lawyer get a friendly message asking whether they've heard from you."],
+  ["Guardian vote", "Then it escalates: your guardians are asked whether you've passed away. A single “they're alive” stops everything."],
+  ["Challenge period", "If enough guardians confirm your passing, you're alerted on every channel you've linked. Any sign of life cancels."],
+  ["Released in stages", "10% first, then the longest wait, because a slice leaving your vaults is the loudest possible alarm. Then 20%, 30% and 40% across NEAR, Ethereum and Bitcoin. A strong sign of life stops the rest."],
+  ["Secrets last", "Sealed notes open for each heir only after everything is handed over and one more waiting period has passed. A note can explain how to reach a cold or hot wallet, a bank account or anything else. A secret can't be taken back, so it goes last."],
 ];
 
 const PROBLEMS = [
