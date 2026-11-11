@@ -55,7 +55,7 @@ describe("POST /api/policy", () => {
     const t = setup(false);
     const res = await t.post("/api/policy", { owner: "alice.testnet", policy: { ...policyInput, stages_pct: [50] } });
     expect(res.status).toBe(400);
-    expect((await res.json()).errors).toContain("stages_pct: sums to 50, not 100");
+    expect((await res.json()).errors).toContain("The release stages add up to 50%, not 100%.");
   });
 });
 
@@ -92,6 +92,12 @@ describe("owner-signed routes", () => {
     const res = await t.post("/api/owners", { signed: { owner: "alice.testnet", action: "register_owner", data: { github: "alice" } } });
     expect(await res.json()).toMatchObject({ ok: true, signed: true });
     expect(t.store.get().owners["alice.testnet"]).toMatchObject({ owner: "alice.testnet", github: "alice", watchedSince: expect.any(String) });
+  });
+  it("keeps saved sources when a later registration leaves them out (Start over, timing switch)", async () => {
+    const t = setup(false);
+    await t.post("/api/owners", { signed: { owner: "alice.testnet", action: "register_owner", data: { github: "alice" } } });
+    await t.post("/api/owners", { signed: { owner: "alice.testnet", action: "register_owner", data: {} } });
+    expect(t.store.get().owners["alice.testnet"]).toMatchObject({ github: "alice" });
   });
   it("refuses the will's own vault or an heir's receive address as the owner's EVM address", async () => {
     const vault = "0x" + "c".repeat(40);
@@ -168,6 +174,12 @@ describe("demo vault faucet", () => {
     expect(await res.json()).toMatchObject({ ok: true, sends: [{ chain: "Eth" }, { chain: "Btc" }] });
     expect(t.sent).toEqual(["Eth:Eth-vault-alice.testnet", "Btc:Btc-vault-alice.testnet"]);
     expect((await t.post("/demo/faucet", signed())).status).toBe(409);
+  });
+  it("funds once when several requests arrive at the same time", async () => {
+    const t = faucetSetup();
+    const results = await Promise.all([1, 2, 3].map(() => t.post("/demo/faucet", signed())));
+    expect(results.map((r) => r.status).sort()).toEqual([200, 409, 409]);
+    expect(t.sent).toEqual(["Eth:Eth-vault-alice.testnet", "Btc:Btc-vault-alice.testnet"]);
   });
   it("skips a vault that already holds coins", async () => {
     const t = faucetSetup({ Eth: 5n, Btc: 0n });

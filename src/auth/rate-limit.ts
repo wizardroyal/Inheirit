@@ -41,4 +41,6 @@ export const AI_GUIDE_LIMIT: Limit = { perKey: 20, global: 300, windowMs: HOUR }
 // Per owner: a few attempts so a chain whose send failed can be retried; each chain is still funded once.
 /** Fund-from-anywhere quotes are unsigned (a preview), so they are bounded per owner and in total. */
 export const FUND_QUOTE_LIMIT: Limit = { perKey: 30, global: 600, windowMs: HOUR };
+/** Signed signs of life (heartbeat, SIMULATED demo signals): plenty for a person, not for a script. */
+export const SIGNAL_LIMIT: Limit = { perKey: 120, global: 20_000, windowMs: HOUR };
 export const FAUCET_LIMIT: Limit = { perKey: 3, global: 30, windowMs: 24 * HOUR };

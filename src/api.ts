@@ -5,7 +5,7 @@ import { z } from "zod";
 import type { AttestationResult } from "./ai/attestation";
 import type { GuideAnswer, GuideTurn } from "./ai/heir-guide";
 import { AuthError, type Nep413Verifier, type SignedAction, type Verified } from "./auth/nep413";
-import { AI_DRAFT_LIMIT, AI_GUIDE_LIMIT, FAUCET_LIMIT, FUND_QUOTE_LIMIT, RateLimiter } from "./auth/rate-limit";
+import { AI_DRAFT_LIMIT, AI_GUIDE_LIMIT, FAUCET_LIMIT, FUND_QUOTE_LIMIT, RateLimiter, SIGNAL_LIMIT } from "./auth/rate-limit";
 import type { FaucetSend } from "./demo/faucet";
 import type { PolicyDraft } from "./ai/policy-parser";
 import type { ChainVault } from "./executor/executor";
@@ -113,6 +113,10 @@ export function api(deps: ApiDeps): Hono {
     faucet: new RateLimiter(FAUCET_LIMIT),
   };
   const fundLimiter = deps.limiters?.fund ?? new RateLimiter(FUND_QUOTE_LIMIT);
+  const signalLimiter = new RateLimiter(SIGNAL_LIMIT);
+  // Owners with a faucet request in flight: concurrent requests would each see "not funded yet" and
+  // send again (break-it pass 2, F4).
+  const faucetBusy = new Set<string>();
   // Many open pages poll these routes; each call costs the agent RPC/Sepolia/mempool requests from one
   // IP, so answers are shared for a few seconds.
   const cache = new Map<string, { at: number; value: Promise<unknown> }>();
@@ -177,7 +181,18 @@ export function api(deps: ApiDeps): Hono {
       if (heirs.includes(a)) return c.json({ error: "That is an heir's receive address; give an address you use yourself" }, 400);
     }
     const watchedSince = new Date().toISOString();
-    store.update((s) => (s.owners[r.owner] = { owner: r.owner, evmAddress: evm_address, github, email, watchedSince }));
+    // Fields left out keep their saved value, so re-registering (Start over, a timing switch) never
+    // forgets a source the owner added.
+    store.update((s) => {
+      const prev = s.owners[r.owner];
+      s.owners[r.owner] = {
+        owner: r.owner,
+        evmAddress: evm_address ?? prev?.evmAddress,
+        github: github ?? prev?.github,
+        email: email ?? prev?.email,
+        watchedSince,
+      };
+    });
     return c.json({ ok: true, signed: r.signed, watching: store.get().owners[r.owner] });
   });
 
@@ -186,6 +201,8 @@ export function api(deps: ApiDeps): Hono {
   app.post("/api/heartbeat", async (c) => {
     const r = await ownerRequest(await c.req.json(), "heartbeat", z.object({}).passthrough(), "A heartbeat must be signed by the owner");
     if (r.error) return c.json(r.error.body, r.error.status);
+    const wait = signalLimiter.take(r.owner);
+    if (wait) return c.json(tooMany(wait), 429);
     if (!(await contract.getWill(r.owner))) return c.json({ error: `No will for ${r.owner}` }, 404);
     const at = new Date().toISOString();
     store.update((s) => {
@@ -492,31 +509,37 @@ export function api(deps: ApiDeps): Hono {
     const r = await ownerRequest(await c.req.json(), "demo_faucet", z.object({}).passthrough(), "The faucet needs a request signed by the will's owner");
     if (r.error) return c.json(r.error.body, r.error.status);
     const owner = r.owner;
-    // Each chain is funded at most once per will; a chain whose send failed can be retried.
-    const earlier = store.get().faucetSends[owner] ?? [];
-    const will = await contract.getWill(owner);
-    if (!will) return c.json({ error: `No will for ${owner}` }, 404);
-    if (stateName(will.state) !== "Active") return c.json({ error: "The faucet only funds Active wills" }, 409);
-    const vaults = deps.vaults.filter((v) => will.foreign_chains.includes(v.chain));
-    if (!vaults.length) return c.json({ error: "This will has no Sepolia or BTC vault" }, 409);
-    const chains = vaults.filter((v) => !earlier.some((s) => s.chain === v.chain));
-    if (!chains.length) return c.json({ error: "This will's vaults were already funded by the faucet", sends: earlier }, 409);
-    const wait = limiters.faucet.take(owner);
-    if (wait) return c.json(tooMany(wait), 429);
-    const sends: FaucetSend[] = [];
-    const errors: string[] = [];
-    for (const v of chains) {
-      try {
-        if ((await v.balance(owner)) > 0n) continue; // already funded some other way
-        sends.push(await deps.faucet.send(v.chain, await v.address(owner)));
-      } catch (e) {
-        const msg = `${v.chain}: ${e instanceof Error ? e.message : String(e)}`;
-        console.error(`[faucet] ${owner} ${msg}`);
-        errors.push(msg);
+    if (faucetBusy.has(owner)) return c.json({ error: "The faucet is already funding this will; wait a moment" }, 409);
+    faucetBusy.add(owner);
+    try {
+      // Each chain is funded at most once per will; a chain whose send failed can be retried.
+      const earlier = store.get().faucetSends[owner] ?? [];
+      const will = await contract.getWill(owner);
+      if (!will) return c.json({ error: `No will for ${owner}` }, 404);
+      if (stateName(will.state) !== "Active") return c.json({ error: "The faucet only funds Active wills" }, 409);
+      const vaults = deps.vaults.filter((v) => will.foreign_chains.includes(v.chain));
+      if (!vaults.length) return c.json({ error: "This will has no Sepolia or BTC vault" }, 409);
+      const chains = vaults.filter((v) => !earlier.some((s) => s.chain === v.chain));
+      if (!chains.length) return c.json({ error: "This will's vaults were already funded by the faucet", sends: earlier }, 409);
+      const wait = limiters.faucet.take(owner);
+      if (wait) return c.json(tooMany(wait), 429);
+      const sends: FaucetSend[] = [];
+      const errors: string[] = [];
+      for (const v of chains) {
+        try {
+          if ((await v.balance(owner)) > 0n) continue; // already funded some other way
+          sends.push(await deps.faucet!.send(v.chain, await v.address(owner)));
+        } catch (e) {
+          const msg = `${v.chain}: ${e instanceof Error ? e.message : String(e)}`;
+          console.error(`[faucet] ${owner} ${msg}`);
+          errors.push(msg);
+        }
       }
+      if (sends.length) store.update((s) => (s.faucetSends[owner] = [...earlier, ...sends]));
+      return c.json({ ok: errors.length === 0, sends, errors }, sends.length || !errors.length ? 200 : 503);
+    } finally {
+      faucetBusy.delete(owner);
     }
-    if (sends.length) store.update((s) => (s.faucetSends[owner] = [...earlier, ...sends]));
-    return c.json({ ok: errors.length === 0, sends, errors }, sends.length || !errors.length ? 200 : 503);
   });
 
   // SIMULATED signals for the demo panel (CLAUDE.md §7.1). Never available outside demo mode.
@@ -526,6 +549,8 @@ export function api(deps: ApiDeps): Hono {
     // route would let anyone keep any demo will from ever executing (break-it 2026-11-06).
     const r = await ownerRequest(await c.req.json(), "demo_signal", DemoSignalFields, "A simulated signal must be signed by the owner");
     if (r.error) return c.json(r.error.body, r.error.status);
+    const wait = signalLimiter.take(r.owner);
+    if (wait) return c.json(tooMany(wait), 429);
     const { owner } = r;
     const { source, at } = r.data;
     const when = at ?? new Date().toISOString();

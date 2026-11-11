@@ -35,6 +35,21 @@ function limited(key: string, max: number, windowMs: number): boolean {
   return false;
 }
 
+// A global budget per instance: however many IPs ask, at most ONBOARD_HOURLY_NEAR leaves the parent each
+// hour from one instance (break-it pass 2, F2). In memory, like the per-IP limits.
+let spent: { windowStart: number; yocto: bigint } = { windowStart: 0, yocto: 0n };
+function overBudget(amount: bigint): boolean {
+  const now = Date.now();
+  if (now - spent.windowStart >= 3_600_000) spent = { windowStart: now, yocto: 0n };
+  if (spent.yocto + amount > nearToYocto(env("ONBOARD_HOURLY_NEAR", "40")!)) return true;
+  spent.yocto += amount;
+  return false;
+}
+const BUDGET_GONE = "This hour's free testnet NEAR has run out; please try again in a little while";
+
+// Accounts topped up by this instance in the last day: one top-up per account.
+const toppedUp = new Map<string, number>();
+
 function clientIp(req: Request): string {
   return req.headers.get("x-real-ip") ?? req.headers.get("x-forwarded-for")?.split(",")[0].trim() ?? "unknown";
 }
@@ -82,6 +97,7 @@ async function topUp(p: NonNullable<ReturnType<typeof parent>>, ip: string, acco
   if (!/^[a-z0-9._-]{2,64}$/.test(accountId) || (!accountId.endsWith(".testnet") && !/^[0-9a-f]{64}$/.test(accountId))) {
     return Response.json({ error: "accountId must be a testnet account" }, { status: 400 });
   }
+  if (Date.now() - (toppedUp.get(accountId) ?? 0) < 86_400_000) return Response.json({ error: "This account was already topped up today" }, { status: 429 });
   if (limited(`topup:${ip}`, 3, 3_600_000)) return Response.json({ error: "Too many top-ups from this network; try again later" }, { status: 429 });
   let have: bigint;
   try {
@@ -96,6 +112,9 @@ async function topUp(p: NonNullable<ReturnType<typeof parent>>, ip: string, acco
   if (BigInt((await p.provider.viewAccount(p.id)).amount) - amount < floor) {
     return Response.json({ error: "Today's free testnet NEAR has run out; please try again later" }, { status: 503 });
   }
+  if (overBudget(amount)) return Response.json({ error: BUDGET_GONE }, { status: 503 });
+  toppedUp.set(accountId, Date.now());
+  if (toppedUp.size > 10_000) toppedUp.clear();
   await p.account.transfer({ receiverId: accountId, amount });
   return Response.json({ accountId, toppedUpTo: env("ONBOARD_FUND_NEAR", "2") });
 }
@@ -116,6 +135,7 @@ async function cast(p: NonNullable<ReturnType<typeof parent>>, ip: string, publi
   if (BigInt((await p.provider.viewAccount(p.id)).amount) - each * BigInt(CAST_ROLES.length) < floor) {
     return Response.json({ error: "Today's free testnet accounts have run out; please try again later" }, { status: 503 });
   }
+  if (overBudget(each * BigInt(CAST_ROLES.length))) return Response.json({ error: BUDGET_GONE }, { status: 503 });
   const tag = randomBytes(4).toString("hex");
   const accounts: Record<string, string> = {};
   // One after another: they share the parent key, so parallel sends would collide on its nonce.
@@ -169,6 +189,9 @@ export async function POST(req: Request) {
         issuer: ["https://accounts.google.com", "accounts.google.com"],
       });
       if (!payload.sub) throw new Error("no sub");
+      // The browser asked Google to sign sha256(publicKey) into the token, so a leaked token can't be
+      // used to create this person's account with someone else's key (break-it pass 2, F5).
+      if (payload.nonce !== createHash("sha256").update(publicKey).digest("hex")) throw new Error("nonce mismatch");
       sub = payload.sub;
     } catch {
       return Response.json({ error: "Google sign-in could not be verified" }, { status: 401 });
@@ -180,7 +203,7 @@ export async function POST(req: Request) {
       return Response.json({ accountId: id, existed: true });
     }
   } else if (body.kind === "demo") {
-    if (limited(`demo:${ip}`, 5, 3_600_000)) return Response.json({ error: "Too many demo accounts from this network; try again later" }, { status: 429 });
+    if (limited(`demo:${ip}`, 3, 3_600_000)) return Response.json({ error: "Too many demo accounts from this network; try again later" }, { status: 429 });
     id = `demo-${randomBytes(4).toString("hex")}.${p.id}`;
   } else {
     return Response.json({ error: 'kind must be "google", "demo", "topup" or "cast"' }, { status: 400 });
@@ -190,6 +213,7 @@ export async function POST(req: Request) {
   const floor = nearToYocto(env("ONBOARD_PARENT_FLOOR_NEAR", "3")!);
   const balance = BigInt((await p.provider.viewAccount(p.id)).amount);
   if (balance - amount < floor) return Response.json({ error: "Today's free testnet accounts have run out; please try again later" }, { status: 503 });
+  if (overBudget(amount)) return Response.json({ error: BUDGET_GONE }, { status: 503 });
 
   await createFunded(p, id, publicKey, amount);
   return Response.json({ accountId: id, existed: false, fundedNear: env("ONBOARD_FUND_NEAR", "2") });

@@ -331,6 +331,37 @@ fn start_over_carries_leftover_near_and_note_ids() {
 }
 
 #[test]
+fn start_over_never_refunds_storage_the_contract_paid_for() {
+    // Records written by the agent, guardians and advance are paid from the contract balance. Replacing
+    // a Completed will must not hand that storage back to the owner (break-it pass 2, F1).
+    let mut t = T::with_will();
+    t.to_completed();
+    let mut w = t.will();
+    for i in 0..50 {
+        w.executions.push(ExecutionRecord {
+            round: 1,
+            stage: 0,
+            chain: Chain::Near,
+            to: H1.into(),
+            amount: i.to_string(),
+            tx_hash: "x".repeat(64),
+            at: T0,
+        });
+    }
+    w.released_notes.push(ReleasedNote { note_id: 0, heir: acc(H1), label: "Ledger".into(), ciphertext: vec![9u8; 1500].into(), at: T0 });
+    t.c.wills.insert(acc(OWNER), w);
+    t.c.wills.flush();
+
+    t.pay(OWNER, NearToken::from_yoctonear(0)).create_will(config());
+    assert!(
+        !get_created_receipts().iter().any(|r| r.receiver_id == acc(OWNER)),
+        "start over must not refund storage the owner didn't pay for"
+    );
+    // Notes already released to an heir stay readable after the owner starts over.
+    assert_eq!(t.c.get_released_notes(acc(OWNER), acc(H1)).len(), 1);
+}
+
+#[test]
 fn start_over_rejected_before_completed() {
     for to_state in states_before_completed() {
         let mut t = T::with_will();

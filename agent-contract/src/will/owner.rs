@@ -23,6 +23,8 @@ impl Contract {
             will.near_balance = old.near_balance;
             will.execution_round = old.execution_round;
             will.next_note_id = old.next_note_id;
+            // Notes already released to heirs stay readable: an heir may not have opened them yet.
+            will.released_notes = old.released_notes.clone();
         }
         emit(
             "will_created",
@@ -34,7 +36,10 @@ impl Contract {
         );
         self.save(will);
         self.wills.flush();
-        self.settle_storage(&owner, initial, env::attached_deposit());
+        // A replaced will freed records the contract paid for (executions, attestations, released
+        // notes); the owner pays for growth but is never refunded below the old usage.
+        let base = if previous.is_some() { initial.min(env::storage_usage()) } else { initial };
+        self.settle_storage(&owner, base, env::attached_deposit());
     }
 
     /// Replaces the will's configuration. Only while Active; registered heir keys are kept.

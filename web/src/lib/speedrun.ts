@@ -13,10 +13,10 @@ import type { Will } from "./will";
 export type Scenario = "returns" | "full" | "accelerated" | "late-heir";
 
 export const SCENARIOS: { id: Scenario; title: string; blurb: string }[] = [
-  { id: "returns", title: "a · Owner returns", blurb: "You go quiet, checks go out, then one sign of life snaps everything back. Nothing moves." },
-  { id: "full", title: "b · Full execution", blurb: "Guardians confirm, the challenge period passes, slices go out 10 → 20 → 30 → 40, then the heir opens a sealed note." },
-  { id: "accelerated", title: "c · Accelerated", blurb: "The lawyer files a death certificate: waits shorten to 10 → 30 → 60, but the challenge period still runs." },
-  { id: "late-heir", title: "d · Late heir", blurb: "The heir hasn't said how to receive. Slices wait for them, then pay out once they choose." },
+  { id: "returns", title: "a · The owner comes back", blurb: "You go quiet and checks go out. One sign of life snaps everything back, and nothing moves." },
+  { id: "full", title: "b · The will is carried out", blurb: "Guardians confirm, the challenge period passes, slices go out 10 → 20 → 30 → 40%, then the heir opens a sealed note." },
+  { id: "accelerated", title: "c · A lawyer speeds it up", blurb: "The lawyer files a death certificate: the release becomes 10 → 30 → 60% with shorter waits, but the challenge period still runs." },
+  { id: "late-heir", title: "d · The heir chooses late", blurb: "The heir hasn't said how to be paid. Slices wait for them, then pay out together once they choose." },
 ];
 
 /** A will on demo timings (it goes quiet after minutes, not days): a speedrun. Same rule as the agent's. */
@@ -45,6 +45,8 @@ export function configFromWill(w: Will, preset: SchedulePreset) {
 /** Switches an Active will to demo timings (or back). Storage barely changes; the excess is refunded. */
 export async function setTimings(w: Will, demo: boolean): Promise<void> {
   await call(w.owner, "update_will", { config: configFromWill(w, demo ? DEMO_SCHEDULE : REAL_SCHEDULE) }, nearToYocto("0.02"));
+  // The agent stops watching a speedrun will after a few hours; switching timings starts it watching again.
+  await agent.registerOwner(await signRequest(w.owner, "register_owner", {}));
 }
 
 /** Start over: a new will with the same people and percentages replaces a Completed one (contract rule). */

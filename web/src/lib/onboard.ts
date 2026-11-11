@@ -17,8 +17,7 @@ export async function onboardInfo(): Promise<OnboardInfo> {
   return res.json();
 }
 
-async function create(body: Record<string, string>): Promise<{ accountId: string; existed: boolean }> {
-  const kp = newKeyPair();
+async function create(body: Record<string, string>, kp: KeyPair = newKeyPair()): Promise<{ accountId: string; existed: boolean }> {
   const res = await fetch("/api/onboard", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -35,12 +34,25 @@ export async function createDemoAccount(): Promise<string> {
   return (await create({ kind: "demo" })).accountId;
 }
 
+export interface GoogleKey {
+  kp: KeyPair;
+  /** sha256 of the public key, as hex. Google signs it into the ID token, so a leaked token can't create the account with someone else's key. */
+  nonce: string;
+}
+
+/** The key pair for a Google sign-in, made before Google is asked, so its fingerprint can be the token's nonce. */
+export async function googleKey(): Promise<GoogleKey> {
+  const kp = newKeyPair();
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(kp.getPublicKey().toString()));
+  return { kp, nonce: [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("") };
+}
+
 /**
  * Google sign-in: the same Google account always maps to the same testnet account. We never hold
  * its key, so a second browser can only use it by restoring the backup key file.
  */
-export async function signInWithGoogle(idToken: string): Promise<string> {
-  const { accountId, existed } = await create({ kind: "google", idToken });
+export async function signInWithGoogle(idToken: string, key: GoogleKey): Promise<string> {
+  const { accountId, existed } = await create({ kind: "google", idToken }, key.kp);
   if (existed && !keys.secret(accountId)) {
     throw new Error(
       `Your Google account already has the testnet account ${accountId}, created in another browser. Restore it there from the key backup file (we never keep your key).`,

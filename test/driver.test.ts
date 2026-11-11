@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { Driver, isAdvanceDue } from "../src/escalation/driver";
+import { describe, expect, it, vi } from "vitest";
+import { Driver, isAdvanceDue, POKE_GAP_MS } from "../src/escalation/driver";
 import { stateName, type WillContract, type WillState, type WillView } from "../src/near/will-contract";
 import type { SignalAdapter } from "../src/signals/adapters";
 import { Store } from "../src/state/store";
@@ -189,7 +189,7 @@ describe("Driver", () => {
     const t = setup({ WelfareCheck: { since: T0 } });
     t.setNow(T0 + 10);
     await t.driver.tick();
-    expect(t.store.get().notifications.filter((n) => n.subject.startsWith("Guardian vote")).flatMap((n) => n.to)).toEqual(["g1.testnet", "g2.testnet"]);
+    expect(t.store.get().notifications.filter((n) => n.event === "GuardianVote").flatMap((n) => n.to)).toEqual(["g1.testnet", "g2.testnet"]);
   });
   it("asks only accepted guardians to vote", async () => {
     const t = setup({ WelfareCheck: { since: T0 } }, [], {
@@ -197,7 +197,7 @@ describe("Driver", () => {
     });
     t.setNow(T0 + 10);
     await t.driver.tick();
-    expect(t.store.get().notifications.filter((n) => n.subject.startsWith("Guardian vote")).flatMap((n) => n.to)).toEqual(["g1.testnet", "g2.testnet"]);
+    expect(t.store.get().notifications.filter((n) => n.event === "GuardianVote").flatMap((n) => n.to)).toEqual(["g1.testnet", "g2.testnet"]);
   });
   it("the welfare check asks guardians, then friends, then the lawyer", async () => {
     const t = setup({ Quiet: { since: T0 } }, [], { lawyer: "lawyer.testnet" });
@@ -255,7 +255,7 @@ describe("Telegram delivery", () => {
     t.setNow(T0 + 80);
     await t.driver.tick();
     expect(t.sent.map(([a]) => a)).toEqual(["alice.testnet"]);
-    expect(t.sent[0][1]).toMatch(/Reply anything/);
+    expect(t.sent[0][1]).toMatch(/Reply with anything/);
     const tg = t.store.get().notifications.find((n) => n.subject === "Check: Telegram");
     expect(tg?.channels).toEqual(["telegram"]);
   });
@@ -269,7 +269,7 @@ describe("Telegram delivery", () => {
     t.setNow(T0 + 530);
     await t.driver.tick();
     expect(t.sent).toHaveLength(1);
-    expect(t.store.get().notifications.some((n) => n.subject.startsWith("Check: Telegram (not resent"))).toBe(true);
+    expect(t.store.get().notifications.some((n) => n.subject.startsWith("Check: Telegram (not sent again"))).toBe(true);
     // A new sign of life starts a new silence: the next check goes out again.
     t.contract.w.last_alive_at = T0 + 600;
     t.contract.w.state = { Quiet: { since: T0 + 900 } };
@@ -292,7 +292,7 @@ describe("Telegram delivery", () => {
       t.setNow(T0 + 910 + i * 400);
       await t.driver.tick();
     }
-    expect(t.sent.filter(([a, text]) => a === "alice.testnet" && text.startsWith("Your will executes"))).toHaveLength(2);
+    expect(t.sent.filter(([a, text]) => a === "alice.testnet" && text.startsWith("Your will starts releasing"))).toHaveLength(2);
   });
   it("adds telegram to an event's channels when a recipient is linked", async () => {
     const t = withBot(["g1.testnet"]);
@@ -346,6 +346,13 @@ describe("demo watch expiry and rate limits", () => {
     // Owners already in flight finish; no new ones start
     expect(calls).toBe(3);
   });
+  it("keeps driving an expired speedrun will in GuardianVote or Challenge (anyone's advance could start a release)", async () => {
+    for (const state of [{ GuardianVote: { since: T0 } }, { Challenge: { since: T0 } }] as WillState[]) {
+      const t = setup(state, since, T0 * 1000 + 4 * HOUR);
+      await t.driver.tick();
+      expect(t.store.get().owners["alice.testnet"]).toBeDefined();
+    }
+  });
   it("never expires a will with real timings", async () => {
     const store = new Store(null);
     store.update((s) => (s.owners["alice.testnet"] = { owner: "alice.testnet", watchedSince: since }));
@@ -385,6 +392,26 @@ describe("poke: act on a sign of life at once", () => {
     };
     await Promise.all([t.driver.tick(), t.driver.poke("alice.testnet"), t.driver.poke("alice.testnet")]);
     expect(maxInside).toBe(1);
+  });
+  it("merges a flood of pokes into one waiting tick, spaced POKE_GAP_MS apart", async () => {
+    vi.useFakeTimers();
+    try {
+      const t = setup();
+      let runs = 0;
+      t.driver.tickOwner = async () => {
+        runs++;
+      };
+      await t.driver.poke("alice.testnet");
+      expect(runs).toBe(1);
+      // 50 signed heartbeats within the gap: one more tick, after the gap
+      const flood = Array.from({ length: 50 }, () => t.driver.poke("alice.testnet"));
+      expect(new Set(flood).size).toBe(1);
+      await vi.advanceTimersByTimeAsync(POKE_GAP_MS);
+      await Promise.all(flood);
+      expect(runs).toBe(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

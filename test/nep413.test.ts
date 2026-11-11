@@ -55,6 +55,13 @@ describe("Nep413Verifier", () => {
     const stranger = KeyPair.fromRandom("ed25519");
     await expect(verifier().verify(await sign(stranger, "heartbeat"), "heartbeat")).rejects.toThrow("not on alice.testnet");
   });
+  it("remembers a missing key briefly, so self-made keys don't each cost an RPC lookup", async () => {
+    let lookups = 0;
+    const v = new Nep413Verifier({ recipient: CONTRACT, accessKey: async () => (lookups++, null), now: () => NOW });
+    const stranger = KeyPair.fromRandom("ed25519");
+    for (let i = 0; i < 5; i++) await expect(v.verify(await sign(stranger, "heartbeat"), "heartbeat")).rejects.toThrow("not on alice.testnet");
+    expect(lookups).toBe(1);
+  });
   it("rejects a message signed for another recipient", async () => {
     await expect(verifier().verify(await sign(owner, "heartbeat", { recipient: "evil.testnet" }), "heartbeat")).rejects.toThrow("bad signature");
   });

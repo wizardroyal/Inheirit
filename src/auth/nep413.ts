@@ -47,6 +47,8 @@ export interface Verified {
 
 /** Messages older or further in the future than this are refused. */
 export const MAX_AGE_MS = 5 * 60_000;
+/** How long a key found missing on its account is answered from memory. */
+export const MISSING_KEY_CACHE_MS = 30_000;
 const NEP413_TAG = 2147484061; // 2^31 + 413
 // NEP-413 payload layout (field order matters for borsh); @near-js/signers doesn't export its copy
 const Nep413MessageSchema = {
@@ -67,6 +69,9 @@ export function nep413Hash(message: string, recipient: string, nonce: Uint8Array
 export class Nep413Verifier {
   /** Nonces seen within MAX_AGE_MS, so a captured request can't be replayed. */
   private readonly seen = new Map<string, number>();
+  /** Keys recently found missing on their account, by "account/public_key". */
+  private readonly missing = new Map<string, number>();
+  private lastPrune = 0;
   constructor(private readonly deps: AuthDeps) {}
 
   async verify(input: unknown, expected: SignedAction): Promise<Verified> {
@@ -94,8 +99,16 @@ export class Nep413Verifier {
     // Claimed before the key lookup, so two concurrent replays of one request can't both pass.
     this.seen.set(req.nonce, now);
 
-    const permission = await this.deps.accessKey(req.account_id, req.public_key);
-    if (!permission) throw new AuthError(`key is not on ${req.account_id}`);
+    const keyId = `${req.account_id}/${req.public_key}`;
+    const missingSince = this.missing.get(keyId);
+    const permission = missingSince !== undefined && now - missingSince < MISSING_KEY_CACHE_MS ? null : await this.deps.accessKey(req.account_id, req.public_key);
+    if (!permission) {
+      // A key that isn't on the account: remember it briefly so self-made keys can't each cost an RPC
+      // call, and release the nonce, which nothing valid used (break-it pass 2, F3).
+      if (missingSince === undefined || now - missingSince >= MISSING_KEY_CACHE_MS) this.missing.set(keyId, now);
+      this.seen.delete(req.nonce);
+      throw new AuthError(`key is not on ${req.account_id}`);
+    }
     if (permission !== "FullAccess") {
       const deviceKey = permission.FunctionCall.receiver_id === this.deps.recipient;
       if (!(deviceKey && expected === "heartbeat")) throw new AuthError("this action needs a full-access key");
@@ -105,7 +118,11 @@ export class Nep413Verifier {
   }
 
   private prune(now: number) {
+    // Scanning on every request would cost O(n) each; once every few seconds is enough.
+    if (now - this.lastPrune < 5_000) return;
+    this.lastPrune = now;
     for (const [n, at] of this.seen) if (now - at > MAX_AGE_MS) this.seen.delete(n);
+    for (const [k, at] of this.missing) if (now - at > MISSING_KEY_CACHE_MS) this.missing.delete(k);
   }
 }
 
