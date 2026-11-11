@@ -106,7 +106,13 @@
       "compose_hash": "758ef2b0664bd13eb504c8bb0ac41a681c282410da0e9f44ab3ff162ddbbb787",
       "image": "unwizarding/inheirit-agent@sha256:0580171dd3c1f46f30316965c3dbef3d17f61284f461014e741236452b70e78a",
       "at": "2026-11-10T13:54:00.357Z",
-      "note": "v2h: parallel ticks + execution queue + numKeys 8, poke on sign of life (snap-back 4-8 s under 10 concurrent wills), speedrun-only watch expiry, verdict/vault fixes; registered 2026-11-10, same sealed-notes key ae74cf06; live, only approved hash"
+      "note": "v2h: parallel ticks + execution queue + numKeys 8, poke on sign of life (snap-back 4-8 s under 10 concurrent wills), speedrun-only watch expiry, verdict/vault fixes; registered 2026-11-10, same sealed-notes key ae74cf06; retired 2026-11-11 (v2i)"
+    },
+    {
+      "compose_hash": "9652a057e059a7d8ab83c031f006f97e4c465b26d85c520d50c95c96d3afa98d",
+      "image": "unwizarding/inheirit-agent@sha256:e1b147082cfbc89e56747f9239a27b741db6f7b163013066eedf0553d1e9ffd9",
+      "at": "2026-11-11T07:45:24.391Z",
+      "note": "v2i: break-it pass 2 fixes (poke merging and spacing, sign-of-life rate limit, NEP-413 missing-key cache, faucet in-flight lock, speedrun expiry not in GuardianVote/Challenge, re-registration keeps sources) + copy pass (full links in Telegram, plain-English policy errors); registered 2026-11-11 as fe00f356, same sealed-notes key ae74cf06; live, only approved hash"
     }
   ]
 }
