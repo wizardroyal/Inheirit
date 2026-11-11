@@ -2,6 +2,13 @@ import Link from "next/link";
 import { HeroLoop } from "@/components/HeroLoop";
 import { REPO_URL } from "@/lib/config";
 
+// The first slice of a real test will (released 2026-11-05 on the hosted stack), one link per chain.
+const PROOF: [string, string][] = [
+  ["NEAR", "https://testnet.nearblocks.io/address/alice.inheirit-gzdcfh.testnet"],
+  ["Ethereum Sepolia", "https://sepolia.etherscan.io/tx/0x0df06408e6ae91219b8c7fb45a3fefa8c8f2eff54d3e9f6b0e65fe8a16ef76ff"],
+  ["Bitcoin testnet4", "https://mempool.space/testnet4/tx/50876126ed1784ed78ad41e5dbbe544031e0b0fd0ded2f36efc7f7f6fdfc4dae"],
+];
+
 const STEPS = [
   ["All good", "The agent quietly notices the signs of life you already give off: NEAR and Ethereum transactions, the heartbeat app, Telegram, your socials and more (socials are SIMULATED for now). You do nothing."],
   ["Quiet", "Silent for longer than usual? It checks in: a ping in the heartbeat app, a Telegram message. Any reply ends it."],
@@ -35,6 +42,19 @@ export default function Home() {
             <Link href="/owner" className="rounded-lg bg-accent px-6 py-3 font-medium text-accent-ink hover:opacity-90">
               Try it in 3 minutes
             </Link>
+          </div>
+          <div className="space-y-2 border-t border-line pt-4">
+            <p className="text-sm text-muted">
+              Real on testnet: the first 10% of a test will, released on three chains by NEAR Chain Signatures, run by an attested agent in an Intel
+              TDX enclave.
+            </p>
+            <div className="tech flex flex-wrap gap-2">
+              {PROOF.map(([label, href]) => (
+                <a key={label} href={href} target="_blank" rel="noreferrer" className="rounded border border-line-strong px-2 py-1 hover:bg-accent-soft">
+                  {label} ↗
+                </a>
+              ))}
+            </div>
           </div>
         </div>
         <HeroLoop />
@@ -104,6 +124,8 @@ export default function Home() {
           ["Private by construction", "The agent runs in a secure enclave (Intel TDX on Phala), and its attestation is checked on-chain. Only timestamps leave it, never content. Your will's wording is read only by a private model on NEAR AI Cloud whose Intel TDX and NVIDIA GPU attestation the agent verifies."],
           ["Staged and reversible", "Releases go out in slices. Any sign of life between stages stops the rest, and you can withdraw whenever the will is at All good."],
           ["Heirs get what they use", "Each slice goes on to the asset and chain the heir chose (USDC on Base, SOL, NEAR…) through NEAR Intents. Stable-value mode pays in dollars, so a release that takes months doesn't expose heirs to price swings."],
+          ["If Inheirit disappears", "Nothing is released: silence never executes. NEAR releases are paid by the contract, which anyone can move along; Ethereum and Bitcoin wait for an agent, and any newly approved agent can resume them from the contract's records. While the will is at All good you can withdraw at any time."],
+          ["Alongside a legal will", "Inheirit complements a legal will; it doesn't replace one. Name your lawyer in it, and they can file a death certificate to speed up (never skip) the release."],
           ["Honest about limits", "The will runs on testnet; heirs see live mainnet quotes from NEAR Intents. Signal sources we can't connect yet are labelled SIMULATED wherever they appear."],
         ].map(([t, d]) => (
           <div key={t} className="rounded-2xl bg-card p-5">

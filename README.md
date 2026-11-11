@@ -27,7 +27,7 @@ Inheirit notices the signs of life you already give off, privately, and only rea
 | Real cross-chain execution: NEAR, Ethereum (Sepolia) and Bitcoin (testnet4) released in stages, with explorer links | [Then the full run](#then-the-full-run-about-15-minutes) |
 | An attested TEE agent and private AI, verifiable on-chain | [`docs/VERIFY.md`](docs/VERIFY.md): read-only calls that check it yourself; the trust badges under *Signs of life*; [`deploy/tee-agent.json`](deploy/tee-agent.json) lists every deployed compose hash |
 | NEAR Intents on mainnet | live quotes (public and confidential) on [`/mainnet`](https://inheirit.vercel.app/mainnet) and the heir page; the payout runbook in [`docs/MAINNET.md`](docs/MAINNET.md) |
-| Tests and security work | 228 agent tests, 163 contract unit tests plus sandbox flows, run on every push ([CI](.github/workflows/ci.yml)); five adversarial review rounds logged finding by finding in [`CLAUDE.md`](CLAUDE.md) (Decision log) and summarised in [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md) |
+| Tests and security work | 228 agent tests, 163 contract unit tests plus sandbox flows, run on every push ([CI](.github/workflows/ci.yml)); five adversarial review rounds logged finding by finding in [`CLAUDE.md`](CLAUDE.md) (Decision log) and summarised in [`docs/AUDITS.md`](docs/AUDITS.md) |
 | What's real and what's simulated | [Real vs simulated](#real-vs-simulated) |
 
 ### Real vs simulated
@@ -188,7 +188,7 @@ See [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md). In short:
 - A lawyer colluding with an heir can only shorten the waits, never skip a step.
 - Outsiders can't move vault funds: only the attested agent can request signatures, and only while a will is executing.
 - The developer can't read notes without shipping new agent code, which shows up as a new compose hash (with the caveat about Phala's centralized KMS below).
-- Several adversarial passes, an independent audit and three review rounds are recorded, finding by finding, in `CLAUDE.md` (Decision log, 2026-11-06, 2026-11-11 and 2026-11-12, including a critical sealed-note fix). Each fix has a test.
+- Several adversarial passes, an independent audit and five review rounds are summarised in [`docs/AUDITS.md`](docs/AUDITS.md) and recorded finding by finding in `CLAUDE.md` (Decision log, 2026-11-06 to 2026-11-11, including a critical sealed-note fix). Each security fix has a test.
 
 ## Honest limitations
 

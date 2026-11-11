@@ -112,25 +112,25 @@
       "compose_hash": "9652a057e059a7d8ab83c031f006f97e4c465b26d85c520d50c95c96d3afa98d",
       "image": "unwizarding/inheirit-agent@sha256:e1b147082cfbc89e56747f9239a27b741db6f7b163013066eedf0553d1e9ffd9",
       "at": "2026-11-11T07:45:24.391Z",
-      "note": "v2i: break-it pass 2 fixes (poke merging and spacing, sign-of-life rate limit, NEP-413 missing-key cache, faucet in-flight lock, speedrun expiry not in GuardianVote/Challenge, re-registration keeps sources) + copy pass (full links in Telegram, plain-English policy errors); registered 2026-11-11 as fe00f356, same sealed-notes key ae74cf06; retired 2026-11-12 (v2j)"
+      "note": "v2i: break-it pass 2 fixes (poke merging and spacing, sign-of-life rate limit, NEP-413 missing-key cache, faucet in-flight lock, speedrun expiry not in GuardianVote/Challenge, re-registration keeps sources) + copy pass (full links in Telegram, plain-English policy errors); registered 2026-11-11 as fe00f356, same sealed-notes key ae74cf06; retired 2026-11-11 (v2j)"
     },
     {
       "compose_hash": "1e4fcf8c8fdb31f93feab6101c4f742907d71be0d0abc796b324494d3e5ac13d",
       "image": "unwizarding/inheirit-agent@sha256:373dfdb008f9a80752a3272581507a3716141e53d6c6df581cd0dd67c3baec9a",
       "at": "2026-11-11T12:00:25.983Z",
-      "note": "v2j: audit round 2 (sealed notes bound to owner+heir, so copied ciphertexts are never re-sealed; Active liveness records rate-limited against gas griefing; gas watchdog; Telegram reply and per-recipient daily caps; NEP-413 lookups capped per account; vault reads only for existing wills; per-owner notification history; display_name in /api/overview); registered as a7a19be6, same sealed-notes key ae74cf06; retired 2026-11-12 (v2k)"
+      "note": "v2j: audit round 2 (sealed notes bound to owner+heir, so copied ciphertexts are never re-sealed; Active liveness records rate-limited against gas griefing; gas watchdog; Telegram reply and per-recipient daily caps; NEP-413 lookups capped per account; vault reads only for existing wills; per-owner notification history; display_name in /api/overview); registered as a7a19be6, same sealed-notes key ae74cf06; retired 2026-11-11 (v2k)"
     },
     {
       "compose_hash": "3ce3efb4375533a5fdcc02266f50a5a1ad4602551dd863836f360ad1e96bf562",
       "image": "unwizarding/inheirit-agent@sha256:5ddaa2f98cbe862a73c1cf534a81e6486e6b7ac300c43cc5ef112208f9ecae1a",
       "at": "2026-11-11T14:30:07.020Z",
-      "note": "v2k: audit round 3 (a newer sign of life is always recorded when a step is due; daily budget of 60 agent-paid advances per will); registered as 1516306f, same sealed-notes key ae74cf06; retired 2026-11-12 (v2l)"
+      "note": "v2k: audit round 3 (a newer sign of life is always recorded when a step is due; daily budget of 60 agent-paid advances per will); registered as 1516306f, same sealed-notes key ae74cf06; retired 2026-11-11 (v2l)"
     },
     {
       "compose_hash": "b2cb95eb8384bac102c516caa3117348aba0db7da7620f2b611ea39ec4966840",
       "image": "unwizarding/inheirit-agent@sha256:260a66c6a655bdb4fc0be0c0d1220b355926bee8cc959a3922acdf91b4f53887",
       "at": "2026-11-11T14:44:56.759Z",
-      "note": "v2l: audit round 4 (only a new lap, Active to Quiet, costs from a daily budget of 20 per will, so idle speedruns no longer freeze; a sign of life is recorded within one throttle step of the quiet deadline); registered as d017a9be, same sealed-notes key ae74cf06; retired 2026-11-12 (v2m)"
+      "note": "v2l: audit round 4 (only a new lap, Active to Quiet, costs from a daily budget of 20 per will, so idle speedruns no longer freeze; a sign of life is recorded within one throttle step of the quiet deadline); registered as d017a9be, same sealed-notes key ae74cf06; retired 2026-11-11 (v2m)"
     },
     {
       "compose_hash": "815ba58a94fd4e6f79b2d861512b2c2bce6182b53ea60517dd402ec94a80766e",
