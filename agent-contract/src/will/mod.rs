@@ -24,6 +24,9 @@ pub const MAX_GUARDIANS: usize = 10;
 pub const MAX_CONTACTS: usize = 10;
 pub const MAX_STAGES: usize = 10;
 pub const MAX_NOTES: usize = 10;
+/// Shortest allowed timing or stage wait. The demo uses 60 s and up (accelerated tests 20 s); shorter only lets a will
+/// cycle the ladder fast enough to burn the agent's gas (audit round 3).
+pub const MIN_TIMING_S: u64 = 20;
 pub const MAX_NOTE_CIPHERTEXT_BYTES: usize = 2048;
 /// A note re-sealed to the heir's key: crypto_box_seal adds 48 bytes.
 pub const MAX_RELEASED_NOTE_BYTES: usize = MAX_NOTE_CIPHERTEXT_BYTES + 48;
@@ -396,8 +399,8 @@ fn validate_stages(stages: &[Stage], name: &str) {
         "Each stage must release > 0%"
     );
     require!(
-        stages.iter().all(|s| s.wait_after > 0),
-        "Every stage wait must be > 0"
+        stages.iter().all(|s| s.wait_after >= MIN_TIMING_S),
+        "Every stage wait must be at least 20 seconds"
     );
     let sum: u32 = stages.iter().map(|s| s.pct as u32).sum();
     require!(sum == 100, format!("{} must sum to 100", name));
@@ -476,8 +479,8 @@ impl WillConfig {
                 t.secrets_buffer
             ]
             .iter()
-            .all(|d| *d > 0),
-            "All timings must be > 0"
+            .all(|d| *d >= MIN_TIMING_S),
+            "Every timing must be at least 20 seconds"
         );
 
         require_hex32(&self.policy_hash, "policy_hash");

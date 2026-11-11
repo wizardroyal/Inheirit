@@ -14,7 +14,7 @@ import { SOURCE_LABELS, ago } from "@/lib/will";
 export function SignsOfLife({ owner, will }: { owner: string; will: Will }) {
   const now = useNow();
   const state = stateName(will.state);
-  const { data: overview, refresh } = useOverview(owner);
+  const { data: overview, error: agentDown, refresh } = useOverview(owner);
   const names = useNames();
   const data = overview?.signals;
   // Refetch as soon as the state changes, so the verdict never describes the previous state for long.
@@ -72,6 +72,13 @@ export function SignsOfLife({ owner, will }: { owner: string; will: Will }) {
           )}
         </div>
       </div>
+
+      {agentDown && (
+        <p className="rounded-lg bg-warn-soft px-4 py-3 text-sm text-warn" role="status">
+          The will agent isn&apos;t answering right now (it may be paused or restarting). Nothing moves until it&apos;s back, and your will
+          is safe on-chain.
+        </p>
+      )}
 
       {/* Verdict */}
       {data?.verdict && (

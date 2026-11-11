@@ -46,7 +46,7 @@ impl World {
     }
 
     async fn advance(&self) -> R<()> {
-        sleep(Duration::from_millis(1100)).await; // every demo timing is 1 s
+        sleep(Duration::from_millis(20_500)).await; // the short timings are 20 s, the contract minimum
         self.call(&self.agent, "advance", json!({ "owner": self.owner.id }), None).await?.assert_success();
         Ok(())
     }
@@ -124,7 +124,7 @@ async fn setup() -> R<World> {
         .await?
         .assert_success();
 
-    let one = 1u64;
+    let one = 20u64; // the contract's shortest allowed timing (MIN_TIMING_S)
     w.call(
         &w.owner,
         "create_will",

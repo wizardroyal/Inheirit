@@ -34,12 +34,14 @@ export async function view<T>(methodName: string, args: Record<string, unknown> 
   return shared(`view:${contractId}:${methodName}:${JSON.stringify(args)}`, async () => (await provider.callFunction(contractId, methodName, args)) as T);
 }
 
+/** Whether a NEAR account exists. Only a definite "doesn't exist" answer is false; other errors throw. */
 export async function accountExists(id: string): Promise<boolean> {
   try {
     await provider.viewAccount(id);
     return true;
-  } catch {
-    return false;
+  } catch (e) {
+    if (/does not exist|UNKNOWN_ACCOUNT|doesn't exist/i.test(e instanceof Error ? e.message : String(e))) return false;
+    throw e;
   }
 }
 
@@ -50,7 +52,7 @@ export async function balanceOf(id: string): Promise<bigint> {
 
 export function account(accountId: string): Account {
   const secret = keys.secret(accountId);
-  if (!secret) throw new Error(`This browser can't sign for ${accountId}. Sign in as that account, or restore its key backup.`);
+  if (!secret) throw new Error(`This browser can't sign for ${accountId.split(".")[0]}. Sign in as that account in the browser that created it.`);
   return new Account(accountId, provider, KeyPairSigner.fromSecretKey(secret as KeyPairString));
 }
 
@@ -129,7 +131,7 @@ export async function signRequest(accountId: string, action: "heartbeat" | "regi
   const message = JSON.stringify({ action, owner: accountId, issued_at: Date.now(), data });
   const nonce = crypto.getRandomValues(new Uint8Array(32));
   if (!secret) {
-    if (walletAccountId() !== accountId) throw new Error(`This browser can't sign for ${accountId}. Sign in as that account, or restore its key backup.`);
+    if (walletAccountId() !== accountId) throw new Error(`This browser can't sign for ${accountId.split(".")[0]}. Sign in as that account in the browser that created it.`);
     const w = await walletSignMessage(accountId, message, nonce);
     return { account_id: accountId, public_key: w.publicKey, signature: w.signature, nonce: b64(nonce), message };
   }

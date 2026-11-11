@@ -1,5 +1,5 @@
 // Throwaway demo keys kept outside the repo in ~/.config/inheirit/demo-accounts.json (mode 600):
-// NEAR demo accounts (see day1-walkthrough.mjs) and the demo heir's Sepolia and BTC testnet4
+// NEAR demo accounts made by the demo scripts and the demo heir's Sepolia and BTC testnet4
 // receive keys, so test funds sent to the heir can be recycled instead of lost.
 import fs from "node:fs";
 import os from "node:os";

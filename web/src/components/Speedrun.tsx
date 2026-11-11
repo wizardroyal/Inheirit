@@ -119,7 +119,7 @@ function steps(w: Will, scenario: Scenario, escalated: boolean): Step[] {
     label: scenario === "accelerated" ? "Releasing 10% → 30% → 60%" : "Releasing 10% → 20% → 30% → 40%",
     detail:
       scenario === "late-heir"
-        ? `After the second slice, open ${heir?.name ?? "the heir"}'s view and choose how to receive: the waiting slices then pay out together.`
+        ? `Once a slice or two has been released, open ${heir?.name ?? "the heir"}'s view and choose how to receive: the waiting slices then pay out together.`
         : "The longest wait comes right after the first 10%, because that's when a living owner would notice. NEAR moves for real, and so do Sepolia and Bitcoin if their vaults were funded.",
     done: reached(w, "SecretsBuffer"),
     link: scenario === "late-heir" && heir ? { label: `Open ${heir.name}'s view`, href: `/heir/${owner}?as=${heir.account_id}` } : undefined,

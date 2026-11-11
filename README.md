@@ -39,7 +39,7 @@ Everything runs on testnet. One path, start to finish:
 1. Open **https://inheirit.vercel.app/owner** and click **Try with a demo account**. You get a fresh, funded testnet account whose key stays in your browser, shown under a random username such as *HatYoungRace*. A NEAR testnet wallet or Google sign-in works too.
 2. Open the **Generate sample will** tab and click **Generate my will** (under a minute). It creates test people with new names each time (an heir, three guardians, a friend and a lawyer), writes the will (everything to the heir, 10% → 20% → 30% → 40%), has the guardians accept (the will is now **armed**), funds the vaults (Sepolia and BTC from a small demo pool while it lasts) and seals a note for the heir.
    → The dashboard opens at **All good**: the *Signs of life* panel shows the ladder, a countdown, the agent's plain-English verdict and "What the agent saw: timestamps only".
-3. **Set your will in motion** is already on scenario **a · The owner comes back**, with demo timings (quiet after 2 minutes instead of 90 days). Do nothing for about 2 minutes.
+3. **Set your will in motion** is already on scenario **a · The owner comes back**, with demo timings (quiet after 2 minutes instead of 30 days). Do nothing for about 2 minutes.
    → The ladder climbs to **Quiet**, and the checks appear under *Messages sent* (heartbeat app, email, Telegram if linked, a SIMULATED DM), then **Welfare check**.
 4. Click **I'm here (send a heartbeat)**.
    → Within seconds the ladder **snaps back to All good**, and the verdict says nothing moved. That's the whole idea: signals can stop it; only people can start it.
@@ -49,7 +49,7 @@ Everything runs on testnet. One path, start to finish:
 Pick another scenario on the same card. The card shows a checklist with a button for each step you take.
 - **b · The will is carried out.** Click **Create &lt;heir&gt;'s key** (buttons use the heir's generated name), wait for **Guardian vote** (about 4 minutes), then **Both guardians confirm**. → **Challenge period** (2 minutes), then **Releasing in stages**: 10% lands on NEAR, Sepolia and BTC testnet4, with explorer links under *Released so far*. The next slice waits **3 minutes**, the longest wait; then 20%, 30%, 40% a minute apart; then **Waiting before secrets**, then **Secrets released**. Click **Open &lt;heir&gt;'s view** → **Open the note**: *"The Ledger is in the blue folder in the study…"*, sealed in your browser and opened only with the heir's key.
 - **c · A lawyer speeds it up.** Once the guardian vote has started, click **File the death certificate** (the evidence is SIMULATED), then **Both guardians confirm**. → The challenge period still runs in full; the release then follows the faster 10% → 30% → 60% schedule.
-- **d · The heir chooses late.** Don't set the heir's payout. → After the release starts, *Payouts to heirs* says the inheritance is waiting. Open the heir's view, choose e.g. **USDC on Base** with an address, and **Save** → the waiting slices pay out together (SIMULATED NEAR Intents on testnet, priced live).
+- **d · The heir chooses late.** Don't set the heir's payout. → After the release starts, *Payouts to heirs* shows slices waiting for the heir to choose. Open the heir's view, choose e.g. **USDC on Base** with an address, and **Save my choice** → the waiting slices pay out together (SIMULATED NEAR Intents on testnet, priced live).
 
 **View as** (on the same card) opens the guardian, heir, friend and lawyer pages as those accounts; each links back to the owner. On the heir's page, once an address is entered, **Get live quotes** shows real NEAR Intents quotes from mainnet, public and confidential side by side (dry runs: no money moves; the confidential column needs our partner key on the deployment). The same quote is on **https://inheirit.vercel.app/mainnet**. Afterwards: **Back to real timings**, or, once Completed, **Start over with the same people**.
 
@@ -105,7 +105,7 @@ Pick another scenario on the same card. The card shows a checklist with a button
 
 | Tech | Used for | Code |
 |---|---|---|
-| NEAR smart contract (Rust, near-sdk 5) | Will state machine (stage waits, secrets buffer, guardian consent, lawyer acceleration, Start over), NEAR vault, signing gate, sealed-note storage, NEP-297 events | `agent-contract/src/will/` (162 unit tests, sandbox tests in `agent-contract/tests/will_flow_tests.rs`) |
+| NEAR smart contract (Rust, near-sdk 5) | Will state machine (stage waits, secrets buffer, guardian consent, lawyer acceleration, Start over), NEAR vault, signing gate, sealed-note storage, NEP-297 events | `agent-contract/src/will/` (163 unit tests, sandbox tests in `agent-contract/tests/will_flow_tests.rs`) |
 | **Chain Signatures** (`v1.signer-prod.testnet`) | Vault addresses on Sepolia and BTC testnet4, derived from the contract account (`heirloom/<owner>/eth\|btc`); release and withdrawal signatures | gate: `agent-contract/src/will/agent.rs`; tx building: `src/chains/evm.ts`, `src/chains/btc.ts` (chainsig.js) |
 | **Shade Agent Framework** (TEE on Phala) | The will agent: liveness scoring and verdict, escalation and checks, execution, sealed-note crypto, Telegram bot. Registered with a real TDX attestation; measurements approved on-chain. | `src/index.ts`, `src/escalation/`, `src/liveness/`, `src/executor/`, `src/sealed/`, `src/telegram/`, `scripts/tee-agent.ts` |
 | **NEAR AI Cloud** (private inference) | Plain-English will → structured policy; heir claim guide. Will text goes only to a model whose attestation passes (TDX quote, NVIDIA GPU, signer bound to a fresh nonce; checked at startup and before each use), and every answer's signature must recover to the attested signer. | `src/ai/attestation.ts`, `src/ai/nearai.ts`, `src/ai/policy-parser.ts`, `src/ai/heir-guide.ts` |
@@ -117,7 +117,7 @@ Pick another scenario on the same card. The card shows a checklist with a button
 
 - **What runs in the TEE:** the agent. It polls signal sources, scores liveness, signs releases, runs the Telegram bot, and holds the sealed-notes private key. That key is derived from Phala's KMS for this app (`getKey`) and kept only in memory.
 - **What leaves it:** timestamps (`record_liveness`), state transitions, signed transfers, and notes re-sealed to an heir's key. Signal adapters return the time of the latest activity, never content. A Telegram reply is recorded as its receive time only; its text is never stored or logged.
-- **Sealed notes:** encrypted in the owner's browser (libsodium sealed box) to the agent's key; only ciphertext goes on-chain. Once the will reaches *Secrets released*, the agent opens each note inside the TEE and re-seals it to the heir's X25519 key, and the heir decrypts it in their browser.
+- **Sealed notes:** encrypted in the owner's browser (libsodium sealed box) to the agent's key, sealed together with the owner and heir they were written for; only ciphertext goes on-chain, and the agent releases a note only inside that will and only to that heir. Once the will reaches *Secrets released*, the agent opens each note inside the TEE and re-seals it to the heir's X25519 key, and the heir decrypts it in their browser.
 - **Will text** is processed only by an attested NEAR AI Cloud model. We verified that only 12 of 61 listed models attest; proxied models are refused.
 - **Minimal data:** sign-up asks for a display name and, optionally, a jurisdiction. Nothing else: no date of birth, nationality or photo. Google sign-in names the account after a hash of Google's user id; the email never goes on-chain, and we never hold the account's key.
 - **In the UI:** the *Signs of life* panel says "What the agent saw: timestamps only", next to badges for the attested TEE agent (approved compose hashes, registered agent, sealed-notes key match) and for the NEAR AI model (each check of a fresh attestation).
@@ -129,7 +129,7 @@ See [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md). In short:
 - A lawyer colluding with an heir can only shorten the waits, never skip a step.
 - Outsiders can't move vault funds: only the attested agent can request signatures, and only while a will is executing.
 - The developer can't read notes without shipping new agent code, which shows up as a new compose hash (with the caveat about Phala's centralized KMS below).
-- Two adversarial passes and an independent audit are recorded, finding by finding, in `CLAUDE.md` (Decision log, 2026-11-06 and 2026-11-11). Each fix has a test.
+- Several adversarial passes, an independent audit and three review rounds are recorded, finding by finding, in `CLAUDE.md` (Decision log, 2026-11-06, 2026-11-11 and 2026-11-12, including a critical sealed-note fix). Each fix has a test.
 
 ## Honest limitations
 
@@ -191,7 +191,7 @@ npm run dev                             # agent on :3000
 
 A local agent can't register on `inheirit.testnet`, which accepts only the attested TEE agent. Give it its own local-mode contract (`npx tsx scripts/deploy-dev-contract.ts <your agent's account id>` creates it and whitelists that agent) and point both `.env` files at it.
 
-Contract: `cd agent-contract && cargo +1.86.0 test --lib` (161 unit tests). The sandbox tests (`cargo +1.86.0 test --tests`) need the wasm at `target/near/shade_contract_template.wasm` first: `cargo +1.86.0 near build non-reproducible-wasm --no-abi` (or the pinned `sourcescan/cargo-near` Docker image).
+Contract: `cd agent-contract && cargo +1.86.0 test --lib` (163 unit tests). The sandbox tests (`cargo +1.86.0 test --tests`) need the wasm at `target/near/shade_contract_template.wasm` first: `cargo +1.86.0 near build non-reproducible-wasm --no-abi` (or the pinned `sourcescan/cargo-near` Docker image).
 
 Headless scenario scripts:
 - `scripts/demo-cancel.ts`: Scenario A.

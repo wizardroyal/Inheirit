@@ -3,9 +3,9 @@ import { HeroLoop } from "@/components/HeroLoop";
 import { REPO_URL } from "@/lib/config";
 
 const STEPS = [
-  ["All good", "The agent quietly notices the signs of life you already give off: NEAR and Ethereum transactions, the heartbeat app, Telegram, your socials and more. You do nothing."],
+  ["All good", "The agent quietly notices the signs of life you already give off: NEAR and Ethereum transactions, the heartbeat app, Telegram, your socials and more (socials are SIMULATED for now). You do nothing."],
   ["Quiet", "Silent for longer than usual? It checks in: a ping in the heartbeat app, a Telegram message. Any reply ends it."],
-  ["Welfare check", "Still nothing? Your guardians, friends and lawyer get a friendly message asking whether they've heard from you."],
+  ["Welfare check", "Still nothing? Your guardians, friends and lawyer get a friendly message asking whether they've heard from you (on Telegram if they've linked it; every message also shows in the app)."],
   ["Guardian vote", "Then it escalates: your guardians are asked whether you've passed away. A single “they're alive” stops everything."],
   ["Challenge period", "If enough guardians confirm your passing, you're alerted on every channel you've linked. Any sign of life cancels."],
   ["Released in stages", "10% first, then the longest wait, because a slice leaving your vaults is the loudest possible alarm. Then 20%, 30% and 40% across NEAR, Ethereum and Bitcoin. Any sign of life that counts stops the rest."],

@@ -1272,15 +1272,22 @@ fn accelerated_stages_must_sum_to_100() {
 }
 
 #[test]
-#[should_panic(expected = "Every stage wait must be > 0")]
+#[should_panic(expected = "Every stage wait must be at least 20 seconds")]
 fn zero_stage_wait_rejected() {
     create_invalid(|c| c.stages = stages(&[50, 50], &[60, 0]));
 }
 
 #[test]
-#[should_panic(expected = "All timings must be > 0")]
+#[should_panic(expected = "Every timing must be at least 20 seconds")]
 fn zero_secrets_buffer_rejected() {
     create_invalid(|c| c.timings.secrets_buffer = 0);
+}
+
+#[test]
+#[should_panic(expected = "Every timing must be at least 20 seconds")]
+fn one_second_timings_rejected() {
+    // A will cycling the ladder every second only burns the agent's gas (audit round 3).
+    create_invalid(|c| c.timings.nudge_period = 1);
 }
 
 #[test]

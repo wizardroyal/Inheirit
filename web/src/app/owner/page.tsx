@@ -6,7 +6,7 @@ import { Suspense, useEffect, useState } from "react";
 import { AgentBadge, AiBadge } from "@/components/Attestation";
 import { Ladder } from "@/components/Ladder";
 import { ActionButton, Card, CopyLink, Details, ErrorNote, Field, inputCls, Pill, short } from "@/components/ui";
-import { QuickSetup, StrengthChecklist } from "@/components/Onboarding";
+import { MyWillSetup, StrengthChecklist } from "@/components/Onboarding";
 import { FundAnywhere, PayoutsPanel } from "@/components/Payouts";
 import { SignIn } from "@/components/SignIn";
 import { SignsOfLife } from "@/components/SignsOfLife";
@@ -179,7 +179,7 @@ function CreateWill(props: { owner: string; onCreating: (b: boolean) => void; on
       {mode === "generate" ? (
         <GenerateWill {...props} />
       ) : mode === "quick" ? (
-        <QuickSetup {...props} summary={(stagesPct, demoClock) => <SetupSummary stagesPct={stagesPct} demoClock={demoClock} />} />
+        <MyWillSetup {...props} summary={(stagesPct, demoClock) => <SetupSummary stagesPct={stagesPct} demoClock={demoClock} />} />
       ) : (
         <WriteWill {...props} />
       )}
@@ -238,6 +238,8 @@ function GenerateWill({ owner, onCreating, onCreated }: { owner: string; onCreat
             setFailed(false);
             onCreating(true);
             try {
+              // Nothing is created while the agent is down: a will without it would be left half-made.
+              await agent.info();
               await generateWillAndCast(
                 owner,
                 {

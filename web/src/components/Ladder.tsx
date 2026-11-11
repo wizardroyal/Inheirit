@@ -60,7 +60,7 @@ export function Ladder({ will, compact = false }: { will: Will; compact?: boolea
               {current === "GuardianVote" && ", unless enough guardians confirm before then. If they don't, the will goes back to All good"}
             </>
           ) : (
-            <>Next: {next.label}, due now. The agent moves it on within seconds.</>
+            <>Next: {next.label}, due now. The agent moves it on at its next check.</>
           )}
         </p>
       )}

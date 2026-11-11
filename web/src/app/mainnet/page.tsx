@@ -45,8 +45,10 @@ export default function MainnetPage() {
           <div className="font-serif text-xl">Mainnet: a showcase, not a service</div>
           <p className="mt-1 text-sm text-muted">
             Heirs see live mainnet quotes from NEAR Intents, public and confidential, when they choose how to be paid: open an heir&apos;s page and
-            press &ldquo;Get live quotes&rdquo;. Real payouts go out from our demo vault on Base through a script that a person approves one
-            transaction at a time, capped at $5 each{records.length ? "; they are listed below" : ""}.
+            press &ldquo;Get live quotes&rdquo;.{" "}
+            {records.length
+              ? "Real payouts went out from our demo vault on Base through a script that a person approved one transaction at a time, capped at $5 each; they are listed below."
+              : "Real payouts can go out from a demo vault on Base, only through a script a person approves one transaction at a time (capped at $5 each). None have been sent yet; any that are will be listed here."}
           </p>
         </div>
       </section>

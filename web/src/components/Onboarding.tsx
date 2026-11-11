@@ -130,7 +130,7 @@ function PeopleField({
   );
 }
 
-export function QuickSetup({
+export function MyWillSetup({
   owner,
   onCreating,
   onCreated,

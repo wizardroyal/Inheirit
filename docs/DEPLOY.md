@@ -1,52 +1,44 @@
 # Deploy runbook: TEE agent upgrade + hosted web app
 
-The human runs these steps: they need the Phala API key and contract-owner key from the shade CLI keyring, Docker Hub and Vercel logins. Run from the repo root. Everything is testnet.
+The full history and the reasoning behind each step are in `CLAUDE.md` (§14 Status, Decision log). Scripts need `NODE_OPTIONS="--no-network-family-autoselection --dns-result-order=ipv4first"` on this WSL machine.
 
 ## A. Upgrade the TEE agent in place (same CVM, same app_id, same sealed-notes key)
 
-1. **Build and push the image** (user-level `docker login` with a Read & Write token):
+Never create a new CVM: a new app_id means a new sealed-notes key and every existing note is stranded (§7.5).
+
+1. Build and push the image, then pin its digest:
    ```bash
-   docker build --platform linux/amd64 -t unwizarding/inheirit-agent:day4 .
-   docker push unwizarding/inheirit-agent:day4
-   docker inspect --format '{{index .RepoDigests 0}}' unwizarding/inheirit-agent:day4
+   docker build --platform linux/amd64 -t unwizarding/inheirit-agent:<tag> .
+   docker push unwizarding/inheirit-agent:<tag>      # prints the digest
    ```
-2. **Pin the digest:** put the printed `unwizarding/inheirit-agent@sha256:…` on the `image:` line of `docker-compose.yaml`.
-3. **Add the demo faucet keys to `.env`** without printing them. The pool is the demo heir's testnet keys, so released coins flow back to it:
-   ```bash
-   python3 -c "import json,os; k=json.load(open(os.path.expanduser('~/.config/inheirit/demo-accounts.json'))); open('.env','a').write(f\"\nDEMO_FAUCET_ETH_KEY={k['heir-eth']}\nDEMO_FAUCET_BTC_KEY={k['heir-btc']}\n\")"
-   ```
-   Check that `.env` has `AGENT_CONTRACT_ID=inheirit.testnet` and `DEMO_MODE=true`. Optional: `NEAR_RPC_URL=` a keyed FastNEAR URL, or a comma-separated list. FastNEAR's free tier throttles a busy agent (429); leave it empty to use the default.
-4. **Ship it.** Two steps, because new env keys change `allowed_envs` (Decision log 2026-10-29):
-   ```bash
-   npx tsx scripts/tee-agent.ts upgrade    # new compose (image + env lines); approves its hash first
-   npx tsx scripts/tee-agent.ts env        # pushes .env with the full key list; approves the resulting hash
-   npx tsx scripts/tee-agent.ts status
-   ```
-   Approve promptly: failed registrations burn agent NEAR.
-5. **Check the logs** (`https://d5b714731becca502b6bd054a5cf6ffa5ce71f61-8090.dstack-pha-prod9.phala.network/logs/shade-agent-app?text&bare&timestamps&tail=50`) for `Agent registered` and `[faucet] demo vault faucet on`. Then:
-   ```bash
-   curl -s https://d5b714731becca502b6bd054a5cf6ffa5ce71f61-3000.dstack-pha-prod9.phala.network/demo/faucet   # enabled: true
-   curl -s https://d5b714731becca502b6bd054a5cf6ffa5ce71f61-3000.dstack-pha-prod9.phala.network/api/agent-info # sealedNotes.enabled: true
-   ```
-   The sealed-notes key must still be `ae74cf06…` (an in-place upgrade keeps it).
-6. **Retire old hashes** once the new agent is registered: `npx tsx scripts/tee-agent.ts retire 8b21f5b81921cdd229e9b03f86764d7e54a452f236e770d2014a6c245b169f2f`, plus the intermediate hash printed by step 4's `upgrade`.
-7. Commit `docker-compose.yaml` and `deploy/tee-agent.json`.
+   Put `unwizarding/inheirit-agent@sha256:<digest>` on the `image:` line of `docker-compose.yaml`.
+2. Make sure the shade CLI keyring has both credentials: `npx tsx scripts/tee-agent.ts status` must work. (On WSL the kernel keyring is wiped on every restart; restore it from `.env`.)
+3. The CVM must be running (`tee-agent.ts start` if not), and the TEE sponsor (`TEE_SPONSOR_*` in `.env`) must hold ≥ 1.5 NEAR: every reboot funds a new agent account with 0.5.
+4. `npx tsx scripts/tee-agent.ts upgrade`: approves the new compose hash *before* committing, then the CVM reboots (~70 s).
+5. Only if `ENV_KEYS` in `scripts/tee-agent.ts` gained a key: `tee-agent.ts env` (retry while it says "Another operation is already in progress"), wait ~45 s, then `tee-agent.ts approve` at once (the env update changes the compose hash).
+6. Check registration: `tee-agent.ts status` shows the new agent account with the new compose hash and `"Valid"`; `GET <agent>/api/agent-info` shows the same sealed-notes key (`ae74cf06…`) and `enabled: true`.
+7. Retire the previous hash (one per call): `tee-agent.ts retire <old compose hash>`. Record the new one in `deploy/tee-agent.json`.
 
 ## B. Host the web app on Vercel
 
-1. Push the branch to GitHub (Vercel can import the private repo).
-2. Vercel → **Add New → Project** → import `wizardroyal/Inheirit`.
-   - **Root Directory:** `web` (keep "Include files outside the root directory" on; `web/` imports `../src/policy`).
-   - Framework, install and build commands come from `web/vercel.json`.
-   - **Environment variables:**
-     - `NEXT_PUBLIC_AGENT_URL` = `https://d5b714731becca502b6bd054a5cf6ffa5ce71f61-3000.dstack-pha-prod9.phala.network`
-     - `NEXT_PUBLIC_CONTRACT_ID` = `inheirit.testnet`
-3. Deploy, then put the URL in the README (`<WEB_URL>`) and run Scenarios A and B on it once.
+1. Vercel project: Root Directory `web`, branch `main`. Install command comes from `web/vercel.json`.
+2. Environment variables (Production):
+   - `NEXT_PUBLIC_AGENT_URL` = `https://d5b714731becca502b6bd054a5cf6ffa5ce71f61-3000.dstack-pha-prod9.phala.network`
+   - `NEXT_PUBLIC_CONTRACT_ID` = `inheirit.testnet`
+   - `ONBOARD_PARENT_ACCOUNT`, `ONBOARD_PARENT_KEY`: the account that funds sign-ups (`inheirit-users.testnet`; never `inheirit.testnet`)
+   - `GOOGLE_CLIENT_ID`: for Google sign-in
+   - `ONECLICK_JWT`: the NEAR Intents partner key, for confidential live quotes
+   - optional limits: `ONBOARD_FUND_NEAR` (1.5), `ONBOARD_HOURLY_NEAR` (80, per instance), `ONBOARD_IP_HOURLY_NEAR` (6, per network), `ONBOARD_PARENT_FLOOR_NEAR` (3); `NEXT_PUBLIC_X_POST_URL` once the demo post exists
+3. Before saying a deploy works, build from a clean clone the way Vercel does: `git clone` → `cd web` → `npx -y npm@10.9.2 ci --prefix .. --ignore-scripts && npx -y npm@10.9.2 ci && npx next build`.
+4. Don't script requests at the hosted site (it once triggered Vercel's DDoS challenge); test with a local `next dev` pointed at the hosted backend.
 
-## C. During judging
+## C. Contract code upgrades (storage layout unchanged)
 
-- Keep the CVM running (~$0.06/h). `tee-agent.ts stop|start` pauses billing and keeps the app_id and key.
-- If the logs show `NEAR RPC is rate-limiting`, set `NEAR_RPC_URL` in `.env` (keyed URL or a list) and run `npx tsx scripts/tee-agent.ts env`. The key list doesn't change, so this is a plain env update and restart.
-- Demo wills are driven for `DEMO_WATCH_HOURS` (default 3 h) after creation, unless mid-execution. On a judge's page, an expired will shows "the agent isn't watching" with a button to resume.
-- Keep the sponsor account funded: the agent pays gas for every will it drives.
-- Faucet pool (= demo heir): on 2026-10-29 it held ~0.015 Sepolia ETH and ~210k testnet4 sats. Each demo will takes 0.002 ETH + 20,000 sats, and most of that comes back when the will executes. Top it up from public faucets if it runs low (`GET /demo/faucet` shows the addresses).
+Build with the pinned image (`sourcescan/cargo-near@sha256:772638e3…`, see §14 Commands), run `cargo +1.86.0 test --tests`, then `npx tsx scripts/upgrade-contract-code.ts inheirit-dev2.testnet` and `… inheirit.testnet`. The script checks the on-chain code hash and that the contract still reads.
+
+## D. During judging
+
+- Keep the CVM running (Phala credit ≈ $0.06/h) and the TEE sponsor ≥ 1.5 NEAR. The agent tops itself up from the sponsor at most 4 × 0.5 NEAR a day.
+- Keep `inheirit-users.testnet` funded (1.5 NEAR per demo or Google sign-in); refill with `scripts/new-onboard-parent.ts inheirit-users.testnet <n> --topup`.
+- Speedrun wills (quiet after < 1 h) stop being watched `DEMO_WATCH_HOURS` (default 3) after they started, but never mid-release, in the guardian vote or in the challenge period. Wills on real timings are watched indefinitely. Changing timings or Start over makes the agent watch again.
+- Hosted regression: `scripts/demo-cancel.ts` (Scenario A, ~5 min).
