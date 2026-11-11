@@ -8,7 +8,7 @@ import { ActionButton, Card, inputCls, Pill, NoWill } from "@/components/ui";
 import { Releases } from "@/components/WillParts";
 import { HeirPayoutList, IntentsSimTag, PayoutChoice } from "@/components/Payouts";
 import { useActingAs, useKeys, usePoll, useWill } from "@/lib/hooks";
-import { useDisplayName } from "@/lib/names";
+import { useAccountLabel, useDisplayName } from "@/lib/names";
 import { keys } from "@/lib/keys";
 import { agent } from "@/lib/agent";
 import { call, ROLE_TGAS, signRequest, view } from "@/lib/near";
@@ -30,6 +30,7 @@ export default function HeirPage() {
   const { data: will, loaded, refresh } = useWill(owner);
   const [me, setMe] = useActingAs();
   const ownerName = useDisplayName(owner);
+  const ownerLabel = useAccountLabel();
   useKeys(); // re-render when the local key store changes
 
   if (!loaded) return <p>Loading…</p>;
@@ -48,21 +49,21 @@ export default function HeirPage() {
         <h1 className="font-serif text-4xl">For the heirs of {ownerName}</h1>
         <p className="max-w-2xl text-muted">
           {started
-            ? `${ownerName}'s will is being carried out. This page walks you through what you receive and any private notes left for you.`
-            : `Nothing has been released. ${ownerName}'s will is at “${stateLabel(s)}”. You can set up your key now, so you're ready if the time comes.`}
+            ? `We're sorry for your loss. ${ownerName}'s will is being carried out, and this page walks you through it one step at a time: what you receive, how you'd like to receive it, and any private notes left for you. There's no rush.`
+            : `Nothing has been released, and nothing will be unless ${ownerName}'s guardians confirm they have passed away. Right now the will is at “${stateLabel(s)}”. If you like, you can set up your key now, so you're ready if that day comes.`}
         </p>
       </div>
-      <Step n={1} title="Who are you?" done={!!heir}>
+      <Step n={1} title="Who you are" done={!!heir}>
         <ActAs value={me} onChange={setMe} suggested={suggested} label="I am" />
-        {me && !heir && <p className="mt-2 text-sm text-danger">{me} isn&apos;t an heir of this will.</p>}
-        {heir && <p className="mt-2 text-sm">Welcome, {heir.name}.</p>}
+        {me && !heir && <p className="mt-2 text-sm text-danger">{ownerLabel(me)} isn&apos;t an heir of this will.</p>}
+        {heir && <p className="mt-2 text-sm">Hello, {heir.name}.</p>}
       </Step>
       {heir && <KeyStep owner={owner} heir={heir} refresh={refresh} />}
       {heir && (
         <Step n={3} title="What you receive">
           <p className="mb-3 text-sm text-muted">
-            Assets are released in stages: {schedule(will).map((st) => `${st.pct}%`).join(", ")}, with the longest wait after the first. If {owner} turns
-            out to be alive, the remaining stages stop. Private notes come last, after everything is handed over and one more wait.
+            What you receive arrives in stages ({schedule(will).map((st) => `${st.pct}%`).join(", ")}), with the longest wait after the first. If it
+            turns out {ownerName} is alive after all, everything stops. Private notes come last, after everything else has been handed over.
           </p>
           <Releases will={will} />
         </Step>
@@ -75,13 +76,14 @@ export default function HeirPage() {
 }
 
 function PayoutStep({ owner, heir }: { owner: string; heir: string }) {
+  const ownerName = useDisplayName(owner);
   const { data, refresh } = usePoll(() => agent.payouts(owner, heir), 6000, [owner, heir]);
   const mine = data?.heirs[heir];
   return (
     <Step n={4} title="How you'd like to receive it" done={!!mine?.pref}>
       <p className="mb-3 text-sm text-muted">
-        Receive your inheritance in what you actually use: USDC on Base, SOL on Solana, NEAR and more. Each slice goes on through NEAR Intents to the
-        asset and chain you choose{data?.value_mode === "stable" ? `. ${owner} chose to pay in dollars, so it arrives as USDC on that chain` : ""}.
+        You can receive your inheritance in whatever you already use: US dollars (USDC) on Base, SOL on Solana, NEAR and more. Each slice goes on through NEAR Intents to the
+        asset and chain you choose{data?.value_mode === "stable" ? `. ${ownerName} chose to pay in dollars, so it arrives as USDC on that chain` : ""}.
         {data?.simulated && (
           <>
             {" "}
@@ -105,10 +107,10 @@ function KeyStep({ owner, heir, refresh }: { owner: string; heir: Will["heirs"][
   const registered = heir.x25519_pubkey;
   const matches = !!registered && registered === localPub;
   return (
-    <Step n={2} title="Your private key for notes" done={matches}>
+    <Step n={2} title="A key for private notes" done={matches}>
       <p className="text-sm text-muted">
-        Notes left for you are encrypted to a key that exists only on your device. Create it here; only its public half goes on-chain. Download
-        a backup: without it, a new browser can&apos;t open your notes.
+        Any private notes left for you are locked so that only you can open them, with a key that stays on this device. Create it here, then
+        download a backup: without it, you can&apos;t open your notes on another device.
       </p>
       {registered && !seed && (
         <p className="mt-2 text-sm text-warn">A key is registered for you, but this browser doesn&apos;t have it. Restore your backup, or create a new key if no notes have been released to you yet.</p>
@@ -169,16 +171,18 @@ function RestoreKey({ owner, heir }: { owner: string; heir: string }) {
 }
 
 function NotesStep({ owner, will, heir }: { owner: string; will: Will; heir: string }) {
+  const ownerName = useDisplayName(owner);
   const { data: released } = usePoll(() => view<Released[]>("get_released_notes", { owner, heir }), 15_000, [owner, heir]);
   const [opened, setOpened] = useState<Record<number, string>>({});
   const waiting = will.sealed_notes.filter((n) => n.heir === heir && !(released ?? []).some((r) => r.note_id === n.id));
   return (
     <Step n={5} title="Private notes left for you">
-      {(released ?? []).length === 0 && waiting.length === 0 && <p className="text-sm text-muted">No private notes were left for you.</p>}
+      {(released ?? []).length === 0 && waiting.length === 0 && <p className="text-sm text-muted">There are no private notes for you.</p>}
       {waiting.length > 0 && (
         <p className="text-sm text-muted">
-          {waiting.length} sealed note{waiting.length > 1 ? "s" : ""} ({waiting.map((n) => `“${n.label}”`).join(", ")}) will be released to you last,
-          after everything is handed over and one more wait. The agent opens them inside its secure enclave and re-seals them to your key.
+          {ownerName} left you {waiting.length === 1 ? "a private note" : `${waiting.length} private notes`} ({waiting.map((n) => `“${n.label}”`).join(", ")}).
+          {waiting.length === 1 ? " It" : " They"} will reach you last, after everything else has been handed over, locked so that only your key can
+          open {waiting.length === 1 ? "it" : "them"}.
         </p>
       )}
       <ul className="mt-3 space-y-3">
@@ -205,7 +209,7 @@ function NotesStep({ owner, will, heir }: { owner: string; will: Will; heir: str
           </li>
         ))}
       </ul>
-      <p className="mt-3 text-xs text-muted">Notes are opened in this browser, and what they say is never sent anywhere.</p>
+      <p className="mt-3 text-xs text-muted">Notes open here, on your device. What they say is never sent anywhere.</p>
     </Step>
   );
 }
@@ -233,8 +237,8 @@ function GuideChat({ owner, heir }: { owner: string; heir: string }) {
   return (
     <Card title="Questions? Ask the guide" aside={<AiBadge />}>
       <p className="mb-3 text-sm text-muted">
-        Answers come from a private model on NEAR AI Cloud, running in a secure enclave. It sees only your own details, never your notes. Never share a
-        seed phrase or password with anyone, here included. An answer takes about 30 seconds.
+        Ask anything about what happens next. Answers come from a private AI that sees only your own details, never your notes, and take about
+        30 seconds. Please never share a seed phrase or password with anyone, here included.
       </p>
       <ul className="mb-3 space-y-2">
         {turns.map((t, i) => (

@@ -42,7 +42,7 @@ export function AgentBadge() {
   const keyMatches = !!info && !!key && info.sealedNotes.x25519_pubkey === key.x25519_pubkey;
   const tee = contract.requires_tee;
   return (
-    <div className="space-y-2 text-sm">
+    <div className="tech space-y-2">
       <div className="flex flex-wrap gap-2">
         {tee ? <Pill tone="accent">Agent runs in a secure enclave (Intel TDX)</Pill> : <Pill tone="warn">local development agent, no enclave</Pill>}
         {valid.length > 0 ? <Pill tone="accent">attested agent registered on-chain</Pill> : <Pill tone="danger">no attested agent registered</Pill>}
@@ -80,7 +80,7 @@ export function AiBadge() {
   if (!data) return <Pill>checking NEAR AI…</Pill>;
   const checks = [...(data.gateway?.checks ?? []), ...data.models.flatMap((m) => m.checks)];
   return (
-    <div className="space-y-2 text-sm">
+    <div className="tech space-y-2">
       {data.ok ? <Pill tone="accent">Private AI verified ({data.model})</Pill> : <Pill tone="danger">NEAR AI attestation failed</Pill>}
       <Details summary={`${checks.filter((c) => c.ok).length}/${checks.length} checks passed · ${new Date(data.checkedAt).toLocaleTimeString()}`}>
         {checks.map((c, i) => (

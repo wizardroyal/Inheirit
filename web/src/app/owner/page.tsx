@@ -1,8 +1,9 @@
 "use client";
+import { ensureName, humanize, useAccountLabel, useNames } from "@/lib/names";
 import { summarizePolicy, type Policy } from "@agent/policy/policy";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useState } from "react";
-import { ActAs, ImportKey } from "@/components/ActAs";
+import { Suspense, useEffect, useState } from "react";
+import { ActAs } from "@/components/ActAs";
 import { AgentBadge, AiBadge } from "@/components/Attestation";
 import { Ladder } from "@/components/Ladder";
 import { ActionButton, Card, CopyLink, Details, ErrorNote, Field, inputCls, Pill } from "@/components/ui";
@@ -19,7 +20,6 @@ import { stagesFor, summarize } from "@agent/policy/schedule";
 import { addSealedNote, createWill, generateWillAndCast } from "@/lib/demo";
 import { useKeys, usePoll, useWill } from "@/lib/hooks";
 import { keys } from "@/lib/keys";
-import { randomName, setName, useDisplayName } from "@/lib/names";
 import { downloadKeyBackup, topUpAccount } from "@/lib/onboard";
 import { disconnectWallet, walletAccountId } from "@/lib/wallet";
 import { balanceOf, call, formatNear, nearToYocto, signRequest } from "@/lib/near";
@@ -42,6 +42,10 @@ function Owner() {
   // Keep the writing view until every creation step has finished, even after the will shows up on-chain
   const [creating, setCreating] = useState(false);
   const showSignIn = signingIn || !owner;
+  // Accounts signed in before usernames existed get one now, so no ".testnet" id is ever shown.
+  useEffect(() => {
+    if (owner) ensureName(owner);
+  }, [owner]);
 
   return (
     <div className="space-y-6">
@@ -66,7 +70,6 @@ function Owner() {
             }}
           />
         )}
-        <ImportKey />
       </div>
       {owner && loaded && (!will || creating) && <LowBalance owner={owner} />}
       {owner && loaded && (!will || creating) && <CreateWill owner={owner} onCreating={setCreating} onCreated={refresh} />}
@@ -82,7 +85,7 @@ function LowBalance({ owner }: { owner: string }) {
   return (
     <Card title="This account needs a little testnet NEAR">
       <p className="text-sm text-muted">
-        {owner} has {formatNear(balance)} NEAR. Creating a will and funding its vault takes about 1 NEAR. Testnet NEAR is free, so we can send you
+        You have {formatNear(balance)} NEAR. Creating a will and funding its vault takes about 1 NEAR. Testnet NEAR is free, so we can send you
         some:
       </p>
       <div className="mt-3">
@@ -99,7 +102,6 @@ function AccountActions({ owner, onSignIn, onSignedOut }: { owner: string; onSig
   const wallet = !!owner && walletAccountId() === owner;
   return (
     <div className="flex flex-wrap items-center gap-3 text-xs">
-      <Username account={owner} />
       {local && (
         <button type="button" className="text-accent underline" onClick={() => downloadKeyBackup(owner)}>
           Download key backup
@@ -117,61 +119,20 @@ function AccountActions({ owner, onSignIn, onSignedOut }: { owner: string; onSig
   );
 }
 
-/** The signed-in person's username (random at sign-in) with an inline rename. */
-function Username({ account }: { account: string }) {
-  const name = useDisplayName(account);
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState("");
-  if (editing)
-    return (
-      <form
-        className="flex items-center gap-2"
-        onSubmit={(e) => {
-          e.preventDefault();
-          setName(account, draft);
-          setEditing(false);
-        }}
-      >
-        <input className={`${inputCls} w-40 py-1`} value={draft} onChange={(e) => setDraft(e.target.value)} maxLength={32} autoFocus aria-label="Username" />
-        <button type="submit" className="border-2 border-line bg-accent-soft px-2 py-1 text-ink">
-          Save
-        </button>
-        <button type="button" className="text-muted underline" onClick={() => setDraft(randomName())}>
-          Shuffle
-        </button>
-      </form>
-    );
-  return (
-    <span className="flex items-center gap-2">
-      <span className="border-2 border-line bg-accent-soft px-1.5 py-0.5 text-sm font-extrabold text-ink">{name}</span>
-      <button
-        type="button"
-        className="text-accent underline"
-        onClick={() => {
-          setDraft(name === account ? randomName() : name);
-          setEditing(true);
-        }}
-      >
-        {name === account ? "Pick a username" : "Rename"}
-      </button>
-    </span>
-  );
-}
-
 /** Quick setup (3 steps) by default; the plain-English route through NEAR AI is the alternative. */
 function CreateWill(props: { owner: string; onCreating: (b: boolean) => void; onCreated: () => void }) {
-  const [mode, setMode] = useState<"generate" | "quick" | "english">("generate");
+  const [mode, setMode] = useState<"generate" | "quick" | "english">("quick");
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap gap-2 text-sm">
-        <ActionButton tone={mode === "generate" ? undefined : "quiet"} onClick={async () => setMode("generate")}>
-          Generate a sample will for me
-        </ActionButton>
         <ActionButton tone={mode === "quick" ? undefined : "quiet"} onClick={async () => setMode("quick")}>
-          Quick setup (3 steps)
+          My will
         </ActionButton>
         <ActionButton tone={mode === "english" ? undefined : "quiet"} onClick={async () => setMode("english")}>
-          Write it in plain English
+          Will in plain English
+        </ActionButton>
+        <ActionButton tone={mode === "generate" ? undefined : "quiet"} onClick={async () => setMode("generate")}>
+          Generate sample will
         </ActionButton>
       </div>
       {mode === "generate" ? (
@@ -194,11 +155,11 @@ function GenerateWill({ owner, onCreating, onCreated }: { owner: string; onCreat
   const [log, setLog] = useState<string[]>([]);
   const [failed, setFailed] = useState(false);
   return (
-    <Card title="Generate a sample will for me">
+    <Card title="Generate sample will">
       <p className="text-sm text-muted">
-        The quickest way to see everything. This creates testnet accounts for an heir (Ada), three guardians, a friend and a lawyer, with their keys
-        in this browser so you can play every role. Then it writes your will (everything to Ada, released 10% → 20% → 30% → 40%), the guardians
-        accept, and a sealed note is left for Ada. You can change any of it later while the will is at All good.
+        The quickest way to see everything. This creates test people (an heir, three guardians, a friend and a lawyer, with new names each time)
+        whose keys stay in this browser, so you can play every role. Then it writes your will (everything to the heir, released 10% → 20% → 30% →
+        40%), the guardians accept, and a sealed note is left for the heir. You can change any of it later while the will is at All good.
       </p>
       <div className="mt-3 flex flex-wrap gap-4 text-sm">
         <label className="flex items-center gap-2">
@@ -211,7 +172,7 @@ function GenerateWill({ owner, onCreating, onCreated }: { owner: string; onCreat
           </label>
         ))}
         <label className="flex items-center gap-2">
-          <input type="checkbox" checked={stable} onChange={(e) => setStable(e.target.checked)} /> Pay Ada in dollars (stable value via NEAR Intents, SIMULATED on testnet)
+          <input type="checkbox" checked={stable} onChange={(e) => setStable(e.target.checked)} /> Pay the heir in dollars (stable value via NEAR Intents, SIMULATED on testnet)
         </label>
       </div>
       <div className="mt-3 flex flex-wrap items-end gap-4">
@@ -273,6 +234,7 @@ function GenerateWill({ owner, onCreating, onCreated }: { owner: string; onCreat
 }
 
 function WriteWill({ owner, onCreating, onCreated }: { owner: string; onCreating: (b: boolean) => void; onCreated: () => void }) {
+  const names = useNames();
   const [text, setText] = useState("");
   const [draft, setDraft] = useState<DraftResult | null>(null);
   const [demoClock, setDemoClock] = useState(true);
@@ -321,7 +283,7 @@ function WriteWill({ owner, onCreating, onCreated }: { owner: string; onCreating
             <h3 className="font-serif text-lg">Please check this summary</h3>
             <ul className="list-disc space-y-1 pl-5 text-sm">
               {summarizePolicy(policy).map((l) => (
-                <li key={l}>{l}</li>
+                <li key={l}>{humanize(l, names)}</li>
               ))}
             </ul>
             <p className="text-xs text-muted">
@@ -386,6 +348,7 @@ function WriteWill({ owner, onCreating, onCreated }: { owner: string; onCreating
 
 function Dashboard({ will, refresh }: { will: Will; refresh: () => void }) {
   const owner = will.owner;
+  const label = useAccountLabel();
   const s = stateName(will.state);
   const active = s === "Active";
   return (
@@ -393,7 +356,7 @@ function Dashboard({ will, refresh }: { will: Will; refresh: () => void }) {
       <SignsOfLife owner={owner} will={will} />
       <Speedrun will={will} refresh={refresh} />
       <div className="grid gap-6 lg:grid-cols-[1fr_1.1fr]">
-      <div className="space-y-6">
+      <div className="min-w-0 space-y-6">
         <Card title="Where your will stands">
           <WatchStatus owner={owner} will={will} canSign />
           <Ladder will={will} compact />
@@ -413,7 +376,7 @@ function Dashboard({ will, refresh }: { will: Will; refresh: () => void }) {
             {will.heirs.map((h) => (
               <div key={h.account_id} className="flex flex-wrap justify-between gap-2">
                 <dt>
-                  Heir: {h.name} <span className="text-muted">({h.account_id})</span>
+                  Heir: {h.name}
                 </dt>
                 <dd className="text-muted">{h.near_share_bps / 100}% of NEAR</dd>
               </div>
@@ -422,13 +385,13 @@ function Dashboard({ will, refresh }: { will: Will; refresh: () => void }) {
               <dt>Guardians</dt>
               <dd className="text-muted">
                 {will.guardian_threshold} of {will.guardians.length}:{" "}
-                {will.guardians.map((g) => `${g.account_id}${g.accepted ? "" : " (invited, hasn't accepted yet)"}`).join(", ")}
+                {will.guardians.map((g) => `${label(g.account_id)}${g.accepted ? "" : " (invited, hasn't accepted yet)"}`).join(", ")}
               </dd>
             </div>
             {will.contacts.length > 0 && (
               <div className="flex flex-wrap justify-between gap-2">
                 <dt>Friends (welfare check)</dt>
-                <dd className="text-muted">{will.contacts.join(", ")}</dd>
+                <dd className="text-muted">{will.contacts.map(label).join(", ")}</dd>
               </div>
             )}
           </dl>
@@ -452,7 +415,7 @@ function Dashboard({ will, refresh }: { will: Will; refresh: () => void }) {
           </div>
         </Card>
       </div>
-      <div className="space-y-6">
+      <div className="min-w-0 space-y-6">
         <StrengthChecklist will={will} />
         <Vaults owner={owner} will={will}>
           {active ? (
@@ -587,6 +550,7 @@ function WatchSettings({ owner }: { owner: string }) {
 }
 
 function SealedNotes({ will, refresh }: { will: Will; refresh: () => void }) {
+  const who = useAccountLabel();
   const [heir, setHeir] = useState(will.heirs[0]?.account_id ?? "");
   const [label, setLabel] = useState("");
   const [text, setText] = useState("");
@@ -603,7 +567,7 @@ function SealedNotes({ will, refresh }: { will: Will; refresh: () => void }) {
           return (
             <li key={n.id} className="flex flex-wrap items-center justify-between gap-2">
               <span>
-                {n.label} <span className="text-muted">for {n.heir}</span> {released && <Pill tone="accent">released</Pill>}
+                {n.label} <span className="text-muted">for {who(n.heir)}</span> {released && <Pill tone="accent">released</Pill>}
               </span>
               {active && (
                 <ActionButton tone="quiet" onClick={() => call(will.owner, "remove_sealed_note", { note_id: n.id }).then(refresh)}>

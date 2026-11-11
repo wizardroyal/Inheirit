@@ -22,24 +22,24 @@ const PROBLEMS = [
 
 export default function Home() {
   return (
-    <div className="space-y-16">
-      <section className="grid items-center gap-10 pt-4 lg:grid-cols-[1.25fr_1fr]">
+    <div className="space-y-20">
+      <section className="grid items-center gap-12 pt-6 lg:grid-cols-[1.25fr_1fr]">
         <div className="space-y-6">
-          <p className="inline-block bg-ink px-2 py-1 font-mono text-[11px] uppercase tracking-widest text-bg">A crypto will · NEAR · Ethereum · Bitcoin</p>
-          <h1 className="font-serif text-5xl sm:text-7xl">A will that doesn&apos;t make you prove you&apos;re alive.</h1>
-          <p className="max-w-xl text-lg">
+          <p className="tech-label text-sm">A crypto will · NEAR · Ethereum · Bitcoin</p>
+          <h1 className="font-serif text-5xl leading-[1.05] sm:text-6xl">A will that doesn&apos;t make you prove you&apos;re alive.</h1>
+          <p className="max-w-xl text-lg text-muted">
             Inheirit notices your normal signs of life privately and only reaches out once you&apos;ve gone quiet for longer than usual. Silence alone
             never sets it off: people do. Then it hands your assets on in small, reversible slices, and reveals sealed instructions to the right heir
             last.
           </p>
           <div className="flex flex-wrap items-center gap-4">
-            <Link href="/owner" className="border border-line bg-accent px-6 py-3 font-mono text-sm font-bold uppercase tracking-wider text-accent-ink">
-              Try it in 3 minutes →
+            <Link href="/owner" className="rounded-lg bg-accent px-6 py-3 font-medium text-accent-ink hover:opacity-90">
+              Try it in 3 minutes
             </Link>
-            <span className="font-mono text-xs uppercase tracking-wider text-muted">No sign-up · testnet · nothing costs money</span>
+            <span className="text-sm text-muted">No sign-up. Testnet, so nothing costs money.</span>
           </div>
           <p className="max-w-xl text-sm text-muted">
-            Click <b className="text-ink">Try with a demo account</b>, then <b className="text-ink">Generate a sample will for me</b>, then go quiet
+            Click <b className="text-ink">Try with a demo account</b>, then <b className="text-ink">Generate sample will</b>, then go quiet
             and watch the ladder climb, and send one sign of life to snap it back. The full run, all the way to an heir opening a sealed note, takes
             about 15 minutes.{" "}
             <Link href="/demo" className="text-accent underline">
@@ -51,16 +51,16 @@ export default function Home() {
         <HeroLoop />
       </section>
 
-      <section className="space-y-5">
-        <h2 className="font-serif text-4xl">How it works</h2>
-        <p className="max-w-2xl text-lg">
-          Two rules: <strong className="bg-accent-soft px-1">signals can stop it; only people can start it.</strong> Any sign of life sends the will
+      <section className="space-y-6">
+        <h2 className="font-serif text-3xl">How it works</h2>
+        <p className="max-w-2xl text-lg text-muted">
+          Two rules: <strong className="text-ink">signals can stop it; only people can start it.</strong> Any sign of life sends the will
           back to the top. Moving down the ladder takes time first, then people.
         </p>
         <ol className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {STEPS.map(([title, text], i) => (
-            <li key={title} className={`border border-line bg-card p-4 ${i === STEPS.length - 1 ? "sm:col-span-2 lg:col-span-3" : ""}`}>
-              <div className="font-mono text-3xl font-bold text-accent">{String(i + 1).padStart(2, "0")}</div>
+            <li key={title} className={`rounded-2xl bg-card p-5 ${i === STEPS.length - 1 ? "sm:col-span-2 lg:col-span-3" : ""}`}>
+              <div className="tech-label">Step {i + 1}</div>
               <div className="mt-1 font-serif text-xl">{title}</div>
               <p className="mt-2 text-sm text-muted">{text}</p>
             </li>
@@ -68,11 +68,11 @@ export default function Home() {
         </ol>
       </section>
 
-      <section className="space-y-5">
-        <h2 className="font-serif text-4xl">Why earlier attempts failed</h2>
-        <div className="overflow-x-auto border border-line bg-card">
+      <section className="space-y-6">
+        <h2 className="font-serif text-3xl">Why earlier attempts failed</h2>
+        <div className="overflow-x-auto rounded-2xl bg-card">
           <table className="w-full text-sm">
-            <thead className="bg-ink text-left font-mono text-[11px] uppercase tracking-wider text-bg">
+            <thead className="tech-label text-left">
               <tr>
                 <th className="p-3">Problem</th>
                 <th className="p-3">What went wrong</th>
@@ -81,8 +81,8 @@ export default function Home() {
             </thead>
             <tbody>
               {PROBLEMS.map(([p, wrong, fix]) => (
-                <tr key={p} className="border-t-2 border-line align-top">
-                  <td className="p-3 font-serif">{p}</td>
+                <tr key={p} className="border-t border-line align-top">
+                  <td className="p-3 font-medium">{p}</td>
                   <td className="p-3 text-muted">{wrong}</td>
                   <td className="p-3">{fix}</td>
                 </tr>
@@ -92,26 +92,26 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="grid gap-5 sm:grid-cols-2">
+      <section className="grid gap-4 sm:grid-cols-2">
         {[
           ["Private by construction", "The agent runs in a secure enclave (Intel TDX on Phala), and its attestation is checked on-chain. Only timestamps leave it, never content. Your will's wording is read only by a private model on NEAR AI Cloud whose Intel TDX and NVIDIA GPU attestation the agent verifies."],
           ["Staged and reversible", "Releases go out in slices. Any sign of life between stages stops the rest, and you can withdraw at any time while you're alive."],
           ["Heirs get what they use", "Each slice goes on to the asset and chain the heir chose (USDC on Base, SOL, NEAR…) through NEAR Intents. Stable-value mode pays in dollars, so a release that takes months doesn't expose heirs to price swings."],
           ["Honest about limits", "The will runs on testnet; heirs see live mainnet quotes from NEAR Intents. Signal sources we can't connect yet are labelled SIMULATED wherever they appear."],
         ].map(([t, d]) => (
-          <div key={t} className="border border-line bg-card p-5">
+          <div key={t} className="rounded-2xl bg-card p-5">
             <div className="font-serif text-xl">{t}</div>
             <p className="mt-2 text-sm text-muted">{d}</p>
           </div>
         ))}
       </section>
 
-      <section className="border border-line bg-ink p-6 text-bg">
-        <p className="font-mono text-[11px] uppercase tracking-widest opacity-75">Next</p>
-        <p className="mt-2 font-serif text-2xl">A will is the first use. Next: gifts that release when the people you love reach their milestones.</p>
+      <section className="rounded-2xl bg-accent-soft p-6">
+        <p className="tech-label">Next</p>
+        <p className="mt-2 font-serif text-2xl text-accent">A will is the first use. Next: gifts that release when the people you love reach their milestones.</p>
       </section>
 
-      <p className="font-mono text-xs uppercase tracking-wider text-muted">
+      <p className="text-sm text-muted">
         Built at NEAR HACKATHON on Chain Signatures, Shade Agents (TEE), NEAR AI Cloud and NEAR Intents ·{" "}
         <a href={REPO_URL} target="_blank" rel="noreferrer" className="text-accent underline">
           Code on GitHub

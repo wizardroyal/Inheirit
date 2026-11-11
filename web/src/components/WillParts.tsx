@@ -1,5 +1,6 @@
 "use client";
 // Pieces shared by the owner, guardian, heir and demo pages.
+import { accountLabel, humanize, useNames } from "@/lib/names";
 import { useState } from "react";
 import { agent, type SignalSource } from "@/lib/agent";
 import { explorer } from "@/lib/config";
@@ -42,7 +43,7 @@ export function SignalList({ owner, will }: { owner: string; will: Will | null }
   const shown = showAll ? SOURCES : SOURCES.filter((s) => !folded.includes(s));
   return (
     <div className="space-y-2">
-      <ul className="divide-y divide-line text-sm">
+      <ul className="tech divide-y divide-line">
         {shown.map((s) => {
           const at = data?.observations[s.source]?.at;
           return (
@@ -74,8 +75,22 @@ export function SignalList({ owner, will }: { owner: string; will: Will | null }
   );
 }
 
+/** A message body with its links shown as "open the page" instead of a raw URL full of account ids. */
+function withLinks(text: string) {
+  return text.split(/(https?:\/\/\S+)/).map((part, i) =>
+    /^https?:\/\//.test(part) ? (
+      <ExtLink key={i} href={part.replace(/[.,;]$/, "")}>
+        open the page
+      </ExtLink>
+    ) : (
+      part
+    ),
+  );
+}
+
 export function NotificationLog({ owner }: { owner: string }) {
   const { data: overview, error } = useOverview(owner);
+  const names = useNames();
   const data = overview?.notifications;
   const items = [...(data ?? [])].reverse().slice(0, 20);
   return (
@@ -85,13 +100,13 @@ export function NotificationLog({ owner }: { owner: string }) {
         {items.map((n, i) => (
           <li key={i} className="rounded-lg border border-line px-3 py-2 text-sm">
             <div className="flex flex-wrap justify-between gap-2">
-              <span className="font-medium">{n.subject}</span>
+              <span className="font-medium">{humanize(n.subject, names)}</span>
               <span className="text-xs text-muted">{ago(n.at)}</span>
             </div>
             <div className="text-xs text-muted">
-              to {n.to.join(", ")} · via {n.channels.map((c) => (c === "ui" ? "this app" : c)).join(", ")}
+              to {n.to.map((t) => humanize(t, names)).join(", ")} · via {n.channels.map((c) => (c === "ui" ? "this app" : c)).join(", ")}
             </div>
-            <div className="mt-1 text-sm">{n.body}</div>
+            <div className="mt-1 text-sm">{withLinks(humanize(n.body, names))}</div>
           </li>
         ))}
       </ul>
@@ -113,14 +128,15 @@ function txLink(chain: string, hash: string): string | null {
 
 /** What has been released in the current round, per stage and chain, with explorer links. */
 export function Releases({ will }: { will: Will }) {
+  const names = useNames();
   const round = will.execution_round;
   const recs = will.executions.filter((e) => e.round === round);
   const chains = ["Near", ...will.foreign_chains] as const;
   if (round === 0) return <p className="text-sm text-muted">Nothing has been released. Nothing moves unless guardians confirm and the challenge period passes.</p>;
   return (
     <div className="space-y-3">
-      <table className="w-full text-sm">
-        <thead className="text-left text-xs text-muted">
+      <table className="tech w-full">
+        <thead className="tech-label text-left">
           <tr>
             <th className="py-1">Stage</th>
             {chains.map((c) => (
@@ -146,7 +162,7 @@ export function Releases({ will }: { will: Will }) {
                       return (
                         <div key={i}>
                           {amountText(c, e.amount)} {link && <ExtLink href={link}>tx</ExtLink>}
-                          <div className="text-xs text-muted">to {short(e.to, 8)}</div>
+                          <div className="text-xs text-muted">to {/\.testnet$/.test(e.to) ? accountLabel(e.to, names) : short(e.to, 8)}</div>
                         </div>
                       );
                     })}

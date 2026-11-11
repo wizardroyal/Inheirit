@@ -3,6 +3,7 @@
 // status per slice, fund-from-anywhere, and the mainnet demo payouts made with scripts/mainnet-payout.ts.
 // On testnet the agent's 1Click client is SIMULATED (NEAR Intents has no testnet), and every element it
 // drives says so.
+import { useAccountLabel } from "@/lib/names";
 import { useEffect, useMemo, useState } from "react";
 import mainnetPayouts from "@/data/mainnet-payouts.json";
 import { agent, type FundQuote, type HeirPayouts, type IntentsToken, type PayoutBatch } from "@/lib/agent";
@@ -109,7 +110,7 @@ export function PayoutChoice({ owner, heir, current, onSaved }: { owner: string;
           onSaved();
         }}
       >
-        Save, signed as {heir}
+        Save my choice
       </ActionButton>
       <p className="text-xs text-muted">
         Before saving, the agent checks that NEAR Intents can actually route to this choice. You can change it until each slice is paid.
@@ -273,6 +274,7 @@ export function HeirPayoutList({ p, minUsd, mine }: { p: HeirPayouts; minUsd: nu
 
 /** All heirs' payouts (owner/demo view); shown once the release has started. */
 export function PayoutsPanel({ owner }: { owner: string }) {
+  const label = useAccountLabel();
   const { data } = usePoll(() => agent.payouts(owner), 6000, [owner]);
   if (!data) return <p className="text-sm text-muted">Loading…</p>;
   if (!data.started)
@@ -292,7 +294,7 @@ export function PayoutsPanel({ owner }: { owner: string }) {
       )}
       {Object.entries(data.heirs).map(([heir, p]) => (
         <div key={heir}>
-          <p className="mb-1 text-sm font-medium">{heir}</p>
+          <p className="mb-1 text-sm font-medium">{label(heir)}</p>
           <HeirPayoutList p={p} minUsd={data.min_usd} />
         </div>
       ))}

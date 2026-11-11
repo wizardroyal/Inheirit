@@ -56,7 +56,7 @@ export default function HeartbeatPage() {
         type="button"
         disabled={!owner || busy}
         onClick={() => ping(owner)}
-        className="h-48 w-48 rounded-full border-4 border-line bg-accent font-serif text-3xl text-accent-ink transition hover:scale-[1.02] disabled:opacity-40"
+        className="h-48 w-48 rounded-full bg-accent font-serif text-3xl text-accent-ink shadow-lg hover:opacity-95 disabled:opacity-40"
       >
         {busy ? "…" : "I'm here"}
       </button>

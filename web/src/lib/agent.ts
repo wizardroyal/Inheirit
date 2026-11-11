@@ -17,7 +17,9 @@ async function req<T>(path: string, body?: unknown): Promise<T> {
 }
 
 async function send<T>(path: string, body?: unknown): Promise<T> {
-  const res = await fetch(`${AGENT_URL}${path}`, body === undefined ? {} : { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const res = await fetch(`${AGENT_URL}${path}`, body === undefined ? {} : { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).catch(() => {
+    throw new Error("The will agent isn't answering right now (it may be restarting or switched off). Try again in a minute.");
+  });
   const json = await res.json().catch(() => ({}));
   if (!res.ok) {
     const err = (json as { error?: unknown; errors?: string[] }).errors?.join("; ") ?? (json as { error?: unknown }).error;

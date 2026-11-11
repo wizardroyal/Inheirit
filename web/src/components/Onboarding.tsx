@@ -7,9 +7,11 @@ import { checkPolicy, summarizePolicy, type Policy } from "@agent/policy/policy"
 import { STANDARD_PCT } from "@agent/policy/schedule";
 import { agent } from "@/lib/agent";
 import { DEMO_SCHEDULE, REAL_SCHEDULE } from "@/lib/config";
-import { createWill } from "@/lib/demo";
+import { acceptAsGuardians, createWill } from "@/lib/demo";
+import { keys } from "@/lib/keys";
+import { createPerson } from "@/lib/onboard";
 import { useOverview } from "@/lib/hooks";
-import { nameOf } from "@/lib/names";
+import { humanize, nameOf, useAccountLabel, useNames } from "@/lib/names";
 import { signRequest } from "@/lib/near";
 import { acceptedGuardians, isArmed, type Will } from "@/lib/will";
 import { TelegramLink } from "./TelegramLink";
@@ -30,6 +32,103 @@ const list = (s: string) =>
     .split(",")
     .map((x) => x.trim())
     .filter(Boolean);
+
+/** A generated person, shown by name; the account id stays out of sight. */
+function Chip({ label, onRemove }: { label: string; onRemove: () => void }) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-accent-soft px-3 py-1 text-sm font-medium text-accent">
+      {label}
+      <button type="button" aria-label={`Remove ${label}`} className="px-1 text-muted hover:text-ink" onClick={onRemove}>
+        ×
+      </button>
+    </span>
+  );
+}
+
+/** ⚡ Creates a funded test person (random name, key in this browser) for this role. */
+function GenerateButton({ owner, what, onMade }: { owner: string; what: string; onMade: (p: { accountId: string; name: string }) => void }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <span className="inline-flex flex-col">
+      <button
+        type="button"
+        title={`Generate a test ${what}`}
+        aria-label={`Generate a test ${what}`}
+        disabled={busy}
+        className="rounded-lg border border-line bg-card px-2.5 py-1.5 text-base leading-none hover:bg-accent-soft disabled:opacity-50"
+        onClick={async () => {
+          setBusy(true);
+          setError(null);
+          try {
+            onMade(await createPerson(owner));
+          } catch (e) {
+            setError(e instanceof Error ? e.message : String(e));
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        {busy ? "…" : "⚡"}
+      </button>
+      {error && <span className="max-w-48 text-xs text-danger">{error}</span>}
+    </span>
+  );
+}
+
+/** A comma-separated list of NEAR accounts shown as name chips, with a box to add one and ⚡ to generate one. */
+function PeopleField({
+  owner,
+  what,
+  value,
+  onChange,
+  label,
+  single,
+}: {
+  owner: string;
+  what: string;
+  value: string;
+  onChange: (v: string) => void;
+  label: (id: string) => string;
+  single?: boolean;
+}) {
+  const [draft, setDraft] = useState("");
+  const people = list(value);
+  const add = (id: string) => {
+    if (!id || people.includes(id)) return;
+    onChange((single ? [id] : [...people, id]).join(", "));
+    setDraft("");
+  };
+  return (
+    <div className="space-y-2">
+      {people.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {people.map((p) => (
+            <Chip key={p} label={label(p)} onRemove={() => onChange(people.filter((x) => x !== p).join(", "))} />
+          ))}
+        </div>
+      )}
+      {(!single || people.length === 0) && (
+        <span className="flex gap-2">
+          <input
+            className={`${inputCls} min-w-0 flex-1`}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value.trim())}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === ",") {
+                e.preventDefault();
+                add(draft);
+              }
+            }}
+            onBlur={() => add(draft)}
+            placeholder={`Their NEAR account, or ⚡ for a test ${what}`}
+          />
+          <GenerateButton owner={owner} what={what} onMade={(p) => add(p.accountId)} />
+        </span>
+      )}
+    </div>
+  );
+}
 
 export function QuickSetup({
   owner,
@@ -56,6 +155,8 @@ export function QuickSetup({
   const [stable, setStable] = useState(false);
   const [log, setLog] = useState<string[]>([]);
 
+  const label = useAccountLabel();
+  const names = useNames();
   const guardianList = list(guardians);
   const badAccounts = [...heirs.map((h) => h.account), ...guardianList, ...(lawyer ? [lawyer] : [])].filter((a) => a && !ACCOUNT.test(a));
   const ids = heirs.map((_, i) => `h${i + 1}`);
@@ -111,7 +212,7 @@ export function QuickSetup({
       <Card title="1 · Signs of life" aside={<Pill tone="accent">your NEAR account always counts</Pill>}>
         <p className="text-sm text-muted">
           You never need to check in. The agent notices normal activity and only reaches out if you go quiet for longer than usual. One strong
-          source is already on: every transaction you sign with <b>{owner}</b>.
+          source is already on: every transaction you sign with your account.
         </p>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <Field label="Your own Sepolia address (optional)" hint="Not a vault. Transactions you send from it count as signs of life.">
@@ -132,8 +233,19 @@ export function QuickSetup({
         <div className="space-y-3">
           {heirs.map((h, i) => (
             <div key={i} className="grid gap-2 rounded-lg border border-line p-3 sm:grid-cols-[1fr_1.4fr_5rem_auto]">
-              <input className={inputCls} value={h.name} onChange={(e) => setHeir(i, { name: e.target.value })} placeholder="Heir name (Ada)" />
-              <input className={inputCls} value={h.account} onChange={(e) => setHeir(i, { account: e.target.value.trim() })} placeholder="NEAR account (ada.testnet)" />
+              <input className={inputCls} value={h.name} onChange={(e) => setHeir(i, { name: e.target.value })} placeholder="Heir's name" />
+              <span className="flex gap-2">
+                {h.account && keys.secret(h.account) ? (
+                  <Chip label={`${label(h.account)} · test account`} onRemove={() => setHeir(i, { account: "" })} />
+                ) : (
+                  <input className={`${inputCls} min-w-0 flex-1`} value={h.account} onChange={(e) => setHeir(i, { account: e.target.value.trim() })} placeholder="Their NEAR account" />
+                )}
+                <GenerateButton
+                  owner={owner}
+                  what="heir"
+                  onMade={(p) => setHeir(i, { account: p.accountId, name: heirs[i].name || p.name })}
+                />
+              </span>
               <span className="relative">
                 <input className={`${inputCls} w-full pr-7`} inputMode="decimal" value={h.pct} onChange={(e) => setHeir(i, { pct: e.target.value })} aria-label="Share in percent" />
                 <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted">%</span>
@@ -161,17 +273,17 @@ export function QuickSetup({
           </div>
         </div>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          <Field label="Guardians" hint="At least two NEAR accounts, separated by commas. Heirs can't be guardians.">
-            <input className={inputCls} value={guardians} onChange={(e) => setGuardians(e.target.value)} placeholder="g1.testnet, g2.testnet, g3.testnet" />
+          <Field label="Guardians" hint="At least two. Add their NEAR accounts, or generate test people. Heirs can't be guardians.">
+            <PeopleField owner={owner} what="guardian" value={guardians} onChange={setGuardians} label={label} />
           </Field>
           <Field label="How many must confirm">
             <input className={inputCls} value={threshold} onChange={(e) => setThreshold(e.target.value)} />
           </Field>
           <Field label="Lawyer (optional)" hint="Can speed up the release with a death certificate, but never skips the challenge period.">
-            <input className={inputCls} value={lawyer} onChange={(e) => setLawyer(e.target.value.trim())} placeholder="lawyer.testnet" />
+            <PeopleField owner={owner} what="lawyer" value={lawyer} onChange={setLawyer} label={label} single />
           </Field>
-          <Field label="Friends for a welfare check (optional)" hint="NEAR accounts, separated by commas. They can only stop things, never start them.">
-            <input className={inputCls} value={contacts} onChange={(e) => setContacts(e.target.value)} placeholder="friend.testnet" />
+          <Field label="Friends for a welfare check (optional)" hint="They can only stop things, never start them.">
+            <PeopleField owner={owner} what="friend" value={contacts} onChange={setContacts} label={label} />
           </Field>
         </div>
       </Card>
@@ -236,7 +348,7 @@ export function QuickSetup({
           policy && (
             <ul className="list-disc space-y-1 pl-5 text-sm">
               {summarizePolicy(policy).map((l) => (
-                <li key={l}>{l}</li>
+                <li key={l}>{humanize(l, names)}</li>
               ))}
             </ul>
           )
@@ -260,6 +372,9 @@ export function QuickSetup({
                   },
                   progress,
                 );
+                // Test guardians generated here hold their keys in this browser: they accept at once.
+                const local = list(guardians).filter((g) => keys.secret(g));
+                if (local.length) await acceptAsGuardians(owner, local, progress);
                 if (evm) {
                   progress("Adding your Sepolia address as a sign of life…");
                   await agent.registerOwner(await signRequest(owner, "register_owner", { evm_address: evm }));

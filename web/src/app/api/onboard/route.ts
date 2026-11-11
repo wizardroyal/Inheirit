@@ -119,7 +119,7 @@ async function topUp(p: NonNullable<ReturnType<typeof parent>>, ip: string, acco
   return Response.json({ accountId, toppedUpTo: env("ONBOARD_FUND_NEAR", "2") });
 }
 
-const CAST_ROLES = ["ada", "g1", "g2", "g3", "friend", "lawyer"] as const;
+const CAST_ROLES = ["heir", "g1", "g2", "g3", "friend", "lawyer"] as const;
 
 /**
  * A test cast for a wallet owner: wallets (rightly) refuse to add full-access keys to new subaccounts, so
@@ -144,6 +144,21 @@ async function cast(p: NonNullable<ReturnType<typeof parent>>, ip: string, publi
     await createFunded(p, accounts[r], publicKeys[r], each);
   }
   return Response.json({ accounts });
+}
+
+/** One person for a wallet owner's will (an heir, guardian, friend or lawyer), from a browser-made key. */
+async function person(p: NonNullable<ReturnType<typeof parent>>, ip: string, publicKey: string) {
+  if (!isPublicKey(publicKey)) return Response.json({ error: "publicKey must be an ed25519 public key" }, { status: 400 });
+  if (limited(`person:${ip}`, 12, 3_600_000)) return Response.json({ error: "Too many accounts from this network; try again later" }, { status: 429 });
+  const each = nearToYocto("0.1");
+  const floor = nearToYocto(env("ONBOARD_PARENT_FLOOR_NEAR", "3")!);
+  if (BigInt((await p.provider.viewAccount(p.id)).amount) - each < floor) {
+    return Response.json({ error: "Today's free testnet accounts have run out; please try again later" }, { status: 503 });
+  }
+  if (overBudget(each)) return Response.json({ error: BUDGET_GONE }, { status: 503 });
+  const accountId = `p-${randomBytes(5).toString("hex")}.${p.id}`;
+  await createFunded(p, accountId, publicKey, each);
+  return Response.json({ accountId });
 }
 
 function isPublicKey(k: unknown): k is string {
@@ -174,6 +189,7 @@ export async function POST(req: Request) {
   const ip = clientIp(req);
   if (body.kind === "topup") return topUp(p, ip, body.accountId ?? "");
   if (body.kind === "cast") return cast(p, ip, body.publicKeys);
+  if (body.kind === "person") return person(p, ip, body.publicKey ?? "");
   const publicKey = body.publicKey ?? "";
   if (!isPublicKey(publicKey)) return Response.json({ error: "publicKey must be an ed25519 public key" }, { status: 400 });
 
@@ -206,7 +222,7 @@ export async function POST(req: Request) {
     if (limited(`demo:${ip}`, 3, 3_600_000)) return Response.json({ error: "Too many demo accounts from this network; try again later" }, { status: 429 });
     id = `demo-${randomBytes(4).toString("hex")}.${p.id}`;
   } else {
-    return Response.json({ error: 'kind must be "google", "demo", "topup" or "cast"' }, { status: 400 });
+    return Response.json({ error: 'kind must be "google", "demo", "topup", "cast" or "person"' }, { status: 400 });
   }
 
   const amount = nearToYocto(env("ONBOARD_FUND_NEAR", "2")!);

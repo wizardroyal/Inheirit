@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { useKeys } from "@/lib/hooks";
 import { keys } from "@/lib/keys";
-import { useNames } from "@/lib/names";
+import { accountLabel, useNames } from "@/lib/names";
 import { provider } from "@/lib/near";
 import { ActionButton, Details, inputCls } from "./ui";
 
@@ -17,11 +17,11 @@ export function ActAs({ value, onChange, suggested, label = "Acting as" }: { val
     <div className="flex flex-wrap items-center gap-2 text-sm">
       <span className="text-muted">{label}</span>
       {options.length ? (
-        <select value={value} onChange={(e) => onChange(e.target.value)} className={inputCls}>
+        <select value={value} onChange={(e) => onChange(e.target.value)} className={`${inputCls} max-w-full`}>
           <option value="">choose an account…</option>
           {options.map((a) => (
             <option key={a} value={a}>
-              {names[a] ? `${names[a]} · ${a}` : a}
+              {accountLabel(a, names)}
             </option>
           ))}
         </select>

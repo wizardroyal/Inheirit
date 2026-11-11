@@ -8,7 +8,7 @@ import { ActionButton, Card, ErrorNote, Field, inputCls, Pill, NoWill } from "@/
 import { TelegramLink } from "@/components/TelegramLink";
 import { SignalList } from "@/components/WillParts";
 import { useActingAs, useWill } from "@/lib/hooks";
-import { useDisplayName } from "@/lib/names";
+import { useAccountLabel, useDisplayName } from "@/lib/names";
 import { call, ROLE_TGAS } from "@/lib/near";
 import { ago, guardianIds, stateName } from "@/lib/will";
 
@@ -37,7 +37,7 @@ function LawyerCard({ owner, lawyer, state, accelerated, refresh }: { owner: str
           <Field label="Certificate" hint="Only its fingerprint (SHA-256) goes on-chain; the file never leaves your device.">
             <input
               type="file"
-              className={inputCls}
+              className={`${inputCls} w-full min-w-0`}
               onChange={async (e) => {
                 const f = e.target.files?.[0];
                 setEvidence(f ? { name: f.name, hash: await sha256Hex(f) } : null);
@@ -64,6 +64,7 @@ export default function GuardianPage() {
   const [me, setMe] = useActingAs();
   const [evidence, setEvidence] = useState<{ name: string; hash: string } | null>(null);
   const ownerName = useDisplayName(owner);
+  const label = useAccountLabel();
 
   if (!loaded) return <p>Loading…</p>;
   if (!will) return <NoWill owner={owner} />;
@@ -79,17 +80,17 @@ export default function GuardianPage() {
         <BackToOwner owner={owner} />
         <h1 className="font-serif text-4xl">Guardian for {ownerName}</h1>
         <p className="max-w-2xl text-muted">
-          {owner} chose you because they trust you to tell the truth. Confirm a passing only if you&apos;re sure. If you believe they&apos;re alive,
+          {ownerName} chose you because they trust you to tell the truth. Confirm a passing only if you&apos;re sure. If you believe they&apos;re alive,
           say so: one “they&apos;re alive” from any guardian stops everything.
         </p>
         <ActAs value={me} onChange={setMe} suggested={[...guardianIds(will), ...(will.lawyer ? [will.lawyer] : [])]} label="I am" />
-        {me && !entry && me !== will.lawyer && <ErrorNote>{me} isn&apos;t a guardian or the lawyer for this will.</ErrorNote>}
+        {me && !entry && me !== will.lawyer && <ErrorNote>{label(me)} isn&apos;t a guardian or the lawyer for this will.</ErrorNote>}
       </div>
       {me && me === will.lawyer && <LawyerCard owner={owner} lawyer={me} state={s} accelerated={will.accelerated} refresh={refresh} />}
       {entry && !entry.accepted && (
         <Card title="You've been invited">
           <p className="text-sm">
-            {owner} has asked you to be a guardian. You&apos;ll only hear from us if they go quiet for a long time and nobody in a welfare check has
+            {ownerName} has asked you to be a guardian. You&apos;ll only hear from us if they go quiet for a long time and nobody in a welfare check has
             heard from them. Then you&apos;ll be asked whether they have passed away. Until enough guardians accept, the will can never start.
           </p>
           <div className="mt-3">
@@ -119,7 +120,7 @@ export default function GuardianPage() {
               <Field label="Evidence (optional)" hint="A death certificate, notice or letter. Only its fingerprint (SHA-256) goes on-chain; the file never leaves your device.">
                 <input
                   type="file"
-                  className={inputCls}
+                  className={`${inputCls} w-full min-w-0`}
                   onChange={async (e) => {
                     const f = e.target.files?.[0];
                     setEvidence(f ? { name: f.name, hash: await sha256Hex(f) } : null);
@@ -132,7 +133,7 @@ export default function GuardianPage() {
               ) : (
                 <div className="flex flex-wrap gap-2">
                   <ActionButton tone="danger" disabled={!isGuardian} onClick={() => call(me, "attest", { owner, kind: "Deceased", evidence_hash: evidence?.hash ?? null }, 0n, ROLE_TGAS).then(refresh)}>
-                    I confirm {owner} has passed away
+                    I confirm {ownerName} has passed away
                   </ActionButton>
                   <ActionButton tone="quiet" disabled={!isGuardian} onClick={() => call(me, "attest", { owner, kind: "Alive", evidence_hash: evidence?.hash ?? null }, 0n, ROLE_TGAS).then(refresh)}>
                     They&apos;re alive

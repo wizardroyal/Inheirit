@@ -5,7 +5,7 @@ import { errorText } from "@/lib/near";
 
 export function Card({ title, aside, children, className = "" }: { title?: ReactNode; aside?: ReactNode; children: ReactNode; className?: string }) {
   return (
-    <section className={`rounded-xl border border-line bg-card p-5 ${className}`}>
+    <section className={`min-w-0 rounded-2xl border border-line bg-card p-5 sm:p-6 ${className}`}>
       {(title || aside) && (
         <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
           {title && <h2 className="font-serif text-xl">{title}</h2>}
@@ -19,7 +19,7 @@ export function Card({ title, aside, children, className = "" }: { title?: React
 
 type Tone = "primary" | "quiet" | "danger";
 const TONES: Record<Tone, string> = {
-  primary: "border border-line bg-accent text-accent-ink",
+  primary: "bg-accent text-accent-ink hover:opacity-90",
   quiet: "border border-line bg-card hover:bg-accent-soft",
   danger: "border border-danger text-danger hover:bg-danger-soft",
 };
@@ -67,13 +67,13 @@ export function ActionButton({
 
 export function Pill({ children, tone = "neutral" }: { children: ReactNode; tone?: "neutral" | "accent" | "warn" | "danger" | "sim" }) {
   const cls = {
-    neutral: "bg-bg text-ink border border-line",
-    accent: "bg-accent-soft text-ink",
+    neutral: "bg-bg text-muted border border-line",
+    accent: "bg-accent-soft text-accent",
     warn: "bg-warn-soft text-warn",
     danger: "bg-danger-soft text-danger",
     sim: "bg-sim-soft text-sim",
   }[tone];
-  return <span className={`inline-flex items-center px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider ${cls}`}>{children}</span>;
+  return <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${cls}`}>{children}</span>;
 }
 
 export function SimulatedTag() {
@@ -88,7 +88,7 @@ export function Details({ summary, children }: { summary: ReactNode; children: R
   return (
     <details className="group text-sm">
       <summary className="cursor-pointer select-none text-muted hover:text-ink">{summary}</summary>
-      <div className="mt-2 space-y-1 break-all font-mono text-xs text-muted">{children}</div>
+      <div className="tech mt-2 space-y-1 break-all border-l border-line-strong pl-3 text-muted">{children}</div>
     </details>
   );
 }
@@ -107,7 +107,7 @@ export const inputCls = "rounded-lg border border-line bg-bg px-3 py-2 text-sm o
 
 export function ExtLink({ href, children }: { href: string; children: ReactNode }) {
   return (
-    <a href={href} target="_blank" rel="noreferrer" className="text-accent underline decoration-2 underline-offset-2 hover:bg-accent-soft">
+    <a href={href} target="_blank" rel="noreferrer" className="text-accent underline decoration-1 underline-offset-2 hover:decoration-2">
       {children}
     </a>
   );
@@ -123,10 +123,9 @@ export function CopyLink({ path }: { path: string }) {
   const url = typeof window === "undefined" ? path : `${window.location.origin}${path}`;
   return (
     <span className="inline-flex max-w-full flex-wrap items-center gap-2">
-      <code className="break-all rounded bg-bg px-1.5 py-0.5 text-xs">{url}</code>
       <button
         type="button"
-        className="rounded border border-line px-2 py-0.5 text-xs hover:bg-accent-soft"
+        className="rounded-lg border border-line bg-card px-3 py-1 text-sm hover:bg-accent-soft"
         onClick={() =>
           navigator.clipboard.writeText(url).then(
             () => (setCopied(true), setTimeout(() => setCopied(false), 1500)),
@@ -134,7 +133,7 @@ export function CopyLink({ path }: { path: string }) {
           )
         }
       >
-        {copied ? "Copied" : "Copy"}
+        {copied ? "Link copied" : "Copy invitation link"}
       </button>
     </span>
   );

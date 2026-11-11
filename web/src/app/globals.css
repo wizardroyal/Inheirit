@@ -1,45 +1,53 @@
 @import "tailwindcss";
 
 /*
- * Track-and-field brutalism: paper and ink, square edges, thick rules with flat offset shadows, heavy
- * uppercase display type. One loud action colour (cobalt) and one highlighter (volt) for "you are here".
- * Dark mode follows the system.
+ * Two layers.
+ * Human layer (landing, owner, guardian, heir): warm archival. Paper background, a serif for headings,
+ * a plain sans for reading, soft corners, few borders, room to breathe. Green is the one action
+ * colour, amber asks for attention, red is kept for real danger.
+ * Technical layer (.tech: the control panel, signal strips, timeline, attestation and transaction
+ * details): monospace, hairline rules, a tight grid, small-caps labels.
+ * Motion: none, except the ladder snapping back on a sign of life.
  */
 :root {
-  --bg: #efede6;
-  --card: #ffffff;
-  --ink: #0b0b0b;
-  --muted: #55534d;
-  --line: #0b0b0b;
-  --accent: #2626e8;
+  --bg: #f7f4ee;
+  --card: #fffdf9;
+  --ink: #1f2320;
+  --muted: #5a605b;
+  --line: #e3ddd2;
+  --line-strong: #cbc3b4;
+  --accent: #2f5d50;
   --accent-ink: #ffffff;
-  --accent-soft: #e2ff3d;
-  --warn: #b33a00;
-  --warn-soft: #ffe1cf;
-  --danger: #d1001f;
-  --danger-soft: #ffdde1;
-  --sim: #6a1fe0;
-  --sim-soft: #ece0ff;
-  --shadow: #0b0b0b;
+  --accent-soft: #e3ece6;
+  /* Amber: fills and borders use --warn-fill; text uses --warn, darkened to keep AA on paper. */
+  --warn: #8a5a12;
+  --warn-fill: #b7791f;
+  --warn-soft: #f6ead3;
+  --danger: #a3362a;
+  --danger-soft: #f6e1de;
+  --sim: #6b4fa0;
+  --sim-soft: #ece6f5;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #0b0b0b;
-    --card: #161616;
-    --ink: #f1efe8;
-    --muted: #a5a29a;
-    --line: #f1efe8;
-    --accent: #8f8fff;
-    --accent-ink: #0b0b0b;
-    --accent-soft: #2d3a00;
-    --warn: #ff9a5c;
-    --warn-soft: #3a1d0c;
-    --danger: #ff6b7d;
-    --danger-soft: #3d0d14;
-    --sim: #c3a4ff;
-    --sim-soft: #251a3d;
-    --shadow: #e2ff3d;
+    /* Warm charcoal, not pure black. */
+    --bg: #1d1b18;
+    --card: #262320;
+    --ink: #ece6dc;
+    --muted: #aaa294;
+    --line: #3a352f;
+    --line-strong: #514a41;
+    --accent: #8cc0ac;
+    --accent-ink: #13201b;
+    --accent-soft: #283530;
+    --warn: #e3b268;
+    --warn-fill: #c98a2c;
+    --warn-soft: #3a2f1e;
+    --danger: #ec8d81;
+    --danger-soft: #3c2522;
+    --sim: #bba5e8;
+    --sim-soft: #2d2738;
   }
 }
 
@@ -49,10 +57,12 @@
   --color-ink: var(--ink);
   --color-muted: var(--muted);
   --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
   --color-accent: var(--accent);
   --color-accent-ink: var(--accent-ink);
   --color-accent-soft: var(--accent-soft);
   --color-warn: var(--warn);
+  --color-warn-fill: var(--warn-fill);
   --color-warn-soft: var(--warn-soft);
   --color-danger: var(--danger);
   --color-danger-soft: var(--danger-soft);
@@ -61,12 +71,6 @@
   --font-sans: var(--font-body);
   --font-serif: var(--font-display);
   --font-mono: var(--font-code), ui-monospace, SFMono-Regular, Menlo, monospace;
-  /* Square everything; only true circles (status dots, the heartbeat button) stay round. */
-  --radius-sm: 0;
-  --radius-md: 0;
-  --radius-lg: 0;
-  --radius-xl: 0;
-  --radius-2xl: 0;
 }
 
 body {
@@ -74,58 +78,56 @@ body {
   color: var(--ink);
 }
 
-/* Display type: heavy, uppercase, tight. (Components use font-serif for headings.) */
 .font-serif {
-  text-transform: uppercase;
-  letter-spacing: -0.01em;
-  line-height: 0.95;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  font-variation-settings: "opsz" 72;
 }
 
-/* Thick rules. Unlayered, so they win over Tailwind's 1px utilities. */
-.border { border-width: 2px; }
-.border-t { border-top-width: 2px; }
-.border-b { border-bottom-width: 2px; }
-
-/* Cards: a flat offset shadow, like a block print. */
-.bg-card.border { box-shadow: 5px 5px 0 var(--shadow); }
-
-/* Buttons: uppercase, heavy, and they press in. */
-/* Real buttons (bordered or filled), not the small text links that use <button>. */
-button.border, button.bg-accent {
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  font-weight: 800;
+/* ---- Technical layer ---- */
+.tech {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.5;
 }
-button.bg-accent, a.bg-accent { box-shadow: 3px 3px 0 var(--shadow); transition: transform 80ms, box-shadow 80ms; }
-button.bg-accent:hover:not(:disabled), a.bg-accent:hover { transform: translate(-1px, -1px); box-shadow: 4px 4px 0 var(--shadow); }
-button.bg-accent:active:not(:disabled), a.bg-accent:active { transform: translate(3px, 3px); box-shadow: 0 0 0 var(--shadow); }
-
-input, select, textarea { border-width: 2px; }
-input:focus, select:focus, textarea:focus { outline: 3px solid var(--accent-soft); outline-offset: 0; }
-a:focus-visible, button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
-
-/* Landing hero: the ladder climbing and snapping back, on a loop. */
-@keyframes hero-blink { 50% { opacity: 0.2; } }
-.hero-blink { animation: hero-blink 0.9s steps(1) infinite; }
-
-/* Signs-of-life panel (CLAUDE.md §8): a pulse when a signal lands; the ladder snaps back to Active. */
-@keyframes signal-pulse {
-  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent); }
-  100% { box-shadow: 0 0 0 10px transparent; }
+.tech .border,
+.tech .border-t,
+.tech .border-b {
+  border-color: var(--line-strong);
 }
-.signal-pulse { animation: signal-pulse 1.2s ease-out 2; }
+.tech .rounded-lg,
+.tech .rounded-xl,
+.tech .rounded-full {
+  border-radius: 3px;
+}
+/* Small-caps labels for the machinery: source names, column heads, tags. */
+.tech-label {
+  font-family: var(--font-mono);
+  font-variant-caps: all-small-caps;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
 
-.ladder-fill { transition: width 900ms cubic-bezier(0.2, 1.4, 0.4, 1); }
+/* ---- The one moment of motion: a sign of life snaps the ladder back ---- */
+.ladder-fill { transition: width 1100ms cubic-bezier(0.2, 1.3, 0.35, 1); }
 
 @keyframes snap-flash {
   0% { opacity: 0; transform: translateY(-4px); }
-  15% { opacity: 1; transform: translateY(0); }
+  12% { opacity: 1; transform: translateY(0); }
   80% { opacity: 1; }
   100% { opacity: 0; }
 }
 .snap-flash { animation: snap-flash 3.5s ease-out forwards; }
 
+/* The whole panel exhales: a green wash that settles back to paper. */
+@keyframes snap-wash {
+  0% { background-color: var(--accent-soft); box-shadow: 0 0 0 3px var(--accent); }
+  60% { background-color: var(--accent-soft); box-shadow: 0 0 0 1px var(--accent); }
+  100% { background-color: var(--card); box-shadow: 0 0 0 0 transparent; }
+}
+.snap-wash { animation: snap-wash 3.5s ease-out forwards; }
+
 @media (prefers-reduced-motion: reduce) {
-  .signal-pulse, .snap-flash, .hero-blink { animation: none; }
+  .snap-flash, .snap-wash { animation: none; }
   .ladder-fill { transition: none; }
 }

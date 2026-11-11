@@ -68,6 +68,56 @@ function subscribe(cb: () => void) {
   };
 }
 
+// First names for generated people (heirs, guardians, friends, lawyers), shuffled per generation.
+const PEOPLE = [
+  "Chiamaka", "Tobi", "Ngozi", "Emeka", "Funmi", "Kelechi", "Amara", "Seun", "Zainab", "Ifeoma",
+  "Kwame", "Abena", "Wanjiru", "Thabo", "Fatou", "Moussa", "Amina", "Kofi", "Nia", "Jabari",
+  "Sofia", "Lukas", "Elena", "Matteo", "Ingrid", "Pierre", "Anouk", "Mateusz", "Freya", "Pablo",
+  "Olivia", "Ethan", "Maya", "Jordan", "Grace", "Caleb", "Harper", "Miles", "Ruby", "Theo",
+  "Priya", "Arjun", "Mei", "Haruto", "Yuna", "Diego", "Lucía", "Rafael", "Leila", "Omar",
+];
+
+/** `n` different first names in random order. */
+export function randomPeople(n: number): string[] {
+  const pool = [...PEOPLE];
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = crypto.getRandomValues(new Uint32Array(1))[0] % (i + 1);
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  return pool.slice(0, n);
+}
+
+/** Names several accounts at once (generated people), without touching names already set. */
+export function nameAccounts(names: Record<string, string>): void {
+  const m = load();
+  for (const [account, name] of Object.entries(names)) m[account] ??= name;
+  save(m);
+}
+
+/**
+ * What a person sees instead of a NEAR account id: the name this browser knows for it, else the account's
+ * first label without ".testnet" ("alice.testnet" → "alice"; a 64-hex implicit account is shortened).
+ * Agents and judges still see full ids in the technical details.
+ */
+export function accountLabel(id: string, names: Record<string, string>): string {
+  if (names[id]) return names[id];
+  const first = id.split(".")[0];
+  return /^[0-9a-f]{64}$/.test(first) ? `${first.slice(0, 6)}…${first.slice(-4)}` : first;
+}
+
+const ACCOUNT_IN_TEXT = /(?<![\w/.-])[a-z0-9_-]+(?:\.[a-z0-9_-]+)*\.testnet\b/g;
+
+/** Replaces NEAR testnet account ids in a sentence with what a person sees (links are left alone). */
+export function humanize(text: string, names: Record<string, string>): string {
+  return text.replace(ACCOUNT_IN_TEXT, (id) => accountLabel(id, names));
+}
+
+/** `label(id)` for the accounts on a page, re-rendering when a name changes. */
+export function useAccountLabel(): (id: string) => string {
+  const names = useNames();
+  return (id: string) => accountLabel(id, names);
+}
+
 /** Every name in this browser, re-rendering when one changes. */
 export function useNames(): Record<string, string> {
   const raw = useSyncExternalStore(
@@ -84,8 +134,8 @@ export function useNames(): Record<string, string> {
   return JSON.parse(raw) as Record<string, string>;
 }
 
-/** The account's username if this browser has one, otherwise the account id. */
+/** The account's username if this browser has one, otherwise its short label (never ".testnet"). */
 export function useDisplayName(account: string | null | undefined): string {
   const names = useNames();
-  return account ? (names[account] ?? account) : "";
+  return account ? accountLabel(account, names) : "";
 }

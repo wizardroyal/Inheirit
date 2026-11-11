@@ -3,7 +3,8 @@
 // goes to /api/onboard, which creates and funds the testnet account; the secret stays in this browser.
 import { keys } from "./keys";
 import { KeyPair, type KeyPairString } from "@near-js/crypto";
-import { newKeyPair, provider } from "./near";
+import { createSubaccount, newKeyPair, provider } from "./near";
+import { nameAccounts, randomPeople } from "./names";
 
 export interface OnboardInfo {
   enabled: boolean;
@@ -69,8 +70,8 @@ export async function topUpAccount(accountId: string): Promise<void> {
 }
 
 /** Creates a test cast under the onboarding parent (for wallet owners); keys stay in this browser. */
-export async function createCastAccounts(): Promise<Record<"ada" | "g1" | "g2" | "g3" | "friend" | "lawyer", string>> {
-  const roles = ["ada", "g1", "g2", "g3", "friend", "lawyer"] as const;
+export async function createCastAccounts(): Promise<Record<"heir" | "g1" | "g2" | "g3" | "friend" | "lawyer", string>> {
+  const roles = ["heir", "g1", "g2", "g3", "friend", "lawyer"] as const;
   const pairs = Object.fromEntries(roles.map((r) => [r, newKeyPair()]));
   const res = await fetch("/api/onboard", {
     method: "POST",
@@ -81,6 +82,31 @@ export async function createCastAccounts(): Promise<Record<"ada" | "g1" | "g2" |
   if (!res.ok) throw new Error(out.error ?? `Creating the cast failed (${res.status})`);
   for (const r of roles) keys.addAccount(out.accounts[r], pairs[r].toString());
   return out.accounts;
+}
+
+/**
+ * A test person (heir, guardian, friend or lawyer) with a random first name, key in this browser. Made by
+ * the owner when the owner's key is here, else by the onboarding route (wallets won't add full-access keys).
+ */
+export async function createPerson(owner: string): Promise<{ accountId: string; name: string }> {
+  const [name] = randomPeople(1);
+  let accountId: string;
+  if (keys.secret(owner)) {
+    accountId = await createSubaccount(owner, `p-${crypto.getRandomValues(new Uint32Array(1))[0].toString(36)}`, "0.1");
+  } else {
+    const kp = newKeyPair();
+    const res = await fetch("/api/onboard", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ kind: "person", publicKey: kp.getPublicKey().toString() }),
+    });
+    const out = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(out.error ?? `Creating the account failed (${res.status})`);
+    accountId = out.accountId;
+    keys.addAccount(accountId, kp.toString());
+  }
+  nameAccounts({ [accountId]: name });
+  return { accountId, name };
 }
 
 /** Downloads the account's key so it can be restored in another browser. */

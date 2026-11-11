@@ -2,6 +2,7 @@
 // The hero "Signs of life" panel (CLAUDE.md §8): live strips per source that pulse when a signal lands,
 // the ladder as a horizontal progress bar with a countdown, a visible snap back to Active when a sign
 // of life cancels an escalation, the agent's plain-English verdict, and what the agent can see.
+import { humanize, useNames } from "@/lib/names";
 import { useEffect, useRef, useState } from "react";
 import { useNow, useOverview } from "@/lib/hooks";
 import { duration, isArmed, LADDER, nextStepIn, stateName, type StateName, type Will } from "@/lib/will";
@@ -14,6 +15,7 @@ export function SignsOfLife({ owner, will }: { owner: string; will: Will }) {
   const now = useNow();
   const state = stateName(will.state);
   const { data: overview, refresh } = useOverview(owner);
+  const names = useNames();
   const data = overview?.signals;
   // Refetch as soon as the state changes, so the verdict never describes the previous state for long.
   useEffect(() => {
@@ -28,21 +30,21 @@ export function SignsOfLife({ owner, will }: { owner: string; will: Will }) {
   const unseen = SOURCES.filter((s) => !data?.observations[s.source] && !s.simulated);
 
   return (
-    <section className="space-y-4 border border-line bg-card p-5" aria-label="Signs of life">
+    <section key={snapped || undefined} className={`space-y-4 rounded-2xl border border-line bg-card p-6 ${snapped ? "snap-wash" : ""}`} aria-label="Signs of life">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="font-serif text-3xl">Signs of life</h2>
+        <h2 className="font-serif text-2xl">Signs of life</h2>
         {!isArmed(will) && <Pill tone="warn">not armed yet: guardians haven&apos;t accepted</Pill>}
       </div>
 
       {/* The ladder as a progress bar */}
       <div>
-        <div className="relative h-4 border-2 border-line bg-bg">
+        <div className="relative h-2 rounded-full bg-line">
           <div
-            className="ladder-fill absolute inset-y-0 left-0 bg-accent"
+            className="ladder-fill absolute inset-y-0 left-0 rounded-full bg-accent"
             style={{ width: `${((Math.max(idx, 0) + 1) / LADDER.length) * 100}%` }}
           />
         </div>
-        <ol className="mt-2 grid text-[11px] leading-tight text-muted" style={{ gridTemplateColumns: `repeat(${LADDER.length}, minmax(0, 1fr))` }}>
+        <ol className="tech mt-2 grid text-[11px] leading-tight text-muted" style={{ gridTemplateColumns: `repeat(${LADDER.length}, minmax(0, 1fr))` }}>
           {LADDER.map((r, i) => (
             <li key={r.state} className={`pr-1 ${i === idx ? "font-semibold text-ink" : ""} ${i > idx ? "opacity-60" : ""}`}>
               <span className="hidden sm:inline">{r.label}</span>
@@ -64,7 +66,7 @@ export function SignsOfLife({ owner, will }: { owner: string; will: Will }) {
             </span>
           )}
           {snapped > 0 && (
-            <span key={snapped} className="snap-flash border-2 border-line bg-accent-soft px-3 py-1 font-mono text-xs font-bold uppercase tracking-wider text-ink">
+            <span key={snapped} className="snap-flash rounded-full bg-accent px-3 py-1 text-sm font-medium text-accent-ink">
               Sign of life: back to All good
             </span>
           )}
@@ -79,17 +81,17 @@ export function SignsOfLife({ owner, will }: { owner: string; will: Will }) {
               ? movedThisRound
                 ? "Sign of life recorded. The remaining stages and the sealed notes are stopped; what was already sent stays sent."
                 : "Sign of life recorded. Everything is cancelled, and nothing moved."
-              : data.verdict.headline}</p>
+              : humanize(data.verdict.headline, names)}</p>
           {data.verdict.details.map((d) => (
             <p key={d} className="mt-1 text-sm text-muted">
-              {d}
+              {humanize(d, names)}
             </p>
           ))}
         </div>
       )}
 
       {/* One strip per source */}
-      <ul className="grid gap-2 sm:grid-cols-2">
+      <ul className="tech grid gap-1.5 sm:grid-cols-2">
         {seen.map((s) => {
           const at = data!.observations[s.source]!.at;
           const st = strength(s.weight);

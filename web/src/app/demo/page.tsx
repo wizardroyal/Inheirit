@@ -33,7 +33,7 @@ export default function DemoPage() {
   const progress = (m: string) => setLog((l) => [...l, m]);
 
   return (
-    <div className="space-y-6">
+    <div className="tech space-y-6">
       <div className="space-y-2">
         <div className="flex flex-wrap items-center gap-2">
           <h1 className="font-serif text-4xl">Control panel</h1>
@@ -83,7 +83,7 @@ export default function DemoPage() {
 
 function CastPicker({ casts, value, onChange }: { casts: Cast[]; value: string; onChange: (o: string) => void }) {
   return (
-    <select value={value} onChange={(e) => onChange(e.target.value)} className="rounded-lg border border-line bg-bg px-2 py-1 text-sm">
+    <select value={value} onChange={(e) => onChange(e.target.value)} className="w-full max-w-xs rounded-lg border border-line bg-bg px-2 py-1 text-sm">
       {casts.map((c) => (
         <option key={c.owner} value={c.owner}>
           {c.owner} ({ago(c.createdAt)})
@@ -103,9 +103,9 @@ function CastSummary({ cast }: { cast: Cast }) {
   return (
     <dl className="grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
       {rows.map(([k, v]) => (
-        <div key={k} className="flex justify-between gap-2 border-b border-line py-1">
+        <div key={k} className="flex min-w-0 justify-between gap-2 border-b border-line py-1">
           <dt className="text-muted">{k}</dt>
-          <dd className="truncate">
+          <dd className="min-w-0 truncate">
             <ExtLink href={explorer.nearAccount(v)}>{v}</ExtLink>
           </dd>
         </div>
@@ -200,7 +200,7 @@ function WillPanel({ cast }: { cast: Cast }) {
     <div className="space-y-6">
       <SignsOfLife owner={cast.owner} will={will} />
       <div className="grid gap-6 lg:grid-cols-[1fr_1.1fr]">
-      <div className="space-y-6">
+      <div className="min-w-0 space-y-6">
         <Card title="Where the will stands" aside={<Link href={`/owner?as=${cast.owner}`} className="text-sm text-accent underline">Alice&apos;s own view</Link>}>
           <WatchStatus owner={cast.owner} will={will} canSign />
           <Ladder will={will} compact />
@@ -274,7 +274,7 @@ function WillPanel({ cast }: { cast: Cast }) {
         </Card>
       </div>
 
-      <div className="space-y-6">
+      <div className="min-w-0 space-y-6">
         <Vaults owner={cast.owner} will={will} />
         <Card title="Released so far">
           <Releases will={will} />

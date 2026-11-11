@@ -1,7 +1,7 @@
 "use client";
 // Demo tooling (CLAUDE.md §8 /demo): a throwaway cast of testnet accounts created in this browser,
 // and a pre-seeded will with the compressed demo clock. Clearly demo-only.
-import { nameOf } from "./names";
+import { nameAccounts, nameOf, randomPeople } from "./names";
 import { checkPolicy, nearShareBps, policyHash, type Policy } from "@agent/policy/policy";
 import { agent } from "./agent";
 import { stagesFor, type SchedulePreset } from "@agent/policy/schedule";
@@ -134,13 +134,15 @@ export async function generateWillAndCast(
   o: { schedule: SchedulePreset; foreignChains: ("Eth" | "Btc")[]; depositNear: string; stable?: boolean },
   progress: Progress,
 ): Promise<Cast> {
-  progress("Creating the people in your will: Ada (heir), three guardians, a friend and a lawyer…");
+  // Different people every time: names drawn from many cultures, shuffled per generation.
+  const [heirName, ...others] = randomPeople(6);
+  progress(`Creating the people in your will: ${heirName} (heir), guardians ${others.slice(0, 3).join(", ")}, ${others[3]} (friend) and ${others[4]} (lawyer)…`);
   // A wallet won't add full-access keys to new subaccounts, so a wallet owner's cast is made by the
   // onboarding route instead; an owner whose key is in this browser makes its own subaccounts.
   const [heir, g1, g2, g3, contact, lawyer] = !keys.secret(owner)
-    ? await createCastAccounts().then((a) => [a.ada, a.g1, a.g2, a.g3, a.friend, a.lawyer])
+    ? await createCastAccounts().then((a) => [a.heir, a.g1, a.g2, a.g3, a.friend, a.lawyer])
     : await createSubaccounts(owner, [
-    { name: "ada", near: "0.1" },
+    { name: "heir", near: "0.1" },
     { name: "g1", near: "0.1" },
     { name: "g2", near: "0.1" },
     { name: "g3", near: "0.1" },
@@ -149,6 +151,7 @@ export async function generateWillAndCast(
   ]);
   const cast: Cast = { funder: owner, owner, heir, guardians: [g1, g2, g3], contact, lawyer, createdAt: new Date().toISOString() };
   keys.addCast(cast);
+  nameAccounts({ [heir]: heirName, [g1]: others[0], [g2]: others[1], [g3]: others[2], [contact]: others[3], [lawyer]: others[4] });
   const receive = await demoHeirReceive();
   const check = checkPolicy({
     version: 1,
@@ -156,16 +159,16 @@ export async function generateWillAndCast(
     display_name: nameOf(owner) ?? owner.split(".")[0],
     heirs: [
       {
-        id: "ada",
-        name: "Ada",
+        id: "h1",
+        name: heirName,
         near_account: heir,
         receive: { ...(o.foreignChains.includes("Eth") ? { eth: receive.eth } : {}), ...(o.foreignChains.includes("Btc") ? { btc: receive.btc } : {}) },
       },
     ],
     allocations: [
-      { asset: "NEAR", shares: { ada: 100 } },
-      ...(o.foreignChains.includes("Eth") ? [{ asset: "ETH", shares: { ada: 100 } }] : []),
-      ...(o.foreignChains.includes("Btc") ? [{ asset: "BTC", shares: { ada: 100 } }] : []),
+      { asset: "NEAR", shares: { h1: 100 } },
+      ...(o.foreignChains.includes("Eth") ? [{ asset: "ETH", shares: { h1: 100 } }] : []),
+      ...(o.foreignChains.includes("Btc") ? [{ asset: "BTC", shares: { h1: 100 } }] : []),
     ],
     stages_pct: [10, 20, 30, 40],
     guardians: cast.guardians,
@@ -177,7 +180,7 @@ export async function generateWillAndCast(
   if (!check.ok) throw new Error(check.errors.join("; "));
   await createWill(owner, { policy: check.policy, contacts: [contact], schedule: o.schedule, foreignChains: o.foreignChains, depositNear: o.depositNear }, progress);
   await acceptAsGuardians(owner, cast.guardians, progress);
-  progress("Sealing a note for Ada (released last)…");
+  progress(`Sealing a note for ${heirName} (released last)…`);
   await addSealedNote(owner, heir, DEMO_NOTE.label, DEMO_NOTE.text);
   if (o.foreignChains.length) {
     progress("Asking the demo faucet for a little Sepolia ETH and testnet BTC (while the pool lasts)…");

@@ -5,7 +5,7 @@ import { ActAs } from "@/components/ActAs";
 import { BackToOwner } from "@/components/Speedrun";
 import { ActionButton, Card, NoWill } from "@/components/ui";
 import { useActingAs, useWill } from "@/lib/hooks";
-import { useDisplayName } from "@/lib/names";
+import { useAccountLabel, useDisplayName } from "@/lib/names";
 import { call, ROLE_TGAS } from "@/lib/near";
 import { acceptedGuardians, stateName } from "@/lib/will";
 
@@ -14,6 +14,7 @@ export default function ContactPage() {
   const { data: will, loaded, refresh } = useWill(owner);
   const [me, setMe] = useActingAs();
   const ownerName = useDisplayName(owner);
+  const label = useAccountLabel();
   if (!loaded) return <p>Loading…</p>;
   if (!will) return <NoWill owner={owner} />;
   const s = stateName(will.state);
@@ -25,7 +26,7 @@ export default function ContactPage() {
       <BackToOwner owner={owner} />
       <h1 className="font-serif text-4xl">Have you heard from {ownerName}?</h1>
       <p className="text-muted">
-        {owner} listed you as someone who&apos;d know if they were okay, and they&apos;ve been quiet for a while. If you&apos;ve heard from them recently,
+        {ownerName} listed you as someone who&apos;d know if they were okay, and they&apos;ve been quiet for a while. If you&apos;ve heard from them recently,
         say so below and nothing else happens.
       </p>
       <Card>
@@ -42,7 +43,7 @@ export default function ContactPage() {
           )}
         </div>
         <p className="mt-3 text-xs text-muted">Your answer can only stop the process, never start it.</p>
-        {me && !askable.includes(me) && <p className="mt-1 text-xs text-danger">{me} isn&apos;t one of the people this will asks.</p>}
+        {me && !askable.includes(me) && <p className="mt-1 text-xs text-danger">{label(me)} isn&apos;t one of the people this will asks.</p>}
       </Card>
     </div>
   );
