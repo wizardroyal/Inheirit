@@ -3,7 +3,7 @@ import { HeroLoop } from "@/components/HeroLoop";
 import { REPO_URL } from "@/lib/config";
 
 const STEPS = [
-  ["All good", "The agent quietly notices the signs of life you already give off: NEAR and Ethereum transactions, the heartbeat app, Telegram, GitHub. You do nothing."],
+  ["All good", "The agent quietly notices the signs of life you already give off: NEAR and Ethereum transactions, the heartbeat app, Telegram, your socials and more. You do nothing."],
   ["Quiet", "Silent for longer than usual? It checks in: a ping in the heartbeat app, a Telegram message. Any reply ends it."],
   ["Welfare check", "Still nothing? Your guardians, friends and lawyer are asked whether they've heard from you."],
   ["Guardian vote", "Your guardians are asked whether you've passed away. A single “they're alive” stops everything."],
@@ -25,7 +25,6 @@ export default function Home() {
     <div className="space-y-20">
       <section className="grid items-center gap-12 pt-6 lg:grid-cols-[1.25fr_1fr]">
         <div className="space-y-6">
-          <p className="tech-label text-sm">A crypto will · NEAR · Ethereum · Bitcoin</p>
           <h1 className="font-serif text-5xl leading-[1.05] sm:text-6xl">A will that doesn&apos;t make you prove you&apos;re alive.</h1>
           <p className="max-w-xl text-lg text-muted">
             Inheirit notices your normal signs of life privately and only reaches out once you&apos;ve gone quiet for longer than usual. Silence alone
@@ -36,26 +35,34 @@ export default function Home() {
             <Link href="/owner" className="rounded-lg bg-accent px-6 py-3 font-medium text-accent-ink hover:opacity-90">
               Try it in 3 minutes
             </Link>
-            <span className="text-sm text-muted">No sign-up. Testnet, so nothing costs money.</span>
           </div>
-          <p className="max-w-xl text-sm text-muted">
-            Click <b className="text-ink">Try with a demo account</b>, then <b className="text-ink">Generate sample will</b>, then go quiet
-            and watch the ladder climb, and send one sign of life to snap it back. The full run, all the way to an heir opening a sealed note, takes
-            about 15 minutes.{" "}
-            <Link href="/demo" className="text-accent underline">
-              Advanced: the raw control panel
-            </Link>
-            .
-          </p>
         </div>
         <HeroLoop />
       </section>
 
       <section className="space-y-6">
         <h2 className="font-serif text-3xl">How it works</h2>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="rounded-2xl bg-card p-5">
+            <div className="tech-label">Layer 1</div>
+            <div className="mt-1 font-serif text-xl">Signs of life</div>
+            <p className="mt-2 text-sm text-muted">
+              The agent reads many signals, each weighted by how hard it is to fake. A signed transaction or a heartbeat counts on its own; a
+              social post counts only when another source agrees. So one weak signal going quiet changes nothing.
+            </p>
+          </div>
+          <div className="rounded-2xl bg-card p-5">
+            <div className="tech-label">Layer 2</div>
+            <div className="mt-1 font-serif text-xl">Checks</div>
+            <p className="mt-2 text-sm text-muted">
+              Only when your strong signals have all gone quiet for longer than usual does it reach out: the heartbeat app, Telegram, then the
+              people you trust. Any reply sends it back to the top.
+            </p>
+          </div>
+        </div>
         <p className="max-w-2xl text-lg text-muted">
-          Two rules: <strong className="text-ink">signals can stop it; only people can start it.</strong> Any sign of life sends the will
-          back to the top. Moving down the ladder takes time first, then people.
+          <strong className="text-ink">Signals can stop it; only people can start it.</strong> After the checks, it takes your guardians and a
+          challenge period before anything moves, and then it moves in stages:
         </p>
         <ol className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {STEPS.map(([title, text], i) => (
@@ -112,7 +119,7 @@ export default function Home() {
       </section>
 
       <p className="text-sm text-muted">
-        Built at NEAR HACKATHON on Chain Signatures, Shade Agents (TEE), NEAR AI Cloud and NEAR Intents ·{" "}
+        Built on NEAR: Chain Signatures, Shade Agents (TEE), NEAR AI Cloud and NEAR Intents ·{" "}
         <a href={REPO_URL} target="_blank" rel="noreferrer" className="text-accent underline">
           Code on GitHub
         </a>{" "}
