@@ -124,7 +124,13 @@
       "compose_hash": "3ce3efb4375533a5fdcc02266f50a5a1ad4602551dd863836f360ad1e96bf562",
       "image": "unwizarding/inheirit-agent@sha256:5ddaa2f98cbe862a73c1cf534a81e6486e6b7ac300c43cc5ef112208f9ecae1a",
       "at": "2026-11-11T14:30:07.020Z",
-      "note": "v2k: audit round 3 (a newer sign of life is always recorded when a step is due; daily budget of 60 agent-paid advances per will); registered as 1516306f, same sealed-notes key ae74cf06; live, only approved hash"
+      "note": "v2k: audit round 3 (a newer sign of life is always recorded when a step is due; daily budget of 60 agent-paid advances per will); registered as 1516306f, same sealed-notes key ae74cf06; retired 2026-11-12 (v2l)"
+    },
+    {
+      "compose_hash": "b2cb95eb8384bac102c516caa3117348aba0db7da7620f2b611ea39ec4966840",
+      "image": "unwizarding/inheirit-agent@sha256:260a66c6a655bdb4fc0be0c0d1220b355926bee8cc959a3922acdf91b4f53887",
+      "at": "2026-11-11T14:44:56.759Z",
+      "note": "v2l: audit round 4 (only a new lap, Active to Quiet, costs from a daily budget of 20 per will, so idle speedruns no longer freeze; a sign of life is recorded within one throttle step of the quiet deadline); registered as d017a9be, same sealed-notes key ae74cf06; live, only approved hash"
     }
   ]
 }

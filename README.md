@@ -184,7 +184,7 @@ The agent and its tests:
 
 ```bash
 npm ci                                  # repo root
-npm test                                # agent tests (223)
+npm test                                # agent tests (226)
 cp .env.example .env                    # AGENT_CONTRACT_ID, SPONSOR_*, NEARAI_API_KEY, DEMO_MODE=true (TELEGRAM_* optional)
 npm run dev                             # agent on :3000
 ```

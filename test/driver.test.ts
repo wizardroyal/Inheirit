@@ -148,9 +148,17 @@ describe("Driver", () => {
     expect(t.contract.calls).toEqual([`record_liveness ${T0 + 45}`]);
   });
   it("in Active, doesn't pay for a record that barely moves the quiet clock (gas griefing, audit round 2)", async () => {
-    const t = setup("Active", [adapter("phone_heartbeat", 0.9, () => new Date((T0 + 49) * 1000))]);
+    // Far from going quiet (quiet_after 1000 s): a heartbeat 45 s after the last record isn't worth a transaction.
+    const timings = { quiet_after: 1000, nudge_period: 10, welfare_period: 10, vote_period: 50, challenge_period: 10, secrets_buffer: 20 };
+    const t = setup("Active", [adapter("phone_heartbeat", 0.9, () => new Date((T0 + 49) * 1000))], { timings });
     await t.driver.tick();
     expect(t.contract.calls).toEqual([]);
+  });
+  it("records a sign of life that would otherwise land after the quiet clock runs out", async () => {
+    // quiet_after 100 s, 50 s elapsed: within one throttle step (60 s) of going quiet, so it's recorded now.
+    const t = setup("Active", [adapter("phone_heartbeat", 0.9, () => new Date((T0 + 49) * 1000))]);
+    await t.driver.tick();
+    expect(t.contract.calls).toEqual([`record_liveness ${T0 + 45}`]);
   });
   it("does not report a lone weak signal", async () => {
     const t = setup("Active", [adapter("x", 0.4, () => new Date((T0 + 40) * 1000))]);
@@ -397,6 +405,22 @@ describe("poke: act on a sign of life at once", () => {
     };
     await Promise.all([t.driver.tick(), t.driver.poke("alice.testnet"), t.driver.poke("alice.testnet")]);
     expect(maxInside).toBe(1);
+  });
+  it("only a new lap (Active → Quiet) costs from the daily budget; later steps always go through (audit round 4)", async () => {
+    const t = setup({ GuardianVote: { since: T0 - 1000 } });
+    for (let i = 0; i < 30; i++) {
+      t.contract.w.state = { GuardianVote: { since: T0 - 1000 } };
+      await t.driver.tick();
+    }
+    expect(t.contract.calls.filter((c) => c.startsWith("advance")).length).toBe(30);
+  });
+  it("stops starting new laps for a will once its daily budget is spent", async () => {
+    const t = setup("Active", [], { last_alive_at: T0 - 10_000 });
+    for (let i = 0; i < 25; i++) {
+      t.contract.w.state = "Active";
+      await t.driver.tick();
+    }
+    expect(t.contract.calls.filter((c) => c.startsWith("advance")).length).toBe(20);
   });
   it("merges a flood of pokes into one waiting tick, spaced POKE_GAP_MS apart", async () => {
     vi.useFakeTimers();

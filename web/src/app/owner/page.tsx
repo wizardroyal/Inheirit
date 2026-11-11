@@ -644,7 +644,7 @@ function SealedNotes({ will, refresh }: { will: Will; refresh: () => void }) {
             </select>
             <input className={inputCls} aria-label="Note title" placeholder="Title (anyone can see it on-chain)" value={label} onChange={(e) => setLabel(e.target.value)} maxLength={64} />
           </div>
-          <textarea className={`${inputCls} h-24 w-full`} aria-label="Note text" placeholder="What should they know? (Encrypted before it leaves this page.)" value={text} onChange={(e) => setText(e.target.value)} />
+          <textarea className={`${inputCls} h-24 w-full`} aria-label="Note text" placeholder="What should they know? (Encrypted before it leaves this page.)" maxLength={1200} value={text} onChange={(e) => setText(e.target.value)} />
           <ActionButton
             disabled={!label || !text}
             onClick={async () => {

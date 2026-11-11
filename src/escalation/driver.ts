@@ -212,7 +212,7 @@ export class Driver {
   private readonly ownerRuns = new Map<string, Promise<void>>();
   private readonly pokes = new Map<string, Promise<void>>();
   private readonly lastPoke = new Map<string, number>();
-  private readonly advanceBudget = new RateLimiter({ perKey: 60, global: 20_000, windowMs: 24 * 3_600_000 });
+  private readonly lapBudget = new RateLimiter({ perKey: 20, global: 20_000, windowMs: 24 * 3_600_000 });
   constructor(private readonly deps: DriverDeps) {
     this.now = deps.now ?? (() => new Date());
     this.log = deps.log ?? ((m) => console.log(m));
@@ -324,16 +324,19 @@ export class Driver {
         const minStep = active ? Math.max(60, Math.floor(will.timings.quiet_after / 10)) : 1;
         // ...unless a step is due now: then any newer sign of life is recorded, so the will never goes Quiet
         // on an owner who just tapped the heartbeat (audit round 3).
-        const stepDue = active && isAdvanceDue(will, nowS);
-        if (atS - will.last_alive_at >= minStep || (stepDue && atS > will.last_alive_at)) {
+        // Recorded early enough that the quiet clock can't run out first, even if someone else calls advance.
+        const stepSoon = active && nowS - will.last_alive_at >= will.timings.quiet_after - minStep;
+        if (atS - will.last_alive_at >= minStep || (stepSoon && atS > will.last_alive_at)) {
           await contract.recordLiveness(cfg.owner, atS);
           this.log(`[driver] ${cfg.owner}: alive at ${new Date(atS * 1000).toISOString()} (${verdict.basis.join("+")})`);
           will = (await contract.getWill(cfg.owner))!;
         }
       }
-      // Each will gets a daily budget of agent-paid advances: a full speedrun needs about a dozen, while a will
-      // set to cycle the ladder every few seconds would otherwise drain the agent's gas (audit round 3).
-      if (isAdvanceDue(will, nowS) && this.advanceBudget.take(cfg.owner) === 0 && (await contract.advance(cfg.owner))) {
+      // Only starting a new lap (Active → Quiet) costs from a daily budget: every later step is bounded per lap
+      // or needs the guardians. An idle speedrun laps every ~7 min, so 20 laps keep it going for hours, while a
+      // will cycling as fast as the contract allows can't drain the agent's gas (audit rounds 3 and 4).
+      const newLap = stateName(will.state) === "Active";
+      if (isAdvanceDue(will, nowS) && (!newLap || this.lapBudget.take(cfg.owner) === 0) && (await contract.advance(cfg.owner))) {
         will = (await contract.getWill(cfg.owner))!;
         this.log(`[driver] ${cfg.owner}: advanced to ${stateName(will.state)}`);
       }
