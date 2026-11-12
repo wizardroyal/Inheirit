@@ -41,7 +41,7 @@ export function EditWill({ will, refresh }: { will: Will; refresh: () => void })
         <Field label={`Guardians who must confirm (of ${will.guardians.length})`}>
           <input className={`${inputCls} w-24`} inputMode="numeric" value={threshold} onChange={(e) => setThreshold(e.target.value)} />
         </Field>
-        <p className="text-sm text-muted">Add or remove guardians under People; new ones count once they accept.</p>
+        <p className="text-sm text-muted">Add or remove guardians above; new ones count once they accept.</p>
         <ActionButton
           disabled={!ok}
           onClick={async () => {

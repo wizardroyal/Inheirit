@@ -14,8 +14,9 @@ Inheirit notices the signs of life you already give off, privately, and only rea
 </p>
 
 <p>
-  <img src="docs/screenshots/home.png" alt="Home: the will's state in plain words, when it last saw you, I'm here, the strength bar and one next step" width="49%">
-  <img src="docs/screenshots/will-phone.png" alt="My will on a phone: the will in plain sentences, who gets what and the schedule" width="24%">
+  <img src="docs/screenshots/home-phone.png" alt="Home on a phone: the will's state in plain words, when it last saw you, I'm here, the strength bar and one next step" width="24%">
+  <img src="docs/screenshots/will-phone.png" alt="My will on a phone: the will written out in plain sentences, then heirs, guardians and the schedule" width="24%">
+  <img src="docs/screenshots/signs-phone.png" alt="Signs of life on a phone: one list, strongest first, each source connected, not connected or coming soon" width="24%">
   <img src="docs/screenshots/heir-quotes.png" alt="An heir chooses how to be paid, with live NEAR Intents quotes from mainnet" width="24%">
 </p>
 
@@ -29,7 +30,7 @@ Inheirit notices the signs of life you already give off, privately, and only rea
 | Real cross-chain execution: NEAR, Ethereum (Sepolia) and Bitcoin (testnet4) released in stages, with explorer links | [Then the full run](#then-the-full-run-about-15-minutes) |
 | An attested TEE agent and private AI, verifiable on-chain | `npx tsx scripts/verify.ts`: one read-only command, PASS/FAIL per check (explained in [`docs/VERIFY.md`](docs/VERIFY.md)); the trust badges under *Signs of life*; [`deploy/tee-agent.json`](deploy/tee-agent.json) lists every deployed compose hash |
 | NEAR Intents on mainnet | two real payouts (public Base → Solana, confidential Base → Arbitrum) with explorer links on [`/mainnet`](https://inheirit.xyz/mainnet); live quotes on the heir page |
-| Tests and security work | 252 agent tests, 173 contract unit tests plus sandbox flows, run on every push ([CI](.github/workflows/ci.yml)); five adversarial review rounds logged finding by finding in [`CLAUDE.md`](CLAUDE.md) (Decision log) and summarised in [`docs/AUDITS.md`](docs/AUDITS.md) |
+| Tests and security work | 257 agent tests, 181 contract unit tests plus sandbox flows, run on every push ([CI](.github/workflows/ci.yml)); five adversarial review rounds logged finding by finding in [`CLAUDE.md`](CLAUDE.md) (Decision log) and summarised in [`docs/AUDITS.md`](docs/AUDITS.md) |
 | What's real and what's simulated | [Real vs simulated](#real-vs-simulated) |
 
 ### Real vs simulated
@@ -98,7 +99,7 @@ On **Try a speedrun**, pick another scenario. The card shows a checklist with a 
 
 **Advanced:** the [control panel](https://inheirit.xyz/demo) (`/demo`) is a lower-level control room for the same flow: **Make a test cast**, **Create the demo will**, then the guardian and signal buttons. The same steps run headlessly in `scripts/demo-cancel.ts` (cancel) and `scripts/demo-execute.ts` (release).
 
-**Your own will** (`/account`): one screen per job. **Home** (where the will stands, I'm here, strength, the next step) · **My will** (the will in plain sentences, who gets what, the schedule, and the people: heirs, guardians invited or accepted, invite links for people without a NEAR account, friends and lawyer; *Edit will* and *Close will* at All good) · **Signs of life** · **Final secrets** · **Vault** (holdings, withdrawals, fund from another chain, payouts) · **Activity** (messages and the timeline; hashes and attestation under *Technical details*) · **Settings** (back up your access, add a device, email and Telegram alerts, quiet period). On a phone the first five sit in a bottom bar. Before a will exists, Home offers **My will** (a step-by-step form; ↻ creates funded test people with test addresses) or **Will in plain English** (a private NEAR AI model drafts it, our code checks it and asks only for what's missing; you approve a summary that code, not the model, wrote); demo accounts can **Generate my will** on the speedrun page. Lost your browser? **Restore from backup** or **Use an account from another device** on the sign-in screen. Guardians accept at `/guardian/<owner>`; `/heartbeat` is an installable app.
+**Your own will** (`/account`): one screen per job. **Home** (where the will stands, I'm here, strength, the next step) · **My will** (the will in plain sentences, who gets what, the schedule, and the people: heirs, guardians invited or accepted, invite links for people without a NEAR account, friends and lawyer; *Edit will* and *Close will* at All good) · **Signs of life** · **Final secrets** · **Vault** (holdings, withdrawals, fund from another chain, payouts) · **Activity** (messages and the timeline; hashes and attestation under *Technical details*) · **Settings** (back up your access, add a device, email and Telegram alerts, quiet period). Questions people ask first are on [`/faq`](https://inheirit.xyz/faq). On a phone the first five sit in a bottom bar. Before a will exists, Home offers **My will** (a step-by-step form; ↻ creates funded test people with test addresses) or **Will in plain English** (a private NEAR AI model drafts it, our code checks it and asks only for what's missing; you approve a summary that code, not the model, wrote); demo accounts can **Generate my will** on the speedrun page. Lost your browser? **Restore from backup** or **Use an account from another device** on the sign-in screen. Guardians accept at `/guardian/<owner>`; `/heartbeat` is an installable app.
 
 ## How it works
 
@@ -256,14 +257,14 @@ The agent and its tests:
 
 ```bash
 npm ci                                  # repo root
-npm test                                # agent tests (252)
+npm test                                # agent tests (257)
 cp .env.example .env                    # AGENT_CONTRACT_ID, SPONSOR_*, NEARAI_API_KEY, DEMO_MODE=true (TELEGRAM_* optional)
 npm run dev                             # agent on :3000
 ```
 
 A local agent can't register on `inheirit.testnet`, which accepts only the attested TEE agent. Give it its own local-mode contract (`npx tsx scripts/deploy-dev-contract.ts <your agent's account id>` creates it and whitelists that agent) and point both `.env` files at it.
 
-Contract: `cd agent-contract && cargo +1.86.0 test --lib` (173 unit tests). The sandbox tests (`cargo +1.86.0 test --tests`) need the wasm at `target/near/shade_contract_template.wasm` first: `cargo +1.86.0 near build non-reproducible-wasm --no-abi` (or the pinned `sourcescan/cargo-near` Docker image).
+Contract: `cd agent-contract && cargo +1.86.0 test --lib` (181 unit tests). The sandbox tests (`cargo +1.86.0 test --tests`) need the wasm at `target/near/shade_contract_template.wasm` first: `cargo +1.86.0 near build non-reproducible-wasm --no-abi` (or the pinned `sourcescan/cargo-near` Docker image).
 
 Headless scenario scripts:
 - `scripts/demo-cancel.ts`: Scenario A.
