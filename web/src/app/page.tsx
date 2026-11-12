@@ -48,7 +48,7 @@ export default function Home() {
             </p>
             <div className="tech flex flex-wrap gap-2">
               {PROOF.map(([label, href]) => (
-                <a key={label} href={href} target="_blank" rel="noreferrer" className="rounded border border-line-strong px-2 py-1 hover:bg-accent-soft">
+                <a key={label} href={href} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center rounded border border-line-strong px-3 py-2 hover:bg-accent-soft">
                   {label} ↗
                 </a>
               ))}

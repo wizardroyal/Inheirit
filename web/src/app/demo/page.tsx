@@ -92,7 +92,7 @@ export default function DemoPage() {
 function CastPicker({ casts, value, onChange }: { casts: Cast[]; value: string; onChange: (o: string) => void }) {
   const label = useAccountLabel();
   return (
-    <select value={value} onChange={(e) => onChange(e.target.value)} className="w-full max-w-xs rounded-lg border border-line bg-bg px-2 py-1 text-sm">
+    <select value={value} onChange={(e) => onChange(e.target.value)} className="min-h-11 w-full max-w-xs rounded-lg border border-line bg-bg px-3 py-2 text-sm">
       {casts.map((c) => (
         <option key={c.owner} value={c.owner}>
           {label(c.owner)}&apos;s will ({ago(c.createdAt)})

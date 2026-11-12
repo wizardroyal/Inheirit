@@ -174,6 +174,17 @@ export function SignsList({ owner, viewing }: { owner: string; viewing: boolean 
           const st = status(s.source);
           const at = obs[s.source as keyof typeof obs]?.at;
           const isOpen = open === s.source;
+          // Coming soon: a greyed row, nothing to open (round 5). A demo signal sent for it still shows.
+          if (st === "coming soon")
+            return (
+              <li key={s.source} className="flex min-h-14 flex-wrap items-center justify-between gap-2 px-5 py-3 text-muted opacity-70">
+                <span className="flex items-center gap-3 text-lg">
+                  {SOURCE_LABELS[s.source]}
+                  <span className="rounded-full border border-line px-2 py-0.5 text-sm">{strength(s.weight).label}</span>
+                </span>
+                <span>Coming soon</span>
+              </li>
+            );
           return (
             <li key={s.source}>
               <button

@@ -166,7 +166,7 @@ export function RoleSwitcher({ will }: { will: Will }) {
       <span className="text-muted">View as:</span>
       <Pill tone="accent">Owner (here)</Pill>
       {roles.map((r) => (
-        <Link key={r.href} href={r.href} className="rounded-full border border-line px-2.5 py-0.5 text-xs hover:bg-accent-soft">
+        <Link key={r.href} href={r.href} className="inline-flex min-h-11 items-center rounded-lg border border-line px-3 py-2 text-sm hover:bg-accent-soft">
           {r.label}
         </Link>
       ))}

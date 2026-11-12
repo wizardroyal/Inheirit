@@ -98,7 +98,7 @@ export default function HeartbeatPage() {
         <label className="flex items-center gap-2 text-sm">
           <span className="text-muted">For</span>
           <select
-            className="rounded-lg border border-line bg-card px-3 py-1.5"
+            className="min-h-11 rounded-lg border border-line bg-card px-3 py-2"
             value={owner}
             onChange={(e) => {
               setOwner(e.target.value);

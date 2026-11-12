@@ -50,7 +50,7 @@ function Shell({ children }: { children: ReactNode }) {
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-muted">Welcome back:</span>
             {mine.map((a) => (
-              <button key={a} type="button" className="rounded-full border border-line bg-card px-3 py-1 hover:bg-accent-soft" onClick={() => (setOwner(a), setSigningIn(false))}>
+              <button key={a} type="button" className="min-h-11 rounded-lg border border-line bg-card px-4 py-2 hover:bg-accent-soft" onClick={() => (setOwner(a), setSigningIn(false))}>
                 {accountLabel(a, names)}
               </button>
             ))}

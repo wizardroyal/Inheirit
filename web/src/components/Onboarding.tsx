@@ -240,7 +240,7 @@ export function MyWillSetup({
   const [notesOnly, setNotesOnly] = useState(false);
   const [notes, setNotes] = useState<DraftNote[]>([]);
   const [demoClock, setDemoClock] = useState(true);
-  const [quietDays, setQuietDays] = useState<number | null>(null);
+  const [quietDays, setQuietDays] = useState<number | null>(30);
   const [stable, setStable] = useState(false);
   const [log, setLog] = useState<string[]>([]);
   const [failed, setFailed] = useState(false);

@@ -1,11 +1,11 @@
 "use client";
 // The quiet period, from the owner's own rhythm (CLAUDE.md §7.2): "longer than usual" measured, not
 // assumed. Reads the owner's NEAR (and Sepolia, if given) history in the browser, suggests a period,
-// and the owner confirms or edits it. Real timings only; the demo clock keeps minutes.
-import { useEffect, useRef, useState } from "react";
+// and the owner chooses (we suggest, we never adjust it). Real timings only; the demo clock keeps minutes.
+import { useEffect, useState } from "react";
 import { type Baseline, everyPhrase, fetchBaseline } from "@agent/liveness/baseline";
 import { REAL_SCHEDULE } from "@/lib/config";
-import { Field, inputCls } from "./ui";
+import { inputCls } from "./ui";
 
 const DAY = 86_400;
 
@@ -17,8 +17,6 @@ export function realSchedule(quietDays: number | null) {
 
 export function QuietPeriod({ owner, evm, value, onChange }: { owner: string; evm?: string; value: number | null; onChange: (days: number | null) => void }) {
   const [b, setB] = useState<Baseline | null>(null);
-  // Follows the suggestion until the owner types their own number.
-  const edited = useRef(false);
   const sepolia = evm && /^0x[0-9a-fA-F]{40}$/.test(evm) ? evm : "";
   useEffect(() => {
     let live = true;
@@ -27,7 +25,6 @@ export function QuietPeriod({ owner, evm, value, onChange }: { owner: string; ev
       .then((r) => {
         if (!live) return;
         setB(r);
-        if (!edited.current) onChange(r.suggestedQuietS / DAY);
       })
       .catch(() => {});
     return () => {
@@ -38,26 +35,30 @@ export function QuietPeriod({ owner, evm, value, onChange }: { owner: string; ev
 
   const suggested = b ? b.suggestedQuietS / DAY : null;
   return (
-    <Field
-      label="Checks start after this many quiet days"
-      hint={
-        !b
-          ? "Reading your transaction history…"
-          : b.medianGapS
-            ? `You usually transact ${everyPhrase(b.medianGapS)} (${b.sources.join(" + ")}, last 90 days); we suggest ${suggested}.`
-            : `Not enough history to say what's usual for you; we suggest ${suggested}.`
-      }
-    >
+    <div className="flex flex-col gap-1 text-sm">
+      <label className="font-medium" htmlFor="quiet-days">
+        Checks start after this many quiet days
+      </label>
       <input
+        id="quiet-days"
         className={`${inputCls} w-24`}
         inputMode="numeric"
-        aria-label="Quiet days before checks"
         value={value ?? ""}
-        onChange={(e) => {
-          edited.current = true;
-          onChange(e.target.value === "" ? null : Number(e.target.value));
-        }}
+        onChange={(e) => onChange(e.target.value === "" ? null : Number(e.target.value))}
       />
-    </Field>
+      <span className="text-muted">Choose a number. We suggest one from how often you&apos;re usually active.</span>
+      <span className="flex flex-wrap items-center gap-2 text-muted">
+        {!b
+          ? "Reading your transaction history…"
+          : b.medianGapS
+            ? `You usually transact ${everyPhrase(b.medianGapS)} (last 90 days). Suggestion: ${suggested} days.`
+            : `Not enough history to say what's usual for you. Suggestion: ${suggested} days.`}
+        {suggested !== null && value !== suggested && (
+          <button type="button" className="min-h-11 rounded-lg border border-line px-3 py-1 text-ink hover:bg-accent-soft" onClick={() => onChange(suggested)}>
+            Use {suggested} days
+          </button>
+        )}
+      </span>
+    </div>
   );
 }

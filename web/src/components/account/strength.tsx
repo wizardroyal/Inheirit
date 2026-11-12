@@ -118,7 +118,7 @@ export function StrengthBar({ will }: { will: Will }) {
               </li>
             ) : (
               <li key={s.source}>
-                <Link href={s.source === "phone_heartbeat" ? "/heartbeat" : s.source === "telegram" ? "/account/profile" : "/account/signs"} className="inline-block rounded-full border border-dashed border-line px-3 py-1 text-sm text-muted hover:text-ink">
+                <Link href={s.source === "phone_heartbeat" ? "/heartbeat" : s.source === "telegram" ? "/account/profile" : "/account/signs"} className="inline-flex min-h-11 items-center rounded-lg border border-dashed border-line px-3 py-2 text-sm text-muted hover:text-ink">
                   + Add {SOURCE_LABELS[s.source]}
                 </Link>
               </li>
