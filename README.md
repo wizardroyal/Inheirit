@@ -32,7 +32,7 @@ Inheirit notices the signs of life you already give off, privately, and only rea
 | Real cross-chain execution: NEAR, Ethereum (Sepolia) and Bitcoin (testnet4) released in stages, with explorer links | [Then the full run](#then-the-full-run-about-15-minutes) |
 | An attested TEE agent and private AI, verifiable on-chain | `npx tsx scripts/verify.ts`: one read-only command, PASS/FAIL per check (explained in [`docs/VERIFY.md`](docs/VERIFY.md)); the trust badges under *Signs of life*; [`deploy/tee-agent.json`](deploy/tee-agent.json) lists every deployed compose hash |
 | NEAR Intents on mainnet | two real payouts (public Base → Solana, confidential Base → Arbitrum) with explorer links on [`/mainnet`](https://inheirit.vercel.app/mainnet); live quotes on the heir page |
-| Tests and security work | 247 agent tests, 164 contract unit tests plus sandbox flows, run on every push ([CI](.github/workflows/ci.yml)); five adversarial review rounds logged finding by finding in [`CLAUDE.md`](CLAUDE.md) (Decision log) and summarised in [`docs/AUDITS.md`](docs/AUDITS.md) |
+| Tests and security work | 247 agent tests, 173 contract unit tests plus sandbox flows, run on every push ([CI](.github/workflows/ci.yml)); five adversarial review rounds logged finding by finding in [`CLAUDE.md`](CLAUDE.md) (Decision log) and summarised in [`docs/AUDITS.md`](docs/AUDITS.md) |
 | What's real and what's simulated | [Real vs simulated](#real-vs-simulated) |
 
 ### Real vs simulated
@@ -53,6 +53,8 @@ Inheirit notices the signs of life you already give off, privately, and only rea
 2. **The first release is the loudest alarm.** A 10% slice leaving your vaults, with heirs notified, is when a living owner notices. So the *longest wait* comes right after the first slice, and a false trigger costs at most that slice.
 3. **Secrets come last.** Funds move in slices, but a revealed secret can never be taken back. Sealed notes are released only after distribution completes, plus one more wait.
 4. **Private by construction.** The agent reads signals inside a TEE and only timestamps leave it. In-product AI uses only an attested NEAR AI Cloud model.
+
+**People don't need a NEAR account.** The owner makes a one-time link for a guardian, friend or lawyer (*Invite someone by link*); the person opens it, signs in with Google, and accepts. The contract keeps only a hash of the code, and the link carries it in its `#fragment`, so it never reaches a server.
 
 **The zero-custody way in: a notes-only will.** You don't have to put money in a vault. Tick *Notes only, no vaults* and the will holds nothing but sealed notes: where the hardware wallet is, which exchanges you use, who holds the passphrase. The same ladder runs (guardians, challenge period, the long wait), and the notes are released last, per heir. Your assets never leave your wallets; your heirs just learn how to reach them. Heirs can press *Test my key* any time to prove their key opens notes, without revealing any. Templates and a split-your-secret tip are in the *Final secrets* step.
 
@@ -157,7 +159,7 @@ On testnet the onward swap to each heir runs on a SIMULATED 1Click client, becau
 
 | Tech | Used for | Code |
 |---|---|---|
-| NEAR smart contract (Rust, near-sdk 5) | Will state machine (stage waits, secrets buffer, guardian consent, lawyer acceleration, Start over), NEAR vault, signing gate, sealed-note storage, NEP-297 events | `agent-contract/src/will/` (164 unit tests, sandbox tests in `agent-contract/tests/will_flow_tests.rs`) |
+| NEAR smart contract (Rust, near-sdk 5) | Will state machine (stage waits, secrets buffer, guardian consent, lawyer acceleration, Start over, one-time invite links), NEAR vault, signing gate, sealed-note storage, NEP-297 events | `agent-contract/src/will/` (173 unit tests, sandbox tests in `agent-contract/tests/will_flow_tests.rs`) |
 | **Chain Signatures** (`v1.signer-prod.testnet`) | Vault addresses on Sepolia and BTC testnet4, derived from the contract account (`heirloom/<owner>/eth\|btc`); release and withdrawal signatures | gate: `agent-contract/src/will/agent.rs`; tx building: `src/chains/evm.ts`, `src/chains/btc.ts` (chainsig.js) |
 | **Shade Agent Framework** (TEE on Phala) | The will agent: liveness scoring and verdict, escalation and checks, execution, sealed-note crypto, Telegram bot. Registered with a real TDX attestation; measurements approved on-chain. | `src/index.ts`, `src/escalation/`, `src/liveness/`, `src/executor/`, `src/sealed/`, `src/telegram/`, `scripts/tee-agent.ts` |
 | **NEAR AI Cloud** (private inference) | Plain-English will → structured policy; heir claim guide. Will text goes only to a model whose attestation passes (TDX quote, NVIDIA GPU, signer bound to a fresh nonce; checked at startup and before each use), and every answer's signature must recover to the attested signer. | `src/ai/attestation.ts`, `src/ai/nearai.ts`, `src/ai/policy-parser.ts`, `src/ai/heir-guide.ts` |
@@ -261,7 +263,7 @@ npm run dev                             # agent on :3000
 
 A local agent can't register on `inheirit.testnet`, which accepts only the attested TEE agent. Give it its own local-mode contract (`npx tsx scripts/deploy-dev-contract.ts <your agent's account id>` creates it and whitelists that agent) and point both `.env` files at it.
 
-Contract: `cd agent-contract && cargo +1.86.0 test --lib` (164 unit tests). The sandbox tests (`cargo +1.86.0 test --tests`) need the wasm at `target/near/shade_contract_template.wasm` first: `cargo +1.86.0 near build non-reproducible-wasm --no-abi` (or the pinned `sourcescan/cargo-near` Docker image).
+Contract: `cd agent-contract && cargo +1.86.0 test --lib` (173 unit tests). The sandbox tests (`cargo +1.86.0 test --tests`) need the wasm at `target/near/shade_contract_template.wasm` first: `cargo +1.86.0 near build non-reproducible-wasm --no-abi` (or the pinned `sourcescan/cargo-near` Docker image).
 
 Headless scenario scripts:
 - `scripts/demo-cancel.ts`: Scenario A.

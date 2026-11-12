@@ -20,6 +20,7 @@ import { agent, type DraftResult } from "@/lib/agent";
 import { DEMO_SCHEDULE, REAL_SCHEDULE } from "@/lib/config";
 import { stagesFor, summarize } from "@agent/policy/schedule";
 import { acceptAsGuardians, addSealedNote, createWill, generateWillAndCast } from "@/lib/demo";
+import { createInvite, type InviteRole, nameClaimedInvites } from "@/lib/invites";
 import { keys } from "@/lib/keys";
 import { useKeys, useMyAccounts, useNow, usePoll, useWill } from "@/lib/hooks";
 import { topUpAccount } from "@/lib/onboard";
@@ -522,6 +523,7 @@ function Dashboard({ will, refresh }: { will: Will; refresh: () => void }) {
               <CopyLink path={`/guardian/${owner}`} />
             </div>
           )}
+          {s === "Active" && <InviteByLink owner={owner} hasLawyer={!!will.lawyer} will={will} />}
           <p className="mt-2 text-xs text-muted">
             Release: {schedule(will).map((st) => `${st.pct}% (then wait ${duration(st.wait_after)})`).join(" → ")}; sealed notes after a further{" "}
             {duration(will.timings.secrets_buffer)}.
@@ -680,6 +682,57 @@ function WatchSettings({ owner }: { owner: string }) {
  * Email for checks and alerts: the owner's own address, and one for each person in the will. Kept by the
  * agent in the enclave, never on-chain; the app shows only that an email went out, not to whom.
  */
+/** Add someone who has no NEAR account yet: a one-time link they open, sign in (Google is fine) and accept. */
+function InviteByLink({ owner, hasLawyer, will }: { owner: string; hasLawyer: boolean; will: Will }) {
+  // Give claimed invitees the name typed for them (names are per browser).
+  const people = [
+    ...will.guardians.map((g) => ({ role: "guardian" as const, account: g.account_id })),
+    ...will.contacts.map((c) => ({ role: "friend" as const, account: c })),
+    ...(will.lawyer ? [{ role: "lawyer" as const, account: will.lawyer }] : []),
+  ];
+  const key = people.map((p) => p.account).join(",");
+  useEffect(() => {
+    void nameClaimedInvites(owner, people);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [owner, key]);
+  const [role, setRole] = useState<InviteRole>("guardian");
+  const [name, setName] = useState("");
+  const [link, setLink] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  return (
+    <details className="mt-3 text-sm">
+      <summary className="cursor-pointer text-muted hover:text-ink">Invite someone by link (no NEAR account needed)</summary>
+      <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-end">
+        <Field label="As">
+          <select className={inputCls} value={role} onChange={(e) => setRole(e.target.value as InviteRole)}>
+            <option value="guardian">guardian</option>
+            <option value="friend">friend</option>
+            {!hasLawyer && <option value="lawyer">lawyer</option>}
+          </select>
+        </Field>
+        <Field label="Their name">
+          <input className={`${inputCls} min-w-0`} maxLength={64} value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Ngozi" />
+        </Field>
+        <ActionButton tone="quiet" onClick={async () => (setCopied(false), setLink(await createInvite(owner, role, name)))}>
+          Make link
+        </ActionButton>
+      </div>
+      {link && (
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            className="rounded-lg border border-line bg-card px-3 py-1 hover:bg-accent-soft"
+            onClick={() => navigator.clipboard.writeText(link).then(() => setCopied(true))}
+          >
+            {copied ? "Link copied" : "Copy link"}
+          </button>
+          <span className="text-xs text-muted">One use, valid 7 days.</span>
+        </div>
+      )}
+    </details>
+  );
+}
+
 function EmailAlerts({ will }: { will: Will }) {
   const label = useAccountLabel();
   const owner = will.owner;

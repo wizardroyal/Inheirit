@@ -9,6 +9,7 @@ use near_sdk::json_types::{Base64VecU8, U128};
 
 pub mod agent;
 pub mod events;
+pub mod invites;
 pub mod owner;
 pub mod parties;
 #[cfg(test)]

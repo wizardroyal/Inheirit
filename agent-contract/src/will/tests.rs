@@ -1709,3 +1709,95 @@ fn notes_only_will_runs_to_completed_and_releases_its_note() {
         "nothing was paid out"
     );
 }
+
+// ---------------------------------------------------------------- invite links (2026-11-12)
+
+fn code_hash(code: &str) -> String {
+    hex::encode(near_sdk::env::sha256(code.as_bytes()))
+}
+
+const NEWBIE: &str = "newbie.testnet";
+
+fn with_invite(role: &str, code: &str, ttl: u64) -> T {
+    let mut t = T::with_will();
+    t.pay(OWNER, NearToken::from_millinear(10))
+        .create_invite(role.into(), code_hash(code), ttl);
+    t
+}
+
+#[test]
+fn guardian_invite_claimed_adds_an_accepted_guardian_once() {
+    let mut t = with_invite("guardian", "s3cret-code", 3600);
+    assert!(t.c.get_invite(acc(OWNER), code_hash("s3cret-code")).is_some());
+    t.as_(NEWBIE).claim_invite(acc(OWNER), "s3cret-code".into());
+    let w = t.will();
+    let g = w.guardians.iter().find(|g| g.account_id == acc(NEWBIE)).unwrap();
+    assert!(g.accepted, "claiming the invite is accepting the role");
+    assert!(t.c.get_invite(acc(OWNER), code_hash("s3cret-code")).is_none(), "single use");
+}
+
+#[test]
+#[should_panic(expected = "Invite not found or already used")]
+fn invite_cannot_be_claimed_twice() {
+    let mut t = with_invite("guardian", "s3cret-code", 3600);
+    t.as_(NEWBIE).claim_invite(acc(OWNER), "s3cret-code".into());
+    t.as_(STRANGER).claim_invite(acc(OWNER), "s3cret-code".into());
+}
+
+#[test]
+#[should_panic(expected = "Invite not found or already used")]
+fn wrong_code_rejected() {
+    let mut t = with_invite("guardian", "s3cret-code", 3600);
+    t.as_(NEWBIE).claim_invite(acc(OWNER), "guess".into());
+}
+
+#[test]
+#[should_panic(expected = "This invite has expired")]
+fn expired_invite_rejected() {
+    let mut t = with_invite("friend", "s3cret-code", 3600);
+    t.wait(3601);
+    t.as_(NEWBIE).claim_invite(acc(OWNER), "s3cret-code".into());
+}
+
+#[test]
+#[should_panic(expected = "A guardian cannot be an heir")]
+fn heir_cannot_claim_a_guardian_invite() {
+    let mut t = with_invite("guardian", "s3cret-code", 3600);
+    t.as_(H1).claim_invite(acc(OWNER), "s3cret-code".into());
+}
+
+#[test]
+fn friend_and_lawyer_invites() {
+    let mut t = T::new();
+    let mut cfg = config();
+    cfg.lawyer = None;
+    t.pay(OWNER, STORAGE_DEPOSIT).create_will(cfg);
+    t.pay(OWNER, NearToken::from_millinear(10)).create_invite("friend".into(), code_hash("f"), 3600);
+    t.pay(OWNER, NearToken::from_millinear(10)).create_invite("lawyer".into(), code_hash("l"), 3600);
+    t.as_(NEWBIE).claim_invite(acc(OWNER), "f".into());
+    t.as_("counsel.testnet").claim_invite(acc(OWNER), "l".into());
+    let w = t.will();
+    assert!(w.contacts.contains(&acc(NEWBIE)));
+    assert_eq!(w.lawyer, Some(acc("counsel.testnet")));
+}
+
+#[test]
+#[should_panic(expected = "Invites can be claimed only while Active")]
+fn invite_claim_only_while_active() {
+    let mut t = with_invite("guardian", "s3cret-code", 100_000);
+    t.to_quiet();
+    t.as_(NEWBIE).claim_invite(acc(OWNER), "s3cret-code".into());
+}
+
+#[test]
+fn owner_can_cancel_an_invite() {
+    let mut t = with_invite("guardian", "s3cret-code", 3600);
+    t.as_(OWNER).cancel_invite(code_hash("s3cret-code"));
+    assert!(t.c.get_invite(acc(OWNER), code_hash("s3cret-code")).is_none());
+}
+
+#[test]
+#[should_panic(expected = "Unknown role")]
+fn invite_role_validated() {
+    with_invite("heir", "x", 3600);
+}
