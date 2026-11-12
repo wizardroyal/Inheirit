@@ -424,57 +424,110 @@ export function ForeignWithdraw({ owner, will, refresh }: { owner: string; will:
   );
 }
 
+/** Extra sources added from this browser (the agent never reveals them, so only this device can list them). */
+const ADDED = "inheirit:added-sources";
+type Added = { near: string[]; evm: string[] };
+function addedFor(owner: string): Added {
+  try {
+    return (JSON.parse(localStorage.getItem(ADDED) ?? "{}") as Record<string, Added>)[owner] ?? { near: [], evm: [] };
+  } catch {
+    return { near: [], evm: [] };
+  }
+}
+function saveAdded(owner: string, a: Added) {
+  try {
+    const all = JSON.parse(localStorage.getItem(ADDED) ?? "{}") as Record<string, Added>;
+    all[owner] = a;
+    localStorage.setItem(ADDED, JSON.stringify(all));
+  } catch {
+    // storage blocked: removal then works only by re-entering the lists
+  }
+}
+
 export function WatchSettings({ owner }: { owner: string }) {
   const [evm, setEvm] = useState("");
   const [nearMore, setNearMore] = useState("");
   const [evmMore, setEvmMore] = useState("");
   const [github, setGithub] = useState("");
   const [saved, setSaved] = useState<string | null>(null);
+  const [added, setAdded] = useState<Added>(() => addedFor(owner));
   const items = (v: string) => v.split(/[\s,]+/).map((x) => x.trim()).filter(Boolean);
+  // A list replaces what the agent has, so only a list this device is changing is sent; leaving it out
+  // keeps sources added from another device.
+  const push = async (next: Added, kinds: ("near" | "evm")[], extra: Record<string, unknown> = {}) => {
+    const data = { ...(kinds.includes("near") ? { near_accounts: next.near } : {}), ...(kinds.includes("evm") ? { evm_addresses: next.evm } : {}), ...extra };
+    await agent.registerOwner(await signRequest(owner, "register_owner", data));
+    saveAdded(owner, next);
+    setAdded(next);
+  };
+  const remove = (kind: "near" | "evm", v: string) => push({ ...added, [kind]: added[kind].filter((x) => x !== v) }, [kind]).then(() => setSaved("Removed."));
   return (
-    <details className="mt-4 text-sm">
-      <summary className="cursor-pointer text-muted hover:text-ink">Connect more signs of life</summary>
-      <div className="mt-2 grid gap-2 sm:grid-cols-2">
-        <Field label="More NEAR accounts you use" hint="Up to 5. Testnet, or mainnet (.near), read-only.">
-          <input className={inputCls} value={nearMore} onChange={(e) => setNearMore(e.target.value)} placeholder="you.near, work.testnet" />
-        </Field>
-        <Field label="Your Sepolia addresses" hint="Up to 5 more. Not the vault.">
-          <input className={inputCls} value={evmMore} onChange={(e) => setEvmMore(e.target.value)} placeholder="0x…, 0x…" />
-        </Field>
-        <Field label="Main Sepolia address" hint="Not the vault.">
-          <input className={inputCls} value={evm} onChange={(e) => setEvm(e.target.value.trim())} placeholder="0x…" />
-        </Field>
-        <Field label="GitHub username" hint="Public activity times only.">
-          <input className={inputCls} value={github} onChange={(e) => setGithub(e.target.value.trim())} />
-        </Field>
-      </div>
-      <div className="mt-2">
-        <ActionButton
-          tone="quiet"
-          onClick={async () => {
-            const data: Record<string, unknown> = {};
-            if (evm) data.evm_address = evm;
-            if (github) data.github = github;
-            if (nearMore.trim()) data.near_accounts = items(nearMore).map((x) => x.toLowerCase());
-            if (evmMore.trim()) data.evm_addresses = items(evmMore);
-            await agent.registerOwner(await signRequest(owner, "register_owner", data));
-            setSaved("Saved. The agent checks every 15 seconds.");
-          }}
-        >
-          Save
-        </ActionButton>
-        {saved && <span className="ml-2 text-xs text-accent">{saved}</span>}
-      </div>
-      <p className="mt-2 text-xs text-muted">Empty keeps what&apos;s saved. A list replaces the saved list.</p>
-    </details>
+    <div className="mt-4 space-y-4">
+      {added.near.length + added.evm.length > 0 ? (
+        <div>
+          <p className="font-medium">Added from this device</p>
+          <ul className="mt-2 flex flex-wrap gap-2">
+            {added.near.map((v) => (
+              <li key={v} className="flex items-center gap-1 rounded-full bg-accent-soft px-3 py-1">
+                {v}
+                <button type="button" aria-label={`Remove ${v}`} className="px-1 text-muted hover:text-ink" onClick={() => remove("near", v)}>
+                  ×
+                </button>
+              </li>
+            ))}
+            {added.evm.map((v) => (
+              <li key={v} className="flex items-center gap-1 rounded-full bg-accent-soft px-3 py-1">
+                {v.slice(0, 6)}…{v.slice(-4)}
+                <button type="button" aria-label={`Remove ${v}`} className="px-1 text-muted hover:text-ink" onClick={() => remove("evm", v)}>
+                  ×
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : (
+        <p className="text-sm text-muted">Added sources are private; remove them from the device you added them on.</p>
+      )}
+      <details>
+        <summary className="cursor-pointer text-muted hover:text-ink">Connect more signs of life</summary>
+        <div className="mt-2 grid gap-2 sm:grid-cols-2">
+          <Field label="More NEAR accounts you use" hint="Up to 5. Testnet, or mainnet (.near), read-only.">
+            <input className={inputCls} value={nearMore} onChange={(e) => setNearMore(e.target.value)} placeholder="you.near, work.testnet" />
+          </Field>
+          <Field label="Your Sepolia addresses" hint="Up to 5. Not the vault.">
+            <input className={inputCls} value={evmMore} onChange={(e) => setEvmMore(e.target.value)} placeholder="0x…, 0x…" />
+          </Field>
+          <Field label="Main Sepolia address" hint="Not the vault.">
+            <input className={inputCls} value={evm} onChange={(e) => setEvm(e.target.value.trim())} placeholder="0x…" />
+          </Field>
+          <Field label="GitHub username" hint="Public activity times only.">
+            <input className={inputCls} value={github} onChange={(e) => setGithub(e.target.value.trim())} />
+          </Field>
+        </div>
+        <div className="mt-2">
+          <ActionButton
+            tone="quiet"
+            onClick={async () => {
+              const next = {
+                near: [...new Set([...added.near, ...items(nearMore).map((x) => x.toLowerCase())])].slice(0, 5),
+                evm: [...new Set([...added.evm, ...items(evmMore)])].slice(0, 5),
+              };
+              const kinds = [...(items(nearMore).length ? (["near"] as const) : []), ...(items(evmMore).length ? (["evm"] as const) : [])];
+              await push(next, kinds, { ...(evm ? { evm_address: evm } : {}), ...(github ? { github } : {}) });
+              setNearMore("");
+              setEvmMore("");
+              setSaved("Saved. The agent checks every 15 seconds.");
+            }}
+          >
+            Save
+          </ActionButton>
+          {saved && <span className="ml-2 text-xs text-accent">{saved}</span>}
+        </div>
+      </details>
+    </div>
   );
 }
 
-/**
- * Email for checks and alerts: the owner's own address, and one for each person in the will. Kept by the
- * agent in the enclave, never on-chain; the app shows only that an email went out, not to whom.
- */
-/** Add someone who has no NEAR account yet: a one-time link they open, sign in (Google is fine) and accept. */
 export function InviteByLink({ owner, hasLawyer, will }: { owner: string; hasLawyer: boolean; will: Will }) {
   // Give claimed invitees the name typed for them (names are per browser).
   const people = [
