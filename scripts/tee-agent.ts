@@ -294,6 +294,10 @@ async function pushEnv() {
   let res = (await updateCvmEnvs(client, req, { schema: false })) as { status?: string; compose_hash?: string; correlation_id?: string };
   if (res.status === "precondition_required" && res.compose_hash) {
     console.log(`env keys change the compose hash to ${res.compose_hash}`);
+    if (process.argv.includes("--plan")) {
+      console.log(`PLAN ONLY. Keys: ${req.env_keys.join(", ")}. Nothing approved or applied; re-run without --plan to approve ${res.compose_hash} and restart.`);
+      return;
+    }
     const current = await currentMeasurements(apiKey, record.vm_uuid);
     await approveMeasurements(await owner(), { ...current, app_compose_hash_payload: res.compose_hash });
     res = (await updateCvmEnvs(client, { ...req, compose_hash: res.compose_hash }, { schema: false })) as typeof res;
@@ -337,11 +341,13 @@ const run = {
   env: async () => (await requireSponsorFunds(), pushEnv()),
   retire: () => retire(process.argv[3]),
   status,
+  // Read-only: the compose hash the CVM is measured with right now (what `approve` would approve).
+  hash: async () => console.log((await currentMeasurements(await phalaKey(), readRecord().vm_uuid)).app_compose_hash_payload),
   stop: () => power("stopCvm"),
   start: async () => (await requireSponsorFunds(), power("startCvm")),
 }[cmd ?? ""];
 if (!run) {
-  console.log("usage: npx tsx scripts/tee-agent.ts provision|approve|upgrade|env|retire <hash>|status|stop|start");
+  console.log("usage: npx tsx scripts/tee-agent.ts provision|approve|upgrade [--plan]|env [--plan]|retire <hash>|status|hash|stop|start");
   process.exit(1);
 }
 run().catch((e) => {

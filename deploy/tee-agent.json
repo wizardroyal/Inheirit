@@ -154,7 +154,19 @@
       "compose_hash": "3eaafc2449ad67daa0115787b1182b85b232d1e3f21707447ccc3d404b2179fe",
       "image": "unwizarding/inheirit-agent@sha256:07ede9ffdb6c3208d44ca78897482a9a596df31e8fdb8540ca07bdb262602b16",
       "at": "2026-11-12T12:43:27.934Z",
-      "note": "v2p: real email via Resend (mail.inheirit.xyz; footer, one per address per run on demo timings, demo budget 60/day of 95, in-app note when capped); CORS limited to inheirit.xyz, www, vercel.app, localhost; links to inheirit.xyz. Approved by the human after a --plan review. Registered as 420dfa88, same sealed-notes key ae74cf06"
+      "note": "v2p: real email via Resend (mail.inheirit.xyz; footer, one per address per run on demo timings, demo budget 60/day of 95, in-app note when capped); CORS limited to inheirit.xyz, www, vercel.app, localhost; links to inheirit.xyz. Approved by the human after a --plan review. Registered as 420dfa88, same sealed-notes key ae74cf06; its allowed_envs still lacked the Resend keys (Phala keeps them on a compose update); retired 2026-11-12"
+    },
+    {
+      "compose_hash": "d4e991567524768d737e1aa6ed3a0ffc4aa8e4e125c4879dcb280d91e7e672f8",
+      "image": "unwizarding/inheirit-agent@sha256:07ede9ffdb6c3208d44ca78897482a9a596df31e8fdb8540ca07bdb262602b16",
+      "at": "2026-11-12T13:15:00Z",
+      "note": "v2p env keys update: allowed_envs now include RESEND_API_KEY and NOTIFY_FROM_EMAIL. Phala applied the env update at once (no precondition step), so the agent briefly ran unapproved until the human approved d4e99156 in chat. Registered as 9b4fc353, same sealed-notes key ae74cf06; the compose file still didn't map the two keys into the container; retired 2026-11-12"
+    },
+    {
+      "compose_hash": "d0f5748ce72522b37e9384ad6e1c4088c713fbce0e8e94eabb3980ba53132762",
+      "image": "unwizarding/inheirit-agent@sha256:07ede9ffdb6c3208d44ca78897482a9a596df31e8fdb8540ca07bdb262602b16",
+      "at": "2026-11-12T13:05:27.219Z",
+      "note": "v2p, compose maps RESEND_API_KEY and NOTIFY_FROM_EMAIL into the container (the actual fix). Reviewed with upgrade --plan, approved by the human in chat, approved on the contract before the reboot. Registered as 8e617d40, same sealed-notes key ae74cf06. [VERIFIED] a Quiet email check reached the human's inbox (channel 'email')."
     }
   ]
 }
