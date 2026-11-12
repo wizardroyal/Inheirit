@@ -232,10 +232,10 @@ export function MyWillSetup({
     <div className="space-y-6">
       <Card title="About you">
         <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Display name" hint="How heirs and guardians will see you. Required.">
+          <Field label="Display name" hint="Shown to heirs and guardians.">
             <input className={inputCls} value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Sam" />
           </Field>
-          <Field label="Country or state (optional)" hint="For a future letter to your lawyer. That's all we ask: no date of birth, nationality or photo.">
+          <Field label="Country or state (optional)" hint="That's all we ask.">
             <input className={inputCls} value={jurisdiction} onChange={(e) => setJurisdiction(e.target.value)} placeholder="Nigeria" />
           </Field>
         </div>
@@ -243,28 +243,25 @@ export function MyWillSetup({
 
       <Card title="1 · Signs of life" aside={<Pill tone="accent">your NEAR account always counts</Pill>}>
         <p className="text-sm text-muted">
-          You never need to check in. The agent notices normal activity and only reaches out if you go quiet for longer than usual. One strong
-          source is already on: every transaction you sign with your account.
+          No check-ins. Every transaction you sign already counts.
         </p>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          <Field label="Your own Sepolia address (optional)" hint="Not a vault. Transactions you send from it count as signs of life.">
+          <Field label="Your own Sepolia address (optional)" hint="Not a vault.">
             <input className={inputCls} value={evm} onChange={(e) => setEvm(e.target.value.trim())} placeholder="0x…" />
           </Field>
           <div className="text-sm">
             <p className="font-medium">Heartbeat app</p>
             <p className="text-muted">
-              Open <a className="text-accent underline" href="/heartbeat" target="_blank" rel="noreferrer">the heartbeat app</a> on your phone and add it to your home screen. Just
-              opening it is a strong sign of life.
+              Add <a className="text-accent underline" href="/heartbeat" target="_blank" rel="noreferrer">the heartbeat app</a> to your phone&apos;s home screen. Opening it is a strong sign of life.
             </p>
           </div>
         </div>
       </Card>
 
       <Card title="2 · The people">
-        <p className="text-sm text-muted">Heirs receive in stages. Guardians must accept your invitation, and until enough have, nothing can ever start.</p>
+        <p className="text-sm text-muted">Nothing can start until enough guardians accept.</p>
         <p className="mb-3 mt-1 text-sm text-muted">
-          Just trying it? Tap <RefreshIcon className="text-accent" /> to generate a test heir, guardian, lawyer or friend: a funded testnet account,
-          and for heirs, test Sepolia and Bitcoin addresses too.
+          Tap <RefreshIcon className="text-accent" /> to generate a test heir or guardian.
         </p>
         <div className="space-y-3">
           {heirs.map((h, i) => (
@@ -324,9 +321,7 @@ export function MyWillSetup({
           ))}
           {(assets.ETH || assets.BTC) && (
             <p className="text-xs text-muted">
-              In a live will, <b>Pay heirs in dollars</b> means each heir needs just one address: NEAR Intents turns every slice, from every
-              chain, into USDC and sends it there. On testnet the vaults still pay each chain&apos;s test address first, which is why generated
-              heirs get test addresses here.
+              Tip: <b>Pay heirs in dollars</b> and each heir needs one address. Intents converts every slice to USDC.
             </p>
           )}
           <div className="flex items-center gap-3 text-sm">
@@ -337,16 +332,16 @@ export function MyWillSetup({
           </div>
         </div>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          <Field label="Guardians" group hint="At least two. Add their NEAR accounts, or generate test people. Heirs can't be guardians.">
+          <Field label="Guardians" group hint="At least two. Not heirs.">
             <PeopleField owner={owner} what="guardian" value={guardians} onChange={setGuardians} label={label} />
           </Field>
           <Field label="How many must confirm">
             <input className={inputCls} value={threshold} onChange={(e) => setThreshold(e.target.value)} />
           </Field>
-          <Field label="Lawyer (optional)" group hint="Can speed up the release with a death certificate, but never skips the challenge period.">
+          <Field label="Lawyer (optional)" group hint="Can speed up the release, never skip the challenge period.">
             <PeopleField owner={owner} what="lawyer" value={lawyer} onChange={setLawyer} label={label} single />
           </Field>
-          <Field label="Friends for a welfare check (optional)" group hint="They can only stop things, never start them.">
+          <Field label="Friends for a welfare check (optional)" group hint="Can only stop it, never start it.">
             <PeopleField owner={owner} what="friend" value={contacts} onChange={setContacts} label={label} />
           </Field>
         </div>
@@ -367,8 +362,7 @@ export function MyWillSetup({
         <label className="mt-3 flex items-start gap-2 text-sm">
           <input type="checkbox" className="mt-1" checked={stable} onChange={(e) => setStable(e.target.checked)} />
           <span>
-            <b>Pay heirs in dollars</b> (stable value, via NEAR Intents). Your will releases over months; this converts each slice to US dollars
-            (USDC) as it&apos;s released, on whatever chain each heir chooses, so price swings along the way don&apos;t eat into what they get.{" "}
+            <b>Pay heirs in dollars</b>: each slice becomes USDC on the heir&apos;s chain via NEAR Intents.{" "}
             <SimulatedTag /> on testnet.
           </span>
         </label>
@@ -392,7 +386,7 @@ export function MyWillSetup({
               );
             })}
           </ul>
-          <p className="mt-1 text-xs text-muted">Released 10% → 20% → 30% → 40%, with the longest wait after the first slice. You fund the ETH and BTC vaults after the will is created.</p>
+          <p className="mt-1 text-xs text-muted">10% → 20% → 30% → 40%, longest wait after the first. Fund ETH and BTC vaults afterwards.</p>
         </div>
         <label className="mt-3 flex items-center gap-2 text-sm">
           <input type="checkbox" checked={demoClock} onChange={(e) => setDemoClock(e.target.checked)} />
@@ -445,7 +439,7 @@ export function MyWillSetup({
                   progress("Adding your Sepolia address as a sign of life…");
                   await agent.registerOwner(await signRequest(owner, "register_owner", { evm_address: evm }));
                 }
-                progress("Done. Your dashboard has the invitation link to send each guardian.");
+                progress("Done. Send each guardian the link on your dashboard.");
                 onCreated();
                 onCreating(false);
               } catch (e) {
@@ -486,16 +480,16 @@ export function StrengthChecklist({ will }: { will: Will }) {
   const watching = (status?.watching ?? {}) as { evm?: boolean; github?: boolean | string; evmAddress?: string };
   const accepted = acceptedGuardians(will).length;
   const items: { label: string; done: boolean; required?: boolean; hint?: string }[] = [
-    { label: `Enough guardians accepted (${accepted} accepted, ${will.guardian_threshold} needed)`, done: isArmed(will), required: true, hint: "Send each guardian the invitation link shown under People" },
+    { label: `Enough guardians accepted (${accepted} accepted, ${will.guardian_threshold} needed)`, done: isArmed(will), required: true, hint: "Send the link under People" },
     { label: "At least one heir", done: will.heirs.length > 0, required: true },
     { label: "A strong sign-of-life source (your NEAR account)", done: true, required: true },
-    { label: "Heartbeat app opened once", done: !!signals?.heartbeat, hint: "Open the heartbeat app on your phone and add it to your home screen" },
+    { label: "Heartbeat app opened once", done: !!signals?.heartbeat, hint: "Add it to your phone's home screen" },
     { label: "Another source (Sepolia address or GitHub)", done: !!(watching.evm || watching.evmAddress || watching.github) },
     { label: "Telegram linked for checks", done: !!tg?.linked },
     { label: "Friends for a welfare check", done: will.contacts.length > 0 },
-    { label: "A lawyer (can speed up the release with a death certificate)", done: !!will.lawyer },
+    { label: "A lawyer", done: !!will.lawyer },
     { label: "A sealed note for an heir (optional)", done: will.sealed_notes.length > 0, hint: "Add one under Sealed notes" },
-    { label: "Heirs hidden in this app until the release starts (still readable on-chain)", done: will.heirs_hidden },
+    { label: "Heirs hidden in the app until release (readable on-chain)", done: will.heirs_hidden },
     { label: "NEAR vault funded", done: BigInt(will.near_balance) > 0n },
   ];
   const optional = items.filter((i) => !i.required);
@@ -520,7 +514,7 @@ export function StrengthChecklist({ will }: { will: Will }) {
       </ul>
       {!tg?.linked && (
         <div className="mt-3">
-          <TelegramLink account={owner} purpose="Link Telegram so the agent can check in there first if you go quiet." />
+          <TelegramLink account={owner} purpose="So the agent can check in there if you go quiet." />
         </div>
       )}
     </Card>

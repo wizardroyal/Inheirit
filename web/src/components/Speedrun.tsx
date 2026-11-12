@@ -52,7 +52,7 @@ function steps(w: Will, scenario: Scenario, escalated: boolean): Step[] {
   const voters = acceptedGuardians(w).filter(canSign).slice(0, w.guardian_threshold);
   const silent: Step = {
     label: "Go silent",
-    detail: "Do nothing as the owner for about 2 minutes (any transaction you sign counts as a sign of life). The ladder above climbs on its own.",
+    detail: "Do nothing for about 2 minutes. The ladder climbs on its own.",
     done: escalated || s !== "Active",
   };
   if (scenario === "returns") {
@@ -60,12 +60,12 @@ function steps(w: Will, scenario: Scenario, escalated: boolean): Step[] {
       silent,
       {
         label: "Checks go out",
-        detail: "The agent checks in with you (the heartbeat app, Telegram if linked; email and DMs appear in the log), then asks your friends and guardians.",
+        detail: "The agent checks in with you, then your friends and guardians.",
         done: escalated && (s === "Active" || reached(w, "WelfareCheck")),
       },
       {
         label: "Send a sign of life",
-        detail: "Send a signed heartbeat, as if you'd opened the heartbeat app. Watch the ladder snap back to All good. Nothing moves.",
+        detail: "Send a heartbeat. The ladder snaps back to All good.",
         done: escalated && s === "Active",
         action: { label: "I'm here (send a heartbeat)", run: () => signOfLife(owner), enabled: s !== "Active" && s !== "Completed" },
       },
@@ -75,7 +75,7 @@ function steps(w: Will, scenario: Scenario, escalated: boolean): Step[] {
   if (heir) {
     out.push({
       label: `As ${heir.name}, create the key for sealed notes`,
-      detail: "Notes are released last, re-sealed to a key only the heir holds. Any time before the end is fine.",
+      detail: "Any time before the end.",
       done: !!heir.x25519_pubkey,
       action: canSign(heir.account_id) ? { label: `Create ${heir.name}'s key`, run: () => registerHeirKey(owner, heir.account_id), enabled: !heir.x25519_pubkey } : undefined,
     });
@@ -83,7 +83,7 @@ function steps(w: Will, scenario: Scenario, escalated: boolean): Step[] {
   if (scenario === "late-heir") {
     out.push({
       label: `Don't choose ${heir?.name ?? "the heir"}'s payout yet`,
-      detail: "Released slices wait for the heir to choose instead of paying out (NEAR Intents, SIMULATED on testnet).",
+      detail: "Slices wait for the heir's choice (NEAR Intents, SIMULATED on testnet).",
       done: reached(w, "Executing"),
     });
   }
@@ -91,7 +91,7 @@ function steps(w: Will, scenario: Scenario, escalated: boolean): Step[] {
   if (scenario === "accelerated" && w.lawyer) {
     out.push({
       label: "As the lawyer, file a death certificate",
-      detail: "The evidence is SIMULATED (the fingerprint of a demo text). It shortens the remaining waits, but never skips the guardian vote or the challenge period.",
+      detail: "SIMULATED evidence. Shortens waits; never skips the vote or challenge period.",
       done: w.accelerated,
       action: canSign(w.lawyer)
         ? { label: "File the death certificate", run: () => fileDeathProof(w.lawyer!, owner), enabled: ["GuardianVote", "Challenge", "Executing"].includes(s) && !w.accelerated, tone: "quiet" }
@@ -100,7 +100,7 @@ function steps(w: Will, scenario: Scenario, escalated: boolean): Step[] {
   }
   out.push({
     label: `As ${w.guardian_threshold} guardians, confirm the passing`,
-    detail: "Only accepted guardians count (they accepted when the will was generated). Nothing can start without enough of them.",
+    detail: "Only accepted guardians count.",
     done: reached(w, "Challenge"),
     action:
       voters.length >= w.guardian_threshold
@@ -114,20 +114,20 @@ function steps(w: Will, scenario: Scenario, escalated: boolean): Step[] {
           }
         : undefined,
   });
-  out.push({ label: "Challenge period", detail: "The owner is alerted on every channel. A sign of life now still cancels everything.", done: reached(w, "Executing") });
+  out.push({ label: "Challenge period", detail: "The owner is alerted everywhere. A sign of life still cancels.", done: reached(w, "Executing") });
   out.push({
     label: scenario === "accelerated" ? "Releasing 10% → 30% → 60%" : "Releasing 10% → 20% → 30% → 40%",
     detail:
       scenario === "late-heir"
-        ? `Once a slice or two has been released, open ${heir?.name ?? "the heir"}'s view and choose how to receive: the waiting slices then pay out together.`
-        : "The longest wait comes right after the first 10%, because that's when a living owner would notice. NEAR moves for real, and so do Sepolia and Bitcoin if their vaults were funded.",
+        ? `After a slice or two, choose a payout in ${heir?.name ?? "the heir"}'s view; waiting slices pay out together.`
+        : "Longest wait after the first 10%. NEAR moves for real; Sepolia and Bitcoin if funded.",
     done: reached(w, "SecretsBuffer"),
     link: scenario === "late-heir" && heir ? { label: `Open ${heir.name}'s view`, href: `/heir/${owner}?as=${heir.account_id}` } : undefined,
   });
-  out.push({ label: "Waiting before secrets", detail: "One last wait: a sign of life here still stops the notes from ever being released.", done: reached(w, "SecretsReleased") });
+  out.push({ label: "Waiting before secrets", detail: "A sign of life here still stops the notes.", done: reached(w, "SecretsReleased") });
   out.push({
     label: `As ${heir?.name ?? "the heir"}, open the sealed note`,
-    detail: "Released only now, re-sealed to the heir's own key, and opened in the heir's browser.",
+    detail: "Re-sealed to the heir's key, opened in their browser.",
     done: s === "Completed",
     link: heir ? { label: `Open ${heir.name}'s view`, href: `/heir/${owner}?as=${heir.account_id}` } : undefined,
   });
@@ -186,9 +186,7 @@ export function Speedrun({ will, refresh }: { will: Will; refresh: () => void })
     return (
       <Card title="Set your will in motion" aside={<Pill>speedrun</Pill>}>
         <p className="text-sm text-muted">
-          Watch your own will run from start to finish in about 15 minutes instead of months. This switches it to demo timings: it goes quiet
-          after 2 minutes of silence, and slices go out minutes apart. It&apos;s testnet, so nothing is lost: switch back any time, or start over
-          once it completes.
+          Run your will end to end in about 15 minutes on demo timings. Testnet: switch back any time.
         </p>
         <ScenarioPicker value={scenario} onChange={setScenario} />
         <div className="mt-3">
@@ -202,7 +200,7 @@ export function Speedrun({ will, refresh }: { will: Will; refresh: () => void })
           >
             Start the speedrun
           </ActionButton>
-          {s !== "Active" && <p className="mt-1 text-xs text-muted">Timings can only change while the will is at All good.</p>}
+          {s !== "Active" && <p className="mt-1 text-xs text-muted">Only at All good.</p>}
         </div>
       </Card>
     );

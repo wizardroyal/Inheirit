@@ -51,10 +51,10 @@ export default function HeirPage() {
         <h1 className="font-serif text-4xl">For the heirs of {ownerName}</h1>
         <p className="max-w-2xl text-muted">
           {started
-            ? `We're sorry for your loss. ${ownerName}'s will is being carried out, and this page walks you through it one step at a time: what you receive, how you'd like to receive it, and any private notes left for you. There's no rush.`
+            ? `We're sorry for your loss. ${ownerName}'s will is being carried out. There's no rush.`
             : halted
-              ? `Part of ${ownerName}'s will was released, then stopped because ${ownerName} showed a sign of life. Nothing more will move unless the guardians confirm again.`
-              : `Nothing has been released, and nothing will be unless ${ownerName}'s guardians confirm they have passed away. Right now the will is at “${stateLabel(s)}”. If you like, you can set up your key now, so you're ready if that day comes.`}
+              ? `Part was released, then stopped: ${ownerName} showed a sign of life. Nothing more moves unless the guardians confirm again.`
+              : `Nothing is released unless ${ownerName}'s guardians confirm they have passed away. Now: “${stateLabel(s)}”. You can set up your key early.`}
         </p>
       </div>
       <Step n={1} title="Who you are" done={!!heir}>
@@ -66,8 +66,8 @@ export default function HeirPage() {
       {heir && (
         <Step n={3} title="What you receive">
           <p className="mb-3 text-sm text-muted">
-            What you receive arrives in stages ({schedule(will).map((st) => `${st.pct}%`).join(", ")}){will.accelerated ? "" : ", with the longest wait after the first"}. If it
-            turns out {ownerName} is alive after all, everything stops. Private notes come last, after everything else has been handed over.
+            In stages ({schedule(will).map((st) => `${st.pct}%`).join(", ")}){will.accelerated ? "" : ", longest wait after the first"}. If {ownerName}
+            is alive after all, it stops. Notes come last.
           </p>
           <Releases will={will} />
         </Step>
@@ -86,12 +86,11 @@ function PayoutStep({ owner, heir }: { owner: string; heir: string }) {
   return (
     <Step n={4} title="How you'd like to receive it" done={!!mine?.pref}>
       <p className="mb-3 text-sm text-muted">
-        You can receive your inheritance in whatever you already use: US dollars (USDC) on Base, SOL on Solana, NEAR and more. Each slice goes on through NEAR Intents to the
-        asset and chain you choose{data?.value_mode === "stable" ? `. ${ownerName} chose to pay in dollars, so it arrives as USDC on that chain` : ""}.
+        Pick the asset and chain you use; NEAR Intents converts each slice{data?.value_mode === "stable" ? `. ${ownerName} chose dollars, so it arrives as USDC` : ""}.
         {data?.simulated && (
           <>
             {" "}
-            <IntentsSimTag /> on testnet: NEAR Intents has no testnet, so the swap is simulated, priced with live quotes.
+            <IntentsSimTag /> on testnet, priced with live quotes.
           </>
         )}
       </p>
@@ -113,11 +112,10 @@ function KeyStep({ owner, heir, refresh }: { owner: string; heir: Will["heirs"][
   return (
     <Step n={2} title="A key for private notes" done={matches}>
       <p className="text-sm text-muted">
-        Any private notes left for you are locked so that only you can open them, with a key that stays on this device. Create it here, then
-        download a backup: without it, you can&apos;t open your notes on another device.
+        Notes are locked to a key that stays on this device. Download a backup to open them elsewhere.
       </p>
       {registered && !seed && (
-        <p className="mt-2 text-sm text-warn">A key is registered for you, but this browser doesn&apos;t have it. Restore your backup, or create a new key if no notes have been released to you yet.</p>
+        <p className="mt-2 text-sm text-warn">Your registered key isn&apos;t in this browser. Restore your backup, or create a new key if no notes were released yet.</p>
       )}
       {registered && seed && !matches && localPub && <p className="mt-2 text-sm text-warn">This browser holds a different key from the one registered for you.</p>}
       <div className="mt-3 flex flex-wrap gap-2">
@@ -195,8 +193,7 @@ function NotesStep({ owner, will, heir }: { owner: string; will: Will; heir: str
       {waiting.length > 0 && (
         <p className="text-sm text-muted">
           {ownerName} left you {waiting.length === 1 ? "a private note" : `${waiting.length} private notes`} ({waiting.map((n) => `“${n.label}”`).join(", ")}).
-          {waiting.length === 1 ? " It" : " They"} will reach you last, after everything else has been handed over, locked so that only your key can
-          open {waiting.length === 1 ? "it" : "them"}.
+          {waiting.length === 1 ? " It arrives" : " They arrive"} last, locked to your key.
         </p>
       )}
       <ul className="mt-3 space-y-3">
@@ -223,7 +220,7 @@ function NotesStep({ owner, will, heir }: { owner: string; will: Will; heir: str
           </li>
         ))}
       </ul>
-      <p className="mt-3 text-xs text-muted">Notes open here, on your device. What they say is never sent anywhere.</p>
+      <p className="mt-3 text-xs text-muted">Notes open on this device and are never sent anywhere.</p>
     </Step>
   );
 }
@@ -251,8 +248,7 @@ function GuideChat({ owner, heir }: { owner: string; heir: string }) {
   return (
     <Card title="Questions? Ask the guide" aside={<AiBadge />}>
       <p className="mb-3 text-sm text-muted">
-        Ask anything about what happens next. Answers come from a private AI that sees only your own details, never your notes, and take about
-        30 seconds. Please never share a seed phrase or password with anyone, here included.
+        A private AI that sees only your details, never your notes. About 30 s. Never share a seed phrase or password.
       </p>
       <ul className="mb-3 space-y-2">
         {turns.map((t, i) => (

@@ -79,7 +79,7 @@ export function Pill({ children, tone = "neutral" }: { children: ReactNode; tone
 
 export function SimulatedTag() {
   return (
-    <span title="Simulated for the demo: this isn't connected to a real account or service." className="inline-flex">
+    <span title="Simulated: not connected to a real service." className="inline-flex">
       <Pill tone="sim">SIMULATED</Pill>
     </span>
   );
@@ -163,12 +163,10 @@ export function NoWill({ owner }: { owner: string }) {
     <Card title="No will found">
       <div className="space-y-2 text-sm">
         <p>
-          There&apos;s no will for <span className="font-medium">{label(owner)}</span> yet. Check the account name in the link you were sent. If the will was
-          only just created, give it a few seconds and reload.
+          No will for <span className="font-medium">{label(owner)}</span> yet. Check the link, or reload in a few seconds.
         </p>
         <p className="text-muted">
-          Just exploring? <Link href="/owner" className="text-accent underline">Try it with a demo account</Link>: a sample will and its people are
-          ready in about a minute.
+          <Link href="/owner" className="text-accent underline">Try it with a demo account</Link>.
         </p>
       </div>
     </Card>

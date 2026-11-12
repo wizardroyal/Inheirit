@@ -26,10 +26,10 @@ export function TelegramLink({ account, purpose }: { account: string; purpose: s
       ) : (
         <div className="space-y-1">
           <p>
-            Open <ExtLink href={link}>this link</ExtLink> and press Start. It works for 15 minutes.
+            Open <ExtLink href={link}>this link</ExtLink> and press Start (valid 15 minutes).
           </p>
           <p className="text-xs text-muted">
-            Already chatting with @{status.bot}? Send it this message instead: <code className="break-all">/start {token}</code>
+            Or send @{status.bot}: <code className="break-all">/start {token}</code>
           </p>
         </div>
       )}

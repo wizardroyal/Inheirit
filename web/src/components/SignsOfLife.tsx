@@ -75,8 +75,7 @@ export function SignsOfLife({ owner, will }: { owner: string; will: Will }) {
 
       {agentDown && (
         <p className="rounded-lg bg-warn-soft px-4 py-3 text-sm text-warn" role="status">
-          The will agent isn&apos;t answering right now (it may be paused or restarting). Nothing moves until it&apos;s back, and your will
-          is safe on-chain.
+          The agent isn&apos;t answering (paused or restarting). Nothing moves until it&apos;s back; your will is safe on-chain.
         </p>
       )}
 
@@ -86,8 +85,8 @@ export function SignsOfLife({ owner, will }: { owner: string; will: Will }) {
           {/* The agent's verdict can trail the chain by a poll; at the snap-back, say what just happened. */}
           <p className="font-medium">{snapped > 0
               ? movedThisRound
-                ? "Sign of life recorded. The remaining stages and the sealed notes are stopped; what was already sent stays sent."
-                : "Sign of life recorded. Everything is cancelled, and nothing moved."
+                ? "Sign of life recorded. Remaining stages and notes stopped."
+                : "Sign of life recorded. Cancelled; nothing moved."
               : humanize(data.verdict.headline, names)}</p>
           {data.verdict.details.map((d) => (
             <p key={d} className="mt-1 text-sm text-muted">
@@ -122,7 +121,7 @@ export function SignsOfLife({ owner, will }: { owner: string; will: Will }) {
       {/* Privacy strip */}
       <div className="flex flex-wrap items-center gap-3 border-t border-line pt-3 text-xs text-muted">
         <span>
-          <span className="font-medium text-ink">What the agent saw: timestamps only.</span> It runs in a sealed enclave (TEE) and never reads or stores what you wrote or posted.
+          <span className="font-medium text-ink">What the agent saw: timestamps only.</span> It runs in a TEE and never stores content.
         </span>
         <AgentBadge />
         <AiBadge />

@@ -66,8 +66,8 @@ export function AgentBadge() {
         )}
         {info && <div>agent reports: tee={String(info.sealedNotes.tee)} enabled={String(info.sealedNotes.enabled)}</div>}
         <div className="pt-1 font-sans">
-          A caveat: with Phala&apos;s centralized key service, whoever controls our Phala account could ship new code that receives the same key.
-          That&apos;s why every version we deploy is published, and the approved ones are listed above. See the threat model.
+          Caveat: with Phala&apos;s centralized KMS, whoever controls our Phala account could ship code that gets the same key. Every deployed
+          version is published; see the threat model.
         </div>
       </Details>
     </div>

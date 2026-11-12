@@ -68,8 +68,7 @@ export function SignalList({ owner, will }: { owner: string; will: Will | null }
       </ul>
       {will && <p className="text-xs text-muted">Last confirmed sign of life on-chain: {ago(will.last_alive_at)}.</p>}
       <p className="text-xs text-muted">
-        Strong and medium signals count on their own. Weak ones count only when two different sources agree within 24 hours, because posts can be
-        scheduled or written by someone else. The agent reads only when something happened, never what it said.
+        Strong and medium signals count alone; weak ones need two sources within 24 h. Only times are read, never content.
       </p>
       {error && <p className="text-xs text-danger">Can&apos;t reach the will agent right now. Retrying.</p>}
     </div>
@@ -96,7 +95,7 @@ export function NotificationLog({ owner }: { owner: string }) {
   const items = [...(data ?? [])].reverse().slice(0, 20);
   return (
     <div>
-      {items.length === 0 && <p className="text-sm text-muted">Nothing sent yet. Messages appear here once the will goes quiet.</p>}
+      {items.length === 0 && <p className="text-sm text-muted">Nothing sent yet.</p>}
       <ul className="space-y-2">
         {items.map((n, i) => (
           <li key={i} className="rounded-lg border border-line px-3 py-2 text-sm">
@@ -133,7 +132,7 @@ export function Releases({ will }: { will: Will }) {
   const round = will.execution_round;
   const recs = will.executions.filter((e) => e.round === round);
   const chains = ["Near", ...will.foreign_chains] as const;
-  if (round === 0) return <p className="text-sm text-muted">Nothing has been released. Nothing moves unless guardians confirm and the challenge period passes.</p>;
+  if (round === 0) return <p className="text-sm text-muted">Nothing released.</p>;
   return (
     <div className="space-y-3">
       <table className="tech w-full">
@@ -175,10 +174,10 @@ export function Releases({ will }: { will: Will }) {
           ))}
         </tbody>
       </table>
-      <p className="text-xs text-muted">The contract pays NEAR itself as each stage starts. Sepolia and Bitcoin payments are signed by the agent through Chain Signatures.</p>
+      <p className="text-xs text-muted">NEAR is paid by the contract; Sepolia and Bitcoin by the agent via Chain Signatures.</p>
       {will.halted.filter((h) => h.round === round).map((h, i) => (
         <p key={i} className="rounded-lg bg-warn-soft px-3 py-2 text-sm text-warn">
-          Stopped at stage {h.stage + 1} {ago(h.at)}: {haltReason(h.reason)}. The remaining stages were not released.
+          Stopped at stage {h.stage + 1} {ago(h.at)}: {haltReason(h.reason)}.
         </p>
       ))}
     </div>
@@ -192,9 +191,9 @@ export function WatchStatus({ owner, will, canSign }: { owner: string; will: Wil
   if (!data || (data.watching && data.has_policy)) return null;
   return (
     <div className="space-y-2 rounded-lg bg-warn-soft px-3 py-2 text-sm text-warn">
-      {!data.watching && <p>The agent isn&apos;t watching this will yet, so it won&apos;t notice signs of life or move the will along.</p>}
+      {!data.watching && <p>The agent isn&apos;t watching this will yet.</p>}
       {!data.has_policy && will.foreign_chains.length > 0 && (
-        <p>The agent doesn&apos;t have this will&apos;s payout details (the heirs&apos; Sepolia and Bitcoin addresses), so it can&apos;t release those vaults.</p>
+        <p>The agent lacks the heirs&apos; Sepolia and Bitcoin addresses, so it can&apos;t release those vaults.</p>
       )}
       {!data.has_policy && canSign && savedPolicy(owner) && (
         <ActionButton tone="quiet" onClick={async () => agent.submitPolicy(owner, savedPolicy(owner)!).then(refresh)}>

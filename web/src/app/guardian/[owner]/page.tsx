@@ -27,15 +27,13 @@ function LawyerCard({ owner, lawyer, state, accelerated, refresh }: { owner: str
   return (
     <Card title="Lawyer: death certificate" aside={accelerated ? <Pill tone="warn">faster schedule on</Pill> : undefined}>
       <p className="text-sm text-muted">
-        A death certificate shortens the remaining waits (before the release: 10% → 30% → 60%, 14 days apart for real wills; once it has begun,
-        the remaining slices keep their sizes and only the waits get shorter). It never skips the guardian vote or the challenge period, so it
-        can&apos;t be used to rush the will of someone who is still alive.
+        Shortens the remaining waits (10/30/60%, 14 days apart). Never skips the guardian vote or the challenge period.
       </p>
       {accelerated ? (
-        <p className="mt-3 text-sm">A death certificate is on record, so the faster schedule applies.</p>
+        <p className="mt-3 text-sm">Certificate on record: faster schedule.</p>
       ) : (
         <div className="mt-3 space-y-2">
-          <Field label="Certificate" hint="Only its fingerprint (SHA-256) goes on-chain; the file never leaves your device.">
+          <Field label="Certificate" hint="Only its SHA-256 goes on-chain.">
             <input
               type="file"
               className={`${inputCls} w-full min-w-0`}
@@ -52,7 +50,7 @@ function LawyerCard({ owner, lawyer, state, accelerated, refresh }: { owner: str
           >
             File the death certificate
           </ActionButton>
-          {!open && <p className="text-xs text-muted">You can file it once the guardian vote has started, and until the release ends.</p>}
+          {!open && <p className="text-xs text-muted">Open from the guardian vote until the release ends.</p>}
         </div>
       )}
     </Card>
@@ -81,8 +79,7 @@ export default function GuardianPage() {
         <BackToOwner owner={owner} />
         <h1 className="font-serif text-4xl">{me && me === will.lawyer ? "Lawyer" : "Guardian"} for {ownerName}</h1>
         <p className="max-w-2xl text-muted">
-          {ownerName} chose you because they trust you to tell the truth. Confirm a passing only if you&apos;re sure. If you believe they&apos;re alive,
-          say so: one “they&apos;re alive” from any guardian stops everything.
+          Confirm a passing only if you&apos;re sure. One “they&apos;re alive” from any guardian stops everything.
         </p>
         <ActAs value={me} onChange={setMe} suggested={[...guardianIds(will), ...(will.lawyer ? [will.lawyer] : [])]} label="I am" />
         {me && !entry && me !== will.lawyer && <ErrorNote>{label(me)} isn&apos;t a guardian or the lawyer for this will.</ErrorNote>}
@@ -91,8 +88,7 @@ export default function GuardianPage() {
       {entry && !entry.accepted && (
         <Card title="You've been invited">
           <p className="text-sm">
-            {ownerName} has asked you to be a guardian. You&apos;ll only hear from us if they go quiet for a long time and nobody in a welfare check has
-            heard from them. Then you&apos;ll be asked whether they have passed away. Until enough guardians accept, the will can never start.
+            {ownerName} asked you to be a guardian. You&apos;ll hear from us only if they go quiet and nobody has heard from them.
           </p>
           <div className="mt-3">
             <ActionButton onClick={() => call(me, "accept_guardian", { owner }, 0n, ROLE_TGAS).then(refresh)}>I accept the guardian role</ActionButton>
@@ -101,7 +97,7 @@ export default function GuardianPage() {
       )}
       {isGuardian && (
         <Card title="How we reach you">
-          <TelegramLink account={me} purpose="Optional: get welfare checks and vote requests on Telegram." />
+          <TelegramLink account={me} purpose="Optional: get checks and vote requests on Telegram." />
         </Card>
       )}
       <div className="grid gap-6 lg:grid-cols-2">
@@ -115,12 +111,12 @@ export default function GuardianPage() {
           {!voting && (
             <p className="text-sm text-muted">
               {s === "Challenge"
-                ? `Enough guardians have confirmed. ${ownerName} is being alerted; any sign of life still cancels.`
+                ? `Enough guardians confirmed. ${ownerName} is being alerted; a sign of life still cancels.`
                 : s === "Completed"
-                  ? "The will has been carried out. Nothing more is needed from you."
+                  ? "The will has been carried out."
                   : ["Executing", "SecretsBuffer", "SecretsReleased"].includes(s)
-                    ? "The will is being carried out. Nothing is needed from you."
-                    : `Nothing to do now. Guardians are only asked once ${ownerName} has been silent and nobody in the welfare check has heard from them.`}
+                    ? "The will is being carried out."
+                    : "Nothing to do now."}
             </p>
           )}
           {voting && (
@@ -128,7 +124,7 @@ export default function GuardianPage() {
               <p className="text-sm">
                 {will.attestations.filter((a) => a.kind === "Deceased").length} of {will.guardian_threshold} guardians have confirmed so far.
               </p>
-              <Field label="Evidence (optional)" hint="A death certificate, notice or letter. Only its fingerprint (SHA-256) goes on-chain; the file never leaves your device.">
+              <Field label="Evidence (optional)" hint="Certificate, notice or letter. Only its SHA-256 goes on-chain.">
                 <input
                   type="file"
                   className={`${inputCls} w-full min-w-0`}
@@ -152,8 +148,7 @@ export default function GuardianPage() {
                 </div>
               )}
               <p className="text-xs text-muted">
-                Once enough guardians confirm, the owner is alerted on every channel and a challenge period begins. Any sign of life during it
-                cancels everything.
+                Then a challenge period; any sign of life cancels.
               </p>
             </div>
           )}

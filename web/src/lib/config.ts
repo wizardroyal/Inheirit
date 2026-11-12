@@ -2,7 +2,8 @@
 export const AGENT_URL = (process.env.NEXT_PUBLIC_AGENT_URL || "https://d5b714731becca502b6bd054a5cf6ffa5ce71f61-3000.dstack-pha-prod9.phala.network").replace(/\/$/, "");
 export const CONTRACT_ID = process.env.NEXT_PUBLIC_CONTRACT_ID || "inheirit.testnet";
 // rpc.testnet.near.org is deprecated and rate-limits
-export const NEAR_RPC = process.env.NEXT_PUBLIC_NEAR_RPC || "https://test.rpc.fastnear.com";
+// Comma-separated; the next one is used only when one is unreachable or rate-limited.
+export const NEAR_RPC = process.env.NEXT_PUBLIC_NEAR_RPC || "https://test.rpc.fastnear.com,https://near-testnet.drpc.org";
 
 export const explorer = {
   nearTx: (hash: string) => `https://testnet.nearblocks.io/txns/${hash}`,

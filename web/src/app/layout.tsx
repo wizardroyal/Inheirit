@@ -13,7 +13,7 @@ const code = JetBrains_Mono({ variable: "--font-code", subsets: ["latin"] });
 export const metadata: Metadata = {
   title: "Inheirit — a crypto will that doesn't make you prove you're alive",
   description:
-    "Notices normal signs of life privately, never acts on silence alone, and hands assets on in reversible stages across NEAR, Ethereum and Bitcoin. Testnet demo.",
+    "Private signs of life, never silence alone, reversible stages across NEAR, Ethereum and Bitcoin. Testnet demo.",
 };
 
 export const viewport: Viewport = { themeColor: "#2f5d50" };
@@ -47,7 +47,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <footer className="border-t border-line">
           <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-6 text-sm text-muted">
             <span>
-              <span className="font-serif text-ink">Inheirit</span> · built at NEAR HACKATHON · runs on NEAR testnet, so trying it costs nothing
+              <span className="font-serif text-ink">Inheirit</span> · built at NEAR HACKATHON · NEAR testnet, free to try
             </span>
             <span className="flex gap-5">
               <a href={REPO_URL} target="_blank" rel="noreferrer" className="hover:text-ink">

@@ -17,7 +17,7 @@ const chainLabel = (c: string) => CHAIN_LABELS[c] ?? c;
 
 export function IntentsSimTag() {
   return (
-    <span title="NEAR Intents has no testnet: on testnet the 1Click swap is simulated with real prices. Mainnet payouts are listed separately." className="inline-flex">
+    <span title="NEAR Intents has no testnet: the swap is simulated with real prices." className="inline-flex">
       <Pill tone="sim">SIMULATED</Pill>
     </span>
   );
@@ -113,7 +113,7 @@ export function PayoutChoice({ owner, heir, current, onSaved }: { owner: string;
         Save my choice
       </ActionButton>
       <p className="text-xs text-muted">
-        Before saving, the agent checks that NEAR Intents can actually route to this choice. You can change it until each slice is paid.
+        Checked for a route first. Changeable until each slice is paid.
       </p>
       <LiveQuotes assetId={assetId} recipient={address} chain={chain} />
     </div>
@@ -190,8 +190,7 @@ export function LiveQuotes({ assetId, recipient, chain, symbol }: { assetId?: st
       )}
       {result && (
         <p className="mt-2 text-xs text-muted">
-          Quoted {new Date(result.at).toLocaleTimeString()} from NEAR Intents (1Click) on mainnet for {result.origin.amount} NEAR. This is a dry run:
-          nothing is sent. Your testnet inheritance itself is paid out by the SIMULATED client.
+          Mainnet 1Click quote for {result.origin.amount} NEAR at {new Date(result.at).toLocaleTimeString()}. Nothing is sent; testnet payouts are SIMULATED.
         </p>
       )}
     </div>
@@ -256,13 +255,13 @@ export function HeirPayoutList({ p, minUsd, mine }: { p: HeirPayouts; minUsd: nu
       {waiting.length > 0 && (
         <p className="rounded-lg bg-warn-soft px-3 py-2 text-sm text-warn">
           {p.pref
-            ? `${waiting.length} slice${waiting.length > 1 ? "s" : ""} (≈ $${usd.toFixed(2)}) waiting: payouts under $${minUsd} are combined with the next slice, and whatever is left goes out when the release ends.`
+            ? `${waiting.length} slice${waiting.length > 1 ? "s" : ""} (≈ $${usd.toFixed(2)}) waiting: under $${minUsd} is combined with the next.`
             : mine
-              ? `Your inheritance is waiting (${waiting.length} slice${waiting.length > 1 ? "s" : ""}, ≈ $${usd.toFixed(2)}): choose how you'd like to receive it.`
-              : `${waiting.length} slice${waiting.length > 1 ? "s" : ""} (≈ $${usd.toFixed(2)}) waiting for this heir to choose how to be paid.`}
+              ? `Your inheritance is waiting (${waiting.length} slice${waiting.length > 1 ? "s" : ""}, ≈ $${usd.toFixed(2)}): choose how to receive it.`
+              : `${waiting.length} slice${waiting.length > 1 ? "s" : ""} (≈ $${usd.toFixed(2)}) waiting for the heir to choose.`}
         </p>
       )}
-      {p.waiting.some((w) => w.exhausted) && <p className="text-xs text-danger">Some slices failed to pay out three times and need a person to look at them.</p>}
+      {p.waiting.some((w) => w.exhausted) && <p className="text-xs text-danger">Some slices failed three times and need attention.</p>}
       <ul className="space-y-2">
         {[...p.batches].reverse().map((b) => (
           <BatchRow key={b.id} b={b} />
@@ -280,7 +279,7 @@ export function PayoutsPanel({ owner }: { owner: string }) {
   if (!data.started)
     return (
       <p className="text-sm text-muted">
-        Nothing released yet. As slices are released, each heir&apos;s share goes on through NEAR Intents to the asset and chain they chose
+        Nothing released yet. Each share goes to the heir&apos;s chosen asset and chain
         {data.value_mode === "stable" ? ", converted to US dollars" : ""}.
       </p>
     );
@@ -288,8 +287,7 @@ export function PayoutsPanel({ owner }: { owner: string }) {
     <div className="space-y-4">
       {data.simulated && (
         <p className="text-xs text-muted">
-          <IntentsSimTag /> NEAR Intents has no testnet. The testnet slices are real; the swap that takes them on to each heir is simulated with
-          live 1Click prices. <a href="/mainnet" className="text-accent underline">Real payouts on mainnet</a>.
+          <IntentsSimTag /> Testnet slices are real; the onward swap is simulated with live prices. <a href="/mainnet" className="text-accent underline">Mainnet</a>.
         </p>
       )}
       {Object.entries(data.heirs).map(([heir, p]) => (
@@ -322,7 +320,7 @@ export function MainnetPayouts() {
         On mainnet <Pill tone="accent">real</Pill>
       </p>
       <p className="mb-2 text-xs text-muted">
-        The same payout done for real, with small amounts, from our demo vault on Base. Each one was approved by a person before it was sent.
+        Real, small payouts from our Base demo vault, each approved by a person.
       </p>
       <ul className="space-y-1 text-sm">
         {records.map((r, i) => (
@@ -366,8 +364,7 @@ export function FundAnywhere({ owner, vaults }: { owner: string; vaults: ("Near"
   return (
     <div className="space-y-3 text-sm">
       <p className="text-muted">
-        Holding USDC on Arbitrum, SOL or something else? NEAR Intents swaps it into your vault&apos;s asset. You send from your own wallet; the app
-        never holds your keys. <IntentsSimTag /> on testnet: no coins actually arrive, so use the demo faucet to fund testnet vaults.
+        NEAR Intents swaps any token into your vault from your own wallet. <IntentsSimTag /> on testnet: nothing arrives; use the faucet.
       </p>
       <div className="grid gap-3 sm:grid-cols-[1fr_7rem_9rem]">
         <Field label="Pay with">

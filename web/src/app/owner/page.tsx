@@ -124,8 +124,7 @@ function LowBalance({ owner }: { owner: string }) {
   return (
     <Card title="This account needs a little testnet NEAR">
       <p className="text-sm text-muted">
-        You have {formatNear(balance)} NEAR. Creating a will and funding its vault takes about 1 NEAR. Testnet NEAR is free, so we can send you
-        some:
+        You have {formatNear(balance)} NEAR; a will needs about 1.
       </p>
       <div className="mt-3">
         <ActionButton onClick={async () => (await topUpAccount(owner), refresh())}>Get free testnet NEAR</ActionButton>
@@ -198,9 +197,8 @@ function GenerateWill({ owner, onCreating, onCreated }: { owner: string; onCreat
   return (
     <Card title="Generate sample will">
       <p className="text-sm text-muted">
-        The quickest way to see everything. This creates test people (an heir, three guardians, a friend and a lawyer, with new names each time)
-        whose keys stay in this browser, so you can play every role. Then it writes your will (everything to the heir, released 10% → 20% → 30% →
-        40%), the guardians accept, and a sealed note is left for the heir. You can change any of it later while the will is at All good.
+        Test people (heir, three guardians, friend, lawyer) with keys in this browser, so you play every role. Everything to the heir, 10/20/30/40%,
+        plus a sealed note.
       </p>
       <div className="mt-3 flex flex-wrap gap-4 text-sm">
         <label className="flex items-center gap-2">
@@ -213,7 +211,7 @@ function GenerateWill({ owner, onCreating, onCreated }: { owner: string; onCreat
           </label>
         ))}
         <label className="flex items-center gap-2">
-          <input type="checkbox" checked={stable} onChange={(e) => setStable(e.target.checked)} /> Pay the heir in dollars (stable value via NEAR Intents, SIMULATED on testnet)
+          <input type="checkbox" checked={stable} onChange={(e) => setStable(e.target.checked)} /> Pay the heir in dollars (NEAR Intents, SIMULATED on testnet)
         </label>
       </div>
       <div className="mt-3 flex flex-wrap items-end gap-4">
@@ -226,7 +224,7 @@ function GenerateWill({ owner, onCreating, onCreated }: { owner: string; onCreat
         </label>
       </div>
       <p className="mt-2 text-xs text-muted">
-        Sepolia ETH and testnet BTC come from a small demo pool while it lasts. If the pool is empty, those vaults stay empty and only NEAR moves.
+        Sepolia ETH and testnet BTC come from a small pool while it lasts; otherwise only NEAR moves.
       </p>
       <div className="mt-3">
         <SetupSummary stagesPct={[10, 20, 30, 40]} demoClock={demoClock} />
@@ -292,8 +290,7 @@ function WriteWill({ owner, onCreating, onCreated }: { owner: string; onCreating
     <div className="grid gap-6 lg:grid-cols-[1.3fr_1fr]">
       <Card title="Write it in plain English">
         <p className="mb-3 text-sm text-muted">
-          Say who gets what, and who your guardians are. A private model on NEAR AI Cloud turns it into a structured will, and nothing is saved
-          until you approve the summary.
+          Who gets what, and who your guardians are. Nothing is saved until you approve the summary.
         </p>
         <textarea
           aria-label="Your will in plain English"
@@ -315,7 +312,7 @@ function WriteWill({ owner, onCreating, onCreated }: { owner: string; onCreating
         </div>
         {draft && !draft.ok && (
           <div className="mt-4 space-y-2">
-            <ErrorNote>The draft doesn&apos;t add up yet. We never fix a will silently, so please reword it and try again.</ErrorNote>
+            <ErrorNote>The draft doesn&apos;t add up. Reword it and try again.</ErrorNote>
             <ul className="list-disc pl-5 text-sm">
               {draft.errors.map((e) => (
                 <li key={e}>{e}</li>
@@ -332,7 +329,7 @@ function WriteWill({ owner, onCreating, onCreated }: { owner: string; onCreating
               ))}
             </ul>
             <p className="text-xs text-muted">
-              This summary is written by our code from the checked will, not by the model. The model&apos;s answer was signed inside its enclave:{" "}
+              Written by our code, not the model. Model answer:{" "}
               {draft?.ai.signature?.ok ? "signature verified" : "signature not verified"}.
             </p>
             <div className="grid gap-3 sm:grid-cols-2">
@@ -391,8 +388,7 @@ function WriteWill({ owner, onCreating, onCreated }: { owner: string; onCreating
       <Card title="Private by construction">
         <AiBadge />
         <p className="mt-3 text-sm text-muted">
-          Your words go only to a model running in a sealed enclave, which the agent has just checked (Intel TDX quote, NVIDIA GPU attestation, a
-          signing key bound to a fresh nonce). Its answer must be signed by that same key, or it&apos;s thrown away.
+          Your words go only to an attested enclave model. Unsigned answers are discarded.
         </p>
       </Card>
     </div>
@@ -417,7 +413,7 @@ function Dashboard({ will, refresh }: { will: Will; refresh: () => void }) {
             <ActionButton disabled={s === "Completed"} onClick={() => call(owner, "i_am_alive").then(refresh)}>
               I&apos;m alive
             </ActionButton>
-            <span className="text-xs text-muted">Cancels any stage, even mid-release. In normal life you never need to press it.</span>
+            <span className="text-xs text-muted">Cancels any stage, even mid-release.</span>
           </div>
         </Card>
         <Card title="Signs of life the agent watches for">
@@ -438,7 +434,7 @@ function Dashboard({ will, refresh }: { will: Will; refresh: () => void }) {
               <dt>Guardians</dt>
               <dd className="text-muted">
                 {will.guardian_threshold} of {will.guardians.length}:{" "}
-                {will.guardians.map((g) => `${label(g.account_id)}${g.accepted ? "" : " (invited, hasn't accepted yet)"}`).join(", ")}
+                {will.guardians.map((g) => `${label(g.account_id)}${g.accepted ? "" : " (invited)"}`).join(", ")}
               </dd>
             </div>
             {will.contacts.length > 0 && (
@@ -451,8 +447,7 @@ function Dashboard({ will, refresh }: { will: Will; refresh: () => void }) {
           {!isArmed(will) && (
             <div className="mt-2 space-y-1 text-sm text-warn">
               <p>
-                Not armed yet: {will.guardian_threshold} guardian{will.guardian_threshold > 1 ? "s" : ""} must accept before anything can ever
-                happen. Send them this link:
+                Not armed: {will.guardian_threshold} guardian{will.guardian_threshold > 1 ? "s" : ""} must accept. Send them this link:
               </p>
               <CopyLink path={`/guardian/${owner}`} />
             </div>
@@ -474,7 +469,7 @@ function Dashboard({ will, refresh }: { will: Will; refresh: () => void }) {
           {active ? (
             <NearVaultActions owner={owner} refresh={refresh} />
           ) : (
-            <p className="mt-2 text-xs text-muted">You can deposit and withdraw while the will is at All good.</p>
+            <p className="mt-2 text-xs text-muted">Deposits and withdrawals only at All good.</p>
           )}
           {active && will.foreign_chains.length > 0 && <ForeignWithdraw owner={owner} will={will} refresh={refresh} />}
           {will.pending_withdrawals.length > 0 && (
@@ -575,10 +570,10 @@ function WatchSettings({ owner }: { owner: string }) {
     <details className="mt-4 text-sm">
       <summary className="cursor-pointer text-muted hover:text-ink">Add more signs of life</summary>
       <div className="mt-2 grid gap-2 sm:grid-cols-2">
-        <Field label="Your own Sepolia address" hint="Not the vault. Transactions you send from it count as signs of life.">
+        <Field label="Your own Sepolia address" hint="Not the vault.">
           <input className={inputCls} value={evm} onChange={(e) => setEvm(e.target.value.trim())} placeholder="0x…" />
         </Field>
-        <Field label="GitHub username" hint="Only public activity, and only its time.">
+        <Field label="GitHub username" hint="Public activity times only.">
           <input className={inputCls} value={github} onChange={(e) => setGithub(e.target.value.trim())} />
         </Field>
       </div>
@@ -597,7 +592,7 @@ function WatchSettings({ owner }: { owner: string }) {
         </ActionButton>
         {saved && <span className="ml-2 text-xs text-accent">{saved}</span>}
       </div>
-      <p className="mt-2 text-xs text-muted">Leave a field empty to keep what&apos;s saved. Your NEAR account and the heartbeat app always count.</p>
+      <p className="mt-2 text-xs text-muted">Empty keeps what&apos;s saved.</p>
     </details>
   );
 }
@@ -611,8 +606,7 @@ function SealedNotes({ will, refresh }: { will: Will; refresh: () => void }) {
   return (
     <Card title="Sealed notes" aside={<Pill>{will.sealed_notes.length} of 10</Pill>}>
       <p className="text-sm text-muted">
-        Encrypted in this browser to a key held only inside the agent&apos;s enclave; only the scrambled text goes on-chain. Notes are released
-        last, one heir at a time: after everything is distributed and one more wait, the agent re-seals each note to its heir&apos;s own key.
+        Encrypted here to the enclave&apos;s key. Released last, per heir, after distribution and one more wait.
       </p>
       <ul className="mt-3 space-y-1 text-sm">
         {will.sealed_notes.map((n) => {
@@ -630,7 +624,7 @@ function SealedNotes({ will, refresh }: { will: Will; refresh: () => void }) {
             </li>
           );
         })}
-        {will.sealed_notes.length === 0 && <li className="text-muted">No notes yet. Notes are optional.</li>}
+        {will.sealed_notes.length === 0 && <li className="text-muted">No notes yet (optional).</li>}
       </ul>
       {active && (
         <div className="mt-4 space-y-2">
@@ -644,7 +638,7 @@ function SealedNotes({ will, refresh }: { will: Will; refresh: () => void }) {
             </select>
             <input className={inputCls} aria-label="Note title" placeholder="Title (anyone can see it on-chain)" value={label} onChange={(e) => setLabel(e.target.value)} maxLength={64} />
           </div>
-          <textarea className={`${inputCls} h-24 w-full`} aria-label="Note text" placeholder="What should they know? (Encrypted before it leaves this page.)" maxLength={1200} value={text} onChange={(e) => setText(e.target.value)} />
+          <textarea className={`${inputCls} h-24 w-full`} aria-label="Note text" placeholder="What should they know? (Encrypted here.)" maxLength={1200} value={text} onChange={(e) => setText(e.target.value)} />
           <ActionButton
             disabled={!label || !text}
             onClick={async () => {
@@ -657,8 +651,7 @@ function SealedNotes({ will, refresh }: { will: Will; refresh: () => void }) {
             Seal and save
           </ActionButton>
           <p className="text-xs text-muted">
-            Tip: instructions beat raw keys. Write where the hardware wallet is and who holds the passphrase, or split a seed phrase from its
-            passphrase across notes and people.
+            Tip: instructions beat raw keys. Split a seed phrase from its passphrase.
           </p>
         </div>
       )}
@@ -673,9 +666,8 @@ function SetupSummary({ stagesPct, demoClock }: { stagesPct: number[]; demoClock
   const sum = summarize(preset.timings, stagesFor(stagesPct, preset));
   return (
     <p className="rounded-md border border-line bg-accent-soft p-3 text-sm">
-      If you go quiet, the earliest anything moves is after about <b>{duration(sum.earliestMove)}</b>. Everything is handed over after about{" "}
-      <b>{duration(sum.fullDistribution)}</b>, and sealed notes after about <b>{duration(sum.secrets)}</b>. Any sign of life before then stops
-      it.
+      If you go quiet: first slice ≈ <b>{duration(sum.earliestMove)}</b>, all handed over ≈{" "}
+      <b>{duration(sum.fullDistribution)}</b>, notes ≈ <b>{duration(sum.secrets)}</b>. A sign of life stops it.
     </p>
   );
 }

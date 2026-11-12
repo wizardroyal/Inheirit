@@ -28,8 +28,7 @@ export default function MainnetPage() {
       <div className="space-y-3">
         <h1 className="font-serif text-5xl">On mainnet</h1>
         <p className="text-muted">
-          The will itself runs on NEAR testnet, and anyone can use it there end to end. NEAR Intents has no testnet, so the last step, paying each heir in the asset and chain they chose, is priced
-          here live, on mainnet.
+          Wills run on testnet. NEAR Intents has no testnet, so heir payouts are priced live on mainnet.
         </p>
       </div>
 
@@ -37,25 +36,23 @@ export default function MainnetPage() {
         <div className="rounded-xl border border-line bg-card p-4">
           <div className="font-serif text-xl">Testnet: open to everyone</div>
           <p className="mt-1 text-sm text-muted">
-            Sign in, write a will, set it in motion and play every role: owner, guardians, lawyer, heir. Testnet slices are paid onward by a SIMULATED
-            NEAR Intents client priced with live quotes.
+            Write a will and play every role. Payouts use a SIMULATED NEAR Intents client with live prices.
           </p>
         </div>
         <div className="rounded-xl border border-line bg-card p-4">
           <div className="font-serif text-xl">Mainnet: a showcase, not a service</div>
           <p className="mt-1 text-sm text-muted">
-            Heirs see live mainnet quotes from NEAR Intents, public and confidential, when they choose how to be paid: open an heir&apos;s page and
-            press &ldquo;Get live quotes&rdquo;.{" "}
+            Heirs see live quotes, public and confidential (&ldquo;Get live quotes&rdquo;).{" "}
             {records.length
-              ? "Real payouts went out from our demo vault on Base through a script that a person approved one transaction at a time, capped at $5 each; they are listed below."
-              : "Real payouts can go out from a demo vault on Base, only through a script a person approves one transaction at a time (capped at $5 each). None have been sent yet; any that are will be listed here."}
+              ? "Real payouts from our Base demo vault, each approved by a person, $5 cap. Listed below."
+              : "Real payouts would go from a Base demo vault, each approved by a person, $5 cap. None sent yet."}
           </p>
         </div>
       </section>
 
       <section className="space-y-3">
         <h2 className="font-serif text-3xl">Try a live quote</h2>
-        <p className="text-sm text-muted">The same quote an heir sees when choosing how to be paid, straight from NEAR Intents on mainnet.</p>
+        <p className="text-sm text-muted">What an heir sees, from NEAR Intents on mainnet.</p>
         <div className="rounded-2xl border border-line bg-card p-5">
           <MainnetQuote />
         </div>
@@ -98,8 +95,7 @@ export default function MainnetPage() {
       <section className="space-y-2 text-sm text-muted">
         <h2 className="font-serif text-3xl text-ink">Why not open mainnet to everyone?</h2>
         <p>
-          The agent that would sign mainnet releases runs on the Shade Agent Framework, which is experimental and, per NEAR&apos;s own docs, testnet
-          only. A public vault holding other people&apos;s money needs a production TEE framework and an audit first.
+          The Shade Agent Framework is experimental and testnet-only. Public vaults need a production TEE framework and an audit first.
         </p>
         <p>
           <Link href="/owner" className="text-accent underline">

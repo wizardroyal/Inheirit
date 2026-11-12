@@ -60,9 +60,8 @@ export function Vaults({ owner, will, children }: { owner: string; will: Will; c
         <div className="mt-3">
           <Details summary="How to fund the Sepolia and BTC vaults">
             <div className="font-sans">
-              These addresses are derived by NEAR Chain Signatures from the contract account and the path heirloom/&lt;owner&gt;/&lt;chain&gt;. Only the
-              contract can get them signed, and only while the will is being carried out (or for a withdrawal you asked for). Send a little Sepolia
-              ETH or testnet4 BTC before the release starts, from any public faucet or with the demo faucet button below. An empty vault is skipped.
+              Chain Signatures addresses (path heirloom/&lt;owner&gt;/&lt;chain&gt;), signable only during the release or for your withdrawal. Fund
+              them from any faucet or the button below; empty vaults are skipped.
             </div>
           </Details>
         </div>

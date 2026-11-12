@@ -26,8 +26,7 @@ export default function ContactPage() {
       <BackToOwner owner={owner} />
       <h1 className="font-serif text-4xl">Have you heard from {ownerName}?</h1>
       <p className="text-muted">
-        {ownerName} listed you as someone who&apos;d know if they were okay, and they&apos;ve been quiet for a while. If you&apos;ve heard from them recently,
-        say so below and nothing else happens.
+        {ownerName} has been quiet for a while. If you&apos;ve heard from them, say so.
       </p>
       <Card>
         <ActAs value={me} onChange={setMe} suggested={askable} label="I am" />
@@ -41,12 +40,12 @@ export default function ContactPage() {
               {s === "Active"
                 ? `No check is needed right now: ${ownerName} is active.`
                 : s === "GuardianVote" || s === "Challenge"
-                  ? "The welfare check has closed, and the guardians now decide."
+                  ? "The welfare check has closed; guardians decide now."
                   : "The will has moved past the welfare check."}
             </p>
           )}
         </div>
-        <p className="mt-3 text-xs text-muted">Your answer can only stop the process, never start it.</p>
+        <p className="mt-3 text-xs text-muted">Your answer can only stop it, never start it.</p>
         {me && !askable.includes(me) && <p className="mt-1 text-xs text-danger">{label(me)} isn&apos;t one of the people this will asks.</p>}
       </Card>
     </div>

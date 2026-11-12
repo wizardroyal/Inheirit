@@ -14,10 +14,10 @@ import type { Will } from "./will";
 export type Scenario = "returns" | "full" | "accelerated" | "late-heir";
 
 export const SCENARIOS: { id: Scenario; title: string; blurb: string }[] = [
-  { id: "returns", title: "a · The owner comes back", blurb: "You go quiet and checks go out. One sign of life snaps everything back, and nothing moves." },
-  { id: "full", title: "b · The will is carried out", blurb: "Guardians confirm, the challenge period passes, slices go out 10 → 20 → 30 → 40%, then the heir opens a sealed note." },
-  { id: "accelerated", title: "c · A lawyer speeds it up", blurb: "The lawyer files a death certificate: the release becomes 10 → 30 → 60% with shorter waits, but the challenge period still runs." },
-  { id: "late-heir", title: "d · The heir chooses late", blurb: "The heir hasn't said how to be paid. Slices wait for them, then pay out together once they choose." },
+  { id: "returns", title: "a · The owner comes back", blurb: "You go quiet; one sign of life snaps it back." },
+  { id: "full", title: "b · The will is carried out", blurb: "Guardians confirm, 10 → 20 → 30 → 40% goes out, the heir opens a note." },
+  { id: "accelerated", title: "c · A lawyer speeds it up", blurb: "A death certificate: 10 → 30 → 60%, shorter waits, challenge still runs." },
+  { id: "late-heir", title: "d · The heir chooses late", blurb: "Slices wait until the heir picks a payout." },
 ];
 
 /** A will on demo timings (it goes quiet after minutes, not days): a speedrun. Same rule as the agent's. */

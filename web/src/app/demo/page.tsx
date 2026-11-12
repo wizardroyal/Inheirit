@@ -41,8 +41,7 @@ export default function DemoPage() {
           <Pill tone="warn">advanced</Pill>
         </div>
         <p className="max-w-2xl text-lg text-muted">
-          Drive a will by hand. Make a test cast, write a will, then press the buttons the owner, the guardians and a friend would press, and
-          watch what the agent does. A will goes quiet after {DEMO_SCHEDULE.timings.quiet_after / 60} minutes of silence instead of months.
+          Drive a will by hand, playing every role. Quiet after {DEMO_SCHEDULE.timings.quiet_after / 60} minutes, not months.
         </p>
         <p className="text-sm text-muted">
           New here?{" "}
@@ -67,8 +66,7 @@ export default function DemoPage() {
           <CastSummary cast={cast} />
         ) : (
           <p className="text-muted">
-            Six test people, each with a funded testnet account and a random name: an owner, an heir, three guardians and a friend. Their keys stay
-            in this browser, so you can act as any of them. It takes about 20 seconds.
+            Six funded testnet people (owner, heir, three guardians, friend), keys in this browser. About 20 s.
           </p>
         )}
         <div className="mt-4">
@@ -151,9 +149,7 @@ function WillPanel({ cast }: { cast: Cast }) {
     return (
       <Card title="2 · Write the demo will">
         <p className="text-sm text-muted">
-          {ownerN} leaves everything to {heirN}, released in four stages (10%, 20%, 30%, 40%) with the longest wait after the first. Two of three
-          guardians must confirm. 0.5 NEAR goes into the NEAR vault; the Sepolia and Bitcoin vaults are addresses derived by Chain Signatures,
-          and the demo faucet funds them.
+          Everything to {heirN} in 10/20/30/40%; two of three guardians must confirm. 0.5 NEAR in the vault; the faucet funds Sepolia and Bitcoin.
         </p>
         <div className="mt-3 flex flex-wrap gap-4 text-sm">
           {(["Eth", "Btc"] as const).map((c) => (
@@ -229,11 +225,11 @@ function WillPanel({ cast }: { cast: Cast }) {
               Advance now (if due)
             </ActionButton>
           </div>
-          <p className="mt-2 text-xs text-muted">The agent moves the will on by itself every 15 seconds. Anyone may press this too; it only moves once the wait is over.</p>
+          <p className="mt-2 text-xs text-muted">The agent does this every 15 s. It moves only once the wait is over.</p>
         </Card>
 
         <Card title="Send a sign of life">
-          <p className="mb-3 text-sm text-muted">Do nothing and the will climbs the ladder. Then try to stop it:</p>
+          <p className="mb-3 text-sm text-muted">Do nothing and it climbs. Then stop it:</p>
           <div className="flex flex-wrap gap-2">
             <ActionButton disabled={done} onClick={async () => agent.heartbeat(await signRequest(cast.owner, "heartbeat"))}>
               Heartbeat (real, signed by {ownerN})
@@ -251,8 +247,7 @@ function WillPanel({ cast }: { cast: Cast }) {
             ))}
           </div>
           <p className="mt-2 text-xs text-muted">
-            A single X or Instagram post is ignored on purpose: someone else could be running the account. Two weak sources within 24 hours
-            count, and so does any strong one. The agent checks every 15 seconds.
+            One social post alone is ignored. Two weak sources within 24 h count, as does any strong one.
           </p>
           <div className="mt-4">
             <SignalList owner={cast.owner} will={will} />
@@ -287,7 +282,7 @@ function WillPanel({ cast }: { cast: Cast }) {
             </li>
           </ul>
           <p className="mt-2 text-xs text-muted">
-            Guardians can only vote during the guardian vote; the friend can only answer during Quiet or the welfare check. Their own pages:{" "}
+            Votes open only in the guardian vote; the friend answers in Quiet or the welfare check. Pages:{" "}
             <Link className="text-accent underline" href={`/guardian/${cast.owner}`}>guardian</Link>,{" "}
             <Link className="text-accent underline" href={`/heir/${cast.owner}`}>heir</Link>.
           </p>
@@ -322,7 +317,7 @@ function WillPanel({ cast }: { cast: Cast }) {
             </label>
           }
         >
-          {events.length === 0 && <p className="text-sm text-muted">Nothing has happened since you opened this page.</p>}
+          {events.length === 0 && <p className="text-sm text-muted">Nothing yet.</p>}
           <ul className="tech space-y-1">
             {[...events].reverse().map((e, i) => (
               <li key={i} className="flex gap-3">
@@ -364,7 +359,7 @@ function useEventLog(will: Will | null) {
       const tech = `${a} → ${b}`;
       // No new sign of life: the vote period ran out short of the threshold (§5.3 vote_failed)
       if (a === "GuardianVote" && b === "Active" && will.last_alive_at === p.last_alive_at)
-        out.push({ text: "The guardian vote expired without enough confirmations. The owner is still silent, so the ladder starts again", tech });
+        out.push({ text: "Guardian vote expired. The owner is still silent, so the ladder restarts", tech });
       else out.push({ text: describeTransition(a, b, will, accountLabel(will.owner, names)), tech });
     }
     if (will.last_alive_at > p.last_alive_at) out.push({ text: "Sign of life recorded on-chain", tech: "record_liveness" });

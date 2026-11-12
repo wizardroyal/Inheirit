@@ -3,14 +3,14 @@ import { stateLabel, type StateName } from "./will";
 import { boostPolling, shared } from "./boost";
 import { Account } from "@near-js/accounts";
 import { KeyPair, type KeyPairString } from "@near-js/crypto";
-import { JsonRpcProvider } from "@near-js/providers";
 import { KeyPairSigner } from "@near-js/signers";
 import { actionCreators } from "@near-js/transactions";
 import { CONTRACT_ID, NEAR_RPC } from "./config";
 import { keys } from "./keys";
+import { rpcProvider } from "./rpc";
 import { walletAccountId, walletCall, walletSignMessage } from "./wallet";
 
-export const provider = new JsonRpcProvider({ url: NEAR_RPC });
+export const provider = rpcProvider(NEAR_RPC);
 export const YOCTO = 10n ** 24n;
 /** Gas for the small role calls (accept, attest, confirm, register a key): cast accounts hold little NEAR,
  *  and testnet reserves ~0.001 NEAR per Tgas up front, so the 100 Tgas default would need 0.1 NEAR each. */

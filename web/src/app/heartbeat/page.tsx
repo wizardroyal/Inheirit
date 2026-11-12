@@ -49,7 +49,7 @@ export default function HeartbeatPage() {
       const msg = errorText(e);
       setStatus({
         ok: false,
-        text: /^No will for /.test(msg) ? "You don't have a will yet. Create one on Your will, then come back." : msg,
+        text: /^No will for /.test(msg) ? "No will yet. Create one on Your will first." : msg,
       });
     } finally {
       setBusy(false);
@@ -82,7 +82,7 @@ export default function HeartbeatPage() {
     return (
       <div className="mx-auto flex max-w-md flex-col items-center gap-5 py-10 text-center">
         <h1 className="font-serif text-4xl sm:text-5xl">Heartbeat</h1>
-        <p className="text-lg text-muted">Sign in first. Then, on this phone, just opening this page tells your will you&apos;re here.</p>
+        <p className="text-lg text-muted">Sign in. Then opening this page counts as a sign of life.</p>
         <Link href="/owner" className="rounded-lg bg-accent px-6 py-3 font-medium text-accent-ink hover:opacity-90">
           Sign in
         </Link>
@@ -93,7 +93,7 @@ export default function HeartbeatPage() {
   return (
     <div className="mx-auto flex max-w-md flex-col items-center gap-6 py-6 text-center">
       <h1 className="font-serif text-4xl sm:text-5xl">Heartbeat</h1>
-      <p className="text-lg text-muted">Opening this page is enough. Tap the button any time you like.</p>
+      <p className="text-lg text-muted">Opening this page is enough.</p>
       {mine.length > 1 ? (
         <label className="flex items-center gap-2 text-sm">
           <span className="text-muted">For</span>
@@ -131,10 +131,10 @@ export default function HeartbeatPage() {
         {status && <p className={status.ok ? "font-medium text-accent" : "text-danger"}>{status.text}</p>}
         {lastAt && <p className="text-sm text-muted">Last heartbeat {ago(lastAt)}</p>}
       </div>
-      <p className="text-sm text-muted">Add this page to your phone&apos;s home screen, and open it now and then. It&apos;s the strongest sign of life.</p>
+      <p className="text-sm text-muted">Add it to your home screen. It&apos;s the strongest sign of life.</p>
       <Details summary="How it works">
-        <div>Each heartbeat is a message signed with a key on your NEAR account (NEP-413).</div>
-        <div>The agent checks that key on-chain, records only the time, and the will treats it as a strong sign of life.</div>
+        <div>Signed with a key on your NEAR account (NEP-413).</div>
+        <div>The agent checks the key on-chain and records only the time.</div>
       </Details>
     </div>
   );
