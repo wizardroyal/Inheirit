@@ -93,6 +93,24 @@ describe("owner-signed routes", () => {
     expect(await res.json()).toMatchObject({ ok: true, signed: true });
     expect(t.store.get().owners["alice.testnet"]).toMatchObject({ owner: "alice.testnet", github: "alice", watchedSince: expect.any(String) });
   });
+  it("watches extra NEAR accounts and Sepolia addresses, and never names them in the public status", async () => {
+    const t = setup(false);
+    const data = { near_accounts: ["alice.near", "alice-work.testnet"], evm_addresses: ["0x" + "e".repeat(40), "0x" + "f".repeat(40)] };
+    expect((await t.post("/api/owners", { signed: { owner: "alice.testnet", action: "register_owner", data } })).status).toBe(200);
+    expect(t.store.get().owners["alice.testnet"]).toMatchObject({ nearAccounts: data.near_accounts, evmAddresses: data.evm_addresses });
+    const status = JSON.stringify(await (await t.app.request("/api/status/alice.testnet")).json());
+    expect(status).toContain('"near_extra":2');
+    expect(status).not.toContain("alice.near");
+    expect(status).not.toContain("e".repeat(40));
+  });
+  it("refuses an heir's NEAR account, the owner's own, and more than five extras", async () => {
+    const t = setup(false);
+    const post = (near_accounts: string[]) => t.post("/api/owners", { signed: { owner: "alice.testnet", action: "register_owner", data: { near_accounts } } });
+    expect((await post(["bola.testnet"])).status).toBe(400);
+    expect((await post(["alice.testnet"])).status).toBe(400);
+    expect((await post(["a1.near", "a2.near", "a3.near", "a4.near", "a5.near", "a6.near"])).status).toBe(400);
+    expect(t.store.get().owners["alice.testnet"]?.nearAccounts).toBeUndefined();
+  });
   it("keeps saved sources when a later registration leaves them out (Start over, timing switch)", async () => {
     const t = setup(false);
     await t.post("/api/owners", { signed: { owner: "alice.testnet", action: "register_owner", data: { github: "alice" } } });

@@ -10,7 +10,7 @@ const PROOF: [string, string][] = [
 ];
 
 const STEPS = [
-  ["All good", "The agent reads the signs of life you already give off: transactions, the heartbeat app, Telegram, socials (SIMULATED). You do nothing."],
+  ["All good", "The agent reads the signs of life you already give off: transactions on your NEAR accounts (mainnet too) and Sepolia, the heartbeat app, Telegram. Socials are coming soon. You do nothing."],
   ["Quiet", "Quiet longer than your usual (measured from your transactions)? It checks in. Any reply ends it."],
   ["Welfare check", "Still nothing? Your guardians, friends and lawyer are asked if they've heard from you."],
   ["Guardian vote", "Guardians are asked if you've passed away. One “they're alive” stops it."],

@@ -19,6 +19,7 @@ import {
 import type { SignalAdapter } from "../signals/adapters";
 import type { OwnerSignalConfig, Store } from "../state/store";
 import { CHECK_TEXT, type TelegramBot } from "../telegram/bot";
+import { isEmail, type Mailer } from "../notify/email";
 
 /** Seconds of margin so a reported time is never ahead of the chain's block time. */
 const CHAIN_CLOCK_MARGIN_S = 5;
@@ -41,6 +42,8 @@ export interface DriverDeps {
   notes?: NoteReleaser;
   /** Telegram check bot; absent when not configured. */
   telegram?: Pick<TelegramBot, "notify" | "isLinked">;
+  /** Real email (Resend); absent when not configured, and email checks then show in the app only. */
+  mailer?: Mailer;
   /** Onward payouts through NEAR Intents (SIMULATED 1Click on testnet). */
   payouts?: { run(will: WillView): Promise<void> };
   now?: () => Date;
@@ -358,7 +361,8 @@ export class Driver {
 
     const state = stateName(will.state);
     if (store.get().notifiedState[cfg.owner] !== state) {
-      const contacts = store.get().policies[cfg.owner]?.contacts ?? [];
+      // Friends from the will on-chain and from the approved policy (which may also hold plain addresses).
+      const contacts = [...new Set([...(will.contacts ?? []), ...(store.get().policies[cfg.owner]?.contacts ?? [])])];
       store.update((s) => (s.notifiedState[cfg.owner] = state));
       for (const m of notificationsFor(state, will, cfg, contacts)) await this.deliver(cfg.owner, m, will.last_alive_at);
     }
@@ -399,14 +403,42 @@ export class Driver {
    * check and welfare/vote messages after an expired vote (same last_alive_at) stay in the app only.
    * The challenge alarm and heir notices are always sent.
    */
-  private firstTelegramThisSilence(owner: string, event: string, lastAliveAt: number): boolean {
+  private firstTelegramThisSilence(owner: string, event: string, lastAliveAt: number, channel = "telegram"): boolean {
     if (!REPEATABLE_ON_TELEGRAM.has(event)) {
+      // Email keeps its own record ("WelfareCheck:email"), so one channel never silences the other.
+      const key = channel === "telegram" ? event : `${event}:${channel}`;
       const prev = this.deps.store.get().telegramSent[owner];
       const events = prev?.lastAliveAt === lastAliveAt ? prev.events : [];
-      if (events.includes(event)) return false;
-      this.deps.store.update((s) => (s.telegramSent[owner] = { lastAliveAt, events: [...events, event] }));
+      if (events.includes(key)) return false;
+      this.deps.store.update((s) => (s.telegramSent[owner] = { lastAliveAt, events: [...events, key] }));
     }
     return true;
+  }
+
+  /** The email address for a recipient: an address as is, the owner's own, or one the owner gave for that person. */
+  private emailFor(owner: string, to: string): string | null {
+    if (isEmail(to)) return to;
+    const cfg = this.deps.store.get().owners[owner];
+    if (to === owner) return cfg?.email ?? null;
+    return cfg?.peopleEmails?.[to] ?? null;
+  }
+
+  /** Emails one message to every recipient who has an address; returns how many went out. */
+  private async email(owner: string, m: Message, lastAliveAt: number): Promise<"sent" | "repeat" | null> {
+    if (!this.deps.mailer) return null;
+    const addrs = [...new Set(m.to.map((t) => this.emailFor(owner, t)).filter((a): a is string => !!a))];
+    if (!addrs.length) return null;
+    if (!this.firstTelegramThisSilence(owner, m.event, lastAliveAt, "email")) return "repeat";
+    let sent = 0;
+    for (const a of addrs) {
+      try {
+        if (await this.deps.mailer.send(a, m.subject, m.body)) sent++;
+      } catch (e) {
+        // Status only: never the address or the content.
+        this.log(`[email] ${owner}: a message failed: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    }
+    return sent ? "sent" : null;
   }
 
   /** Records one notification and sends it on Telegram to every recipient with a linked chat. */
@@ -425,6 +457,9 @@ export class Driver {
       }
       if (sent) out.push("telegram");
     }
+    const mailed = await this.email(owner, m, lastAliveAt);
+    if (mailed === "sent") out.push("email");
+    else if (mailed === "repeat") out.push("email (already sent during this silence)");
     this.record(owner, m, out);
   }
 
@@ -454,8 +489,12 @@ export class Driver {
       this.deps.store.update((s) => (s.checks[owner] = { since, done: [...done] }));
       const check = (subject: string, body = CHECK_TEXT): Message => ({ event: "check", to: [owner], subject, body });
       if (step === "heartbeat") this.record(owner, check("Check: heartbeat app"), ["ui", "heartbeat app"]);
-      else if (step === "email" && cfg.email)
-        this.record(owner, { ...check("Check: email"), to: [cfg.email], body: `${CHECK_TEXT} (Email isn't sent in this build; the check is shown here instead.)` }, ["ui"]);
+      else if (step === "email" && cfg.email) {
+        if (this.deps.mailer) {
+          const r = await this.email(owner, { ...check("Inheirit: just checking in"), to: [cfg.email] }, will.last_alive_at);
+          this.record(owner, { ...check("Check: email"), to: [cfg.email] }, r === "sent" ? ["email"] : r === "repeat" ? ["email (already sent during this silence)"] : ["ui"]);
+        } else this.record(owner, { ...check("Check: email"), to: [cfg.email], body: `${CHECK_TEXT} (Email isn't configured on this agent; the check is shown here instead.)` }, ["ui"]);
+      }
       else if (step === "telegram" && this.deps.telegram?.isLinked(owner)) {
         if (!this.firstTelegramThisSilence(owner, "check", will.last_alive_at)) {
           this.record(owner, check("Check: Telegram (not sent again: already asked during this silence)"), ["ui"]);

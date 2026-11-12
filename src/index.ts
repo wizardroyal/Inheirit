@@ -1,4 +1,5 @@
 // Load .env before any other module reads process.env (no-op in the TEE, where there is no .env file)
+import { mailerFromEnv } from "./notify/email";
 import { fetchBaseline } from "./liveness/baseline";
 import { HttpOneClickClient, SimulatedOneClickClient } from "./intents/oneclick";
 import { PayoutEngine, simulatedSender } from "./intents/payout";
@@ -196,6 +197,9 @@ const payouts = new PayoutEngine({
   refundTo: async (owner, chain) => (chain === "Near" ? agentContractId : vaults.find((v) => v.chain === chain)!.address(owner)),
 });
 
+// Real email when RESEND_API_KEY and NOTIFY_FROM_EMAIL are set; otherwise checks show in the app only.
+const mailer = mailerFromEnv();
+console.log(mailer ? "Email: on (Resend)" : "Email: off (RESEND_API_KEY / NOTIFY_FROM_EMAIL not set); email checks show in the app only");
 const driver = new Driver({
   payouts,
   contract,
@@ -203,6 +207,7 @@ const driver = new Driver({
   store,
   notes,
   telegram,
+  mailer,
   executor: new StagedExecutor(contract, vaults, store),
   demoWatchMs: config.demoMode() ? config.demoWatchHours() * 3_600_000 : undefined,
 });

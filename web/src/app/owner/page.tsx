@@ -486,7 +486,7 @@ function Dashboard({ will, refresh }: { will: Will; refresh: () => void }) {
             <span className="text-xs text-muted">Cancels any stage, even mid-release.</span>
           </div>
         </Card>
-        <Card title="Signs of life the agent watches for">
+        <Card title="Signs of life: connections">
           <SignalList owner={owner} will={will} />
           <WatchSettings owner={owner} />
         </Card>
@@ -538,6 +538,7 @@ function Dashboard({ will, refresh }: { will: Will; refresh: () => void }) {
       </div>
       <div className="min-w-0 space-y-6">
         <StrengthChecklist will={will} />
+        <EmailAlerts will={will} />
         <Vaults owner={owner} will={will}>
           {active ? (
             <NearVaultActions owner={owner} refresh={refresh} />
@@ -631,13 +632,22 @@ function ForeignWithdraw({ owner, will, refresh }: { owner: string; will: Will; 
 
 function WatchSettings({ owner }: { owner: string }) {
   const [evm, setEvm] = useState("");
+  const [nearMore, setNearMore] = useState("");
+  const [evmMore, setEvmMore] = useState("");
   const [github, setGithub] = useState("");
   const [saved, setSaved] = useState<string | null>(null);
+  const items = (v: string) => v.split(/[\s,]+/).map((x) => x.trim()).filter(Boolean);
   return (
     <details className="mt-4 text-sm">
-      <summary className="cursor-pointer text-muted hover:text-ink">Add more signs of life</summary>
+      <summary className="cursor-pointer text-muted hover:text-ink">Connect more signs of life</summary>
       <div className="mt-2 grid gap-2 sm:grid-cols-2">
-        <Field label="Your own Sepolia address" hint="Not the vault.">
+        <Field label="More NEAR accounts you use" hint="Up to 5. Testnet, or mainnet (.near), read-only.">
+          <input className={inputCls} value={nearMore} onChange={(e) => setNearMore(e.target.value)} placeholder="you.near, work.testnet" />
+        </Field>
+        <Field label="Your Sepolia addresses" hint="Up to 5 more. Not the vault.">
+          <input className={inputCls} value={evmMore} onChange={(e) => setEvmMore(e.target.value)} placeholder="0x…, 0x…" />
+        </Field>
+        <Field label="Main Sepolia address" hint="Not the vault.">
           <input className={inputCls} value={evm} onChange={(e) => setEvm(e.target.value.trim())} placeholder="0x…" />
         </Field>
         <Field label="GitHub username" hint="Public activity times only.">
@@ -648,9 +658,11 @@ function WatchSettings({ owner }: { owner: string }) {
         <ActionButton
           tone="quiet"
           onClick={async () => {
-            const data: Record<string, string> = {};
+            const data: Record<string, unknown> = {};
             if (evm) data.evm_address = evm;
             if (github) data.github = github;
+            if (nearMore.trim()) data.near_accounts = items(nearMore).map((x) => x.toLowerCase());
+            if (evmMore.trim()) data.evm_addresses = items(evmMore);
             await agent.registerOwner(await signRequest(owner, "register_owner", data));
             setSaved("Saved. The agent checks every 15 seconds.");
           }}
@@ -659,8 +671,63 @@ function WatchSettings({ owner }: { owner: string }) {
         </ActionButton>
         {saved && <span className="ml-2 text-xs text-accent">{saved}</span>}
       </div>
-      <p className="mt-2 text-xs text-muted">Empty keeps what&apos;s saved.</p>
+      <p className="mt-2 text-xs text-muted">Empty keeps what&apos;s saved. A list replaces the saved list.</p>
     </details>
+  );
+}
+
+/**
+ * Email for checks and alerts: the owner's own address, and one for each person in the will. Kept by the
+ * agent in the enclave, never on-chain; the app shows only that an email went out, not to whom.
+ */
+function EmailAlerts({ will }: { will: Will }) {
+  const label = useAccountLabel();
+  const owner = will.owner;
+  const people = [
+    ...will.guardians.map((g) => ({ account: g.account_id, role: "guardian" })),
+    ...will.contacts.map((c) => ({ account: c, role: "friend" })),
+    ...(will.lawyer ? [{ account: will.lawyer, role: "lawyer" }] : []),
+  ];
+  const [mine, setMine] = useState("");
+  const [theirs, setTheirs] = useState<Record<string, string>>({});
+  const [saved, setSaved] = useState<string | null>(null);
+  return (
+    <Card title="Email alerts">
+      <p className="text-sm text-muted">Checks, welfare questions, vote requests and the challenge alarm. Addresses stay in the enclave.</p>
+      <div className="mt-3 space-y-2">
+        <Field label="Your email">
+          <input className={inputCls} type="email" value={mine} onChange={(e) => setMine(e.target.value.trim())} placeholder="you@example.com" />
+        </Field>
+        {people.map((p) => (
+          <Field key={p.account} label={`${label(p.account)} (${p.role})`}>
+            <input
+              className={inputCls}
+              type="email"
+              value={theirs[p.account] ?? ""}
+              onChange={(e) => setTheirs((t) => ({ ...t, [p.account]: e.target.value.trim() }))}
+              placeholder="optional"
+            />
+          </Field>
+        ))}
+      </div>
+      <div className="mt-3">
+        <ActionButton
+          tone="quiet"
+          onClick={async () => {
+            const data: Record<string, unknown> = {};
+            if (mine) data.email = mine;
+            const filled = Object.fromEntries(Object.entries(theirs).filter(([, v]) => v));
+            if (Object.keys(filled).length) data.people_emails = filled;
+            await agent.registerOwner(await signRequest(owner, "register_owner", data));
+            setSaved("Saved.");
+          }}
+        >
+          Save
+        </ActionButton>
+        {saved && <span className="ml-2 text-xs text-accent">{saved}</span>}
+      </div>
+      <p className="mt-2 text-xs text-muted">Empty keeps what&apos;s saved. Each address gets at most 12 emails a day.</p>
+    </Card>
   );
 }
 

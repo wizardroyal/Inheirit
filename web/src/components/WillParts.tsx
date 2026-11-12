@@ -2,7 +2,6 @@
 // Pieces shared by the owner, guardian, heir and demo pages.
 import { savedPolicy } from "@/lib/demo";
 import { accountLabel, humanize, useNames } from "@/lib/names";
-import { useState } from "react";
 import { agent, type SignalSource } from "@/lib/agent";
 import { explorer } from "@/lib/config";
 import { useOverview } from "@/lib/hooks";
@@ -34,37 +33,61 @@ export function strength(weight: number): { label: "strong" | "medium" | "weak";
   return { label: "weak", tone: "neutral" };
 }
 
-/** Latest sign of life per source, as the agent last saw it. Timestamps only, never content. */
+/** What the agent watches for this owner, as counts and flags (never the other accounts themselves). */
+export type Watching = { evm?: boolean; github?: boolean | string; email?: boolean; near_extra?: number; evm_count?: number; evmAddress?: string };
+
+/**
+ * Every sign-of-life source in one list (CLAUDE.md §7.1): its weight, and whether it is connected for
+ * this owner. Sources we can't read yet are listed as "coming soon"; a SIMULATED demo signal still shows
+ * when one was sent. Timestamps only, never content.
+ */
 export function SignalList({ owner, will }: { owner: string; will: Will | null }) {
   const { data: overview, error } = useOverview(owner);
   const data = overview?.signals;
-  const [showAll, setShowAll] = useState(false);
-  // Simulated sources that have never fired are folded into one row; real sources and anything seen stay visible.
-  const folded = SOURCES.filter((s) => s.simulated && !data?.observations[s.source]?.at);
-  const shown = showAll ? SOURCES : SOURCES.filter((s) => !folded.includes(s));
+  const w = (overview?.status?.watching ?? {}) as Watching;
+  const evmCount = w.evm_count ?? (w.evm || w.evmAddress ? 1 : 0);
+  const status: Partial<Record<SignalSource, string | null>> = {
+    near_onchain: w.near_extra ? `your account + ${w.near_extra} more` : "your account",
+    evm_onchain: evmCount ? `${evmCount} address${evmCount > 1 ? "es" : ""}` : null,
+    phone_heartbeat: data?.heartbeat ? "app opened" : null,
+    telegram: overview?.telegram?.linked ? "linked" : null,
+    github: w.github ? "connected" : null,
+  };
   return (
     <div className="space-y-2">
       <ul className="tech divide-y divide-line">
-        {shown.map((s) => {
+        {SOURCES.map((s) => {
           const at = data?.observations[s.source]?.at;
+          const st = status[s.source];
           return (
             <li key={s.source} className="flex flex-wrap items-center justify-between gap-2 py-2">
               <span className="flex items-center gap-2">
                 {SOURCE_LABELS[s.source]}
-                {s.simulated && <SimulatedTag />}
-                <Pill tone={strength(s.weight).tone}>{strength(s.weight).label}</Pill>
+                <Pill tone={strength(s.weight).tone}>
+                  {strength(s.weight).label} {s.weight}
+                </Pill>
               </span>
-              <span className="text-muted">{at ? ago(at) : "nothing seen"}</span>
+              <span className="text-right text-muted">
+                {s.simulated ? (
+                  at ? (
+                    <>
+                      <SimulatedTag /> seen {ago(at)}
+                    </>
+                  ) : (
+                    "coming soon"
+                  )
+                ) : st ? (
+                  <>
+                    <span className="text-accent">● {st}</span>
+                    {at ? ` · ${ago(at)}` : ""}
+                  </>
+                ) : (
+                  "not set"
+                )}
+              </span>
             </li>
           );
         })}
-        {folded.length > 0 && (
-          <li className="py-2">
-            <button type="button" className="flex flex-wrap items-center gap-2 text-left text-muted hover:text-ink" onClick={() => setShowAll((v) => !v)}>
-              {showAll ? "Hide" : "Show"} {folded.length} simulated sources with nothing seen <SimulatedTag />
-            </button>
-          </li>
-        )}
       </ul>
       {will && <p className="text-xs text-muted">Last confirmed sign of life on-chain: {ago(will.last_alive_at)}.</p>}
       <p className="text-xs text-muted">

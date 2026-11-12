@@ -16,6 +16,7 @@ import { humanize, nameOf, readable, useAccountLabel, useNames } from "@/lib/nam
 import { signRequest } from "@/lib/near";
 import { acceptedGuardians, isArmed, type Will } from "@/lib/will";
 import { TelegramLink } from "./TelegramLink";
+import type { Watching } from "./WillParts";
 import { QuietPeriod, realSchedule } from "./QuietPeriod";
 import { type DraftNote, FinalSecrets, readyNotes } from "./FinalSecrets";
 import { ActionButton, Card, Field, inputCls, Pill, SimulatedTag } from "./ui";
@@ -524,16 +525,20 @@ export function StrengthChecklist({ will }: { will: Will }) {
   const signals = overview?.signals;
   const status = overview?.status;
   const tg = overview?.telegram;
-  // Newer agents return flags (evm/github/email); older ones returned the values themselves.
-  const watching = (status?.watching ?? {}) as { evm?: boolean; github?: boolean | string; evmAddress?: string };
+  // Newer agents return flags and counts (evm/github/near_extra/evm_count); older ones returned the values themselves.
+  const watching = (status?.watching ?? {}) as Watching;
+  // Strong sources actually connected: the owner's NEAR account always, plus extras, Sepolia addresses, the heartbeat app.
+  const strongCount = 1 + (watching.near_extra ?? 0) + (watching.evm_count ?? (watching.evm || watching.evmAddress ? 1 : 0)) + (signals?.heartbeat ? 1 : 0);
   const accepted = acceptedGuardians(will).length;
   const items: { label: string; done: boolean; required?: boolean; hint?: string }[] = [
     { label: `Enough guardians accepted (${accepted} accepted, ${will.guardian_threshold} needed)`, done: isArmed(will), required: true, hint: "Send the link under People" },
     { label: "At least one heir", done: will.heirs.length > 0, required: true },
     { label: "A strong sign-of-life source (your NEAR account)", done: true, required: true },
     { label: "Heartbeat app opened once", done: !!signals?.heartbeat, hint: "Add it to your phone's home screen" },
-    { label: "Another source (Sepolia address or GitHub)", done: !!(watching.evm || watching.evmAddress || watching.github) },
+    { label: `Two or more strong sources (${strongCount} connected)`, done: strongCount >= 2, hint: "Open the heartbeat app, or connect another NEAR account or Sepolia address" },
+    { label: "GitHub connected (weak; counts with another source)", done: !!watching.github },
     { label: "Telegram linked for checks", done: !!tg?.linked },
+    { label: "Email for checks", done: !!watching.email, hint: "Add it under Email alerts" },
     { label: "Friends for a welfare check", done: will.contacts.length > 0 },
     { label: "A lawyer", done: !!will.lawyer },
     { label: "A sealed note for an heir (optional)", done: will.sealed_notes.length > 0, hint: "Add one under Sealed notes" },

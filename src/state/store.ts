@@ -10,6 +10,12 @@ export interface OwnerSignalConfig {
   owner: string;
   /** Owner's personal Sepolia address (not the vault). */
   evmAddress?: string;
+  /** More Sepolia addresses the owner uses (up to 5). */
+  evmAddresses?: string[];
+  /** More NEAR accounts the owner signs with (up to 5): testnet, or mainnet `*.near`, read-only. */
+  nearAccounts?: string[];
+  /** Email addresses the owner gave for their guardians, friends and lawyer (account → address); never on-chain. */
+  peopleEmails?: Record<string, string>;
   github?: string;
   /** Where to email the owner (optional; without Resend configured, notices go to the UI log). */
   email?: string;

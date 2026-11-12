@@ -20,13 +20,29 @@ export class NearOnchainAdapter implements SignalAdapter {
   source = "near_onchain" as const;
   simulated = false;
   trustWeight = 0.9;
-  constructor(private readonly apiBase: string, private readonly fetchImpl: Fetch = fetch) {}
+  constructor(
+    private readonly apiBase: string,
+    private readonly fetchImpl: Fetch = fetch,
+    /** Extra accounts ending in .near are read from mainnet (read-only). */
+    private readonly mainnetBase = "https://tx.main.fastnear.com",
+  ) {}
 
+  /** The owner's account plus any extra accounts they added; the latest transaction across them counts. */
   async lastActivity(owner: OwnerSignalConfig): Promise<Date | null> {
-    const res = await this.fetchImpl(`${this.apiBase}/v0/account`, {
+    const accounts = [owner.owner, ...(owner.nearAccounts ?? [])];
+    const results = await Promise.allSettled(accounts.map((a) => this.latest(a)));
+    const ok = results.filter((r): r is PromiseFulfilledResult<Date | null> => r.status === "fulfilled");
+    if (!ok.length) throw (results[0] as PromiseRejectedResult).reason;
+    const times = ok.map((r) => r.value?.getTime() ?? 0).filter((t) => t > 0);
+    return times.length ? new Date(Math.max(...times)) : null;
+  }
+
+  private async latest(account: string): Promise<Date | null> {
+    const base = account.endsWith(".near") ? this.mainnetBase : this.apiBase;
+    const res = await this.fetchImpl(`${base}/v0/account`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ account_id: owner.owner, max_block_height: null }),
+      body: JSON.stringify({ account_id: account, max_block_height: null }),
     });
     if (!res.ok) throw new Error(`FastNEAR tx API ${res.status}`);
     const body = (await res.json()) as { account_txs?: { is_any_signer?: boolean; tx_block_timestamp: string }[] };
@@ -56,25 +72,40 @@ export class EvmNonceAdapter implements SignalAdapter {
     private readonly now: () => Date = () => new Date(),
   ) {}
 
+  /** Every Sepolia address the owner gave; the latest outgoing transaction across them counts. */
   async lastActivity(owner: OwnerSignalConfig): Promise<Date | null> {
-    if (!owner.evmAddress) return null;
+    const extra = (owner.evmAddresses ?? []).filter((a) => a.toLowerCase() !== owner.evmAddress?.toLowerCase());
+    const addrs: [string, string][] = [
+      ...(owner.evmAddress ? ([[owner.owner, owner.evmAddress]] as [string, string][]) : []),
+      // Extra addresses keep their own nonce record, keyed by owner and address.
+      ...extra.map((a) => [`${owner.owner}|${a.toLowerCase()}`, a] as [string, string]),
+    ];
+    if (!addrs.length) return null;
+    const results = await Promise.allSettled(addrs.map(([key, addr]) => this.latest(key, addr)));
+    const ok = results.filter((r): r is PromiseFulfilledResult<Date | null> => r.status === "fulfilled");
+    if (!ok.length) throw (results[0] as PromiseRejectedResult).reason;
+    const times = ok.map((r) => r.value?.getTime() ?? 0).filter((t) => t > 0);
+    return times.length ? new Date(Math.max(...times)) : null;
+  }
+
+  private async latest(key: string, address: string): Promise<Date | null> {
     const res = await this.fetchImpl(this.rpcUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_getTransactionCount", params: [owner.evmAddress, "latest"] }),
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_getTransactionCount", params: [address, "latest"] }),
     });
     if (!res.ok) throw new Error(`Sepolia RPC ${res.status}`);
     const body = (await res.json()) as { result?: string; error?: { message: string } };
     if (!body.result) throw new Error(`Sepolia RPC: ${body.error?.message ?? "no result"}`);
     const nonce = Number(BigInt(body.result));
-    const prev = this.store.get().evmNonces[owner.owner];
+    const prev = this.store.get().evmNonces[key];
     if (!prev) {
-      this.store.update((s) => (s.evmNonces[owner.owner] = { nonce, seenAt: "" }));
+      this.store.update((s) => (s.evmNonces[key] = { nonce, seenAt: "" }));
       return null;
     }
     if (nonce > prev.nonce) {
       const seenAt = this.now().toISOString();
-      this.store.update((s) => (s.evmNonces[owner.owner] = { nonce, seenAt }));
+      this.store.update((s) => (s.evmNonces[key] = { nonce, seenAt }));
       return new Date(seenAt);
     }
     return prev.seenAt ? new Date(prev.seenAt) : null;

@@ -37,12 +37,12 @@ Inheirit notices the signs of life you already give off, privately, and only rea
 
 ### Real vs simulated
 
-| Real | Simulated (labelled SIMULATED in the app) |
+| Real | Not real yet |
 |---|---|
-| The will contract, guardians, challenge period and staged release on NEAR testnet | Social and work signals: X, Instagram, TikTok, Facebook, WhatsApp, LinkedIn, Gmail, Calendar |
+| The will contract, guardians, challenge period and staged release on NEAR testnet | Social and work signals (Google, X, Instagram, TikTok, Facebook, WhatsApp, LinkedIn): listed as *coming soon* with their weights; the control panel can send a SIMULATED one to show how weak signals are handled |
 | NEAR, Sepolia ETH and testnet4 BTC payouts, signed by Chain Signatures (MPC) | DM check messages |
 | The agent in an Intel TDX enclave on Phala, attested on-chain | The onward NEAR Intents swap on testnet (NEAR Intents has no testnet; priced with live quotes) |
-| Signs of life: NEAR and Sepolia transactions, the signed heartbeat, Telegram replies, GitHub | Email checks are shown in the app, not sent |
+| Signs of life: transactions from your NEAR accounts (testnet, and mainnet `.near` read-only) and Sepolia addresses, the signed heartbeat, Telegram replies, GitHub | Email checks are shown in the app, not sent |
 | Sealed notes encrypted in the browser, re-sealed inside the enclave | |
 | Plain-English drafting and the heir guide on an attested NEAR AI Cloud model | |
 | Live NEAR Intents quotes from mainnet, public and confidential | |
@@ -53,6 +53,8 @@ Inheirit notices the signs of life you already give off, privately, and only rea
 2. **The first release is the loudest alarm.** A 10% slice leaving your vaults, with heirs notified, is when a living owner notices. So the *longest wait* comes right after the first slice, and a false trigger costs at most that slice.
 3. **Secrets come last.** Funds move in slices, but a revealed secret can never be taken back. Sealed notes are released only after distribution completes, plus one more wait.
 4. **Private by construction.** The agent reads signals inside a TEE and only timestamps leave it. In-product AI uses only an attested NEAR AI Cloud model.
+
+**The zero-custody way in: a notes-only will.** You don't have to put money in a vault. Tick *Notes only, no vaults* and the will holds nothing but sealed notes: where the hardware wallet is, which exchanges you use, who holds the passphrase. The same ladder runs (guardians, challenge period, the long wait), and the notes are released last, per heir. Your assets never leave your wallets; your heirs just learn how to reach them. Heirs can press *Test my key* any time to prove their key opens notes, without revealing any. Templates and a split-your-secret tip are in the *Final secrets* step.
 
 **Your heirs receive what they actually use.** Each heir chooses the asset and chain they're paid in (USDC on Base, SOL on Solana, NEAR…), and every released slice goes on to them through **NEAR Intents**. Owners can choose **stable value**, so each slice is converted to US dollars as it's released and heirs aren't exposed to price swings during a release that takes months. A will can also be **funded from anywhere**, from whatever token and chain the owner holds.
 
@@ -203,7 +205,7 @@ See [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md). In short:
 
 - **Experimental stack.** The Shade Agent Framework is unaudited and testnet-only. The will runs on NEAR testnet, Sepolia and BTC testnet4.
 - **Vault model.** Assets must be moved into vaults the will controls: the NEAR vault in the contract, and Sepolia/BTC addresses derived by Chain Signatures. The owner can withdraw while the will is at All good.
-- **Simulated signals**, labelled SIMULATED in the UI: Google Calendar, Gmail, X, Instagram, TikTok, Facebook, WhatsApp, LinkedIn. Real: NEAR transactions, Sepolia transactions, the signed heartbeat, Telegram replies, GitHub.
+- **Signals not connected yet:** Google Calendar, Gmail, X, Instagram, TikTok, Facebook, WhatsApp, LinkedIn are listed as *coming soon* (the control panel can send a SIMULATED one, labelled so). Real: transactions from your NEAR accounts (testnet, and mainnet `.near` read-only) and Sepolia addresses, the signed heartbeat, Telegram replies, GitHub.
 - **Email** checks are shown in the app; no email is sent yet.
 - **Heirs are hidden in the UI only.** The app and agent don't reveal heirs before the release, but heir accounts and NEAR shares are in contract state, which anyone can read. Commit-reveal is on the roadmap.
 - **Payload-blind gate.** The contract decides *when* and *which vault* can be signed, not *what* the transaction says. That rests on the attested agent code and a per-stage signature cap.

@@ -69,8 +69,17 @@ const GuideRequest = z.object({
   history: z.array(z.object({ role: z.enum(["user", "assistant"]), content: z.string().max(2000) })).max(8).default([]),
 });
 
+const NEAR_ACCOUNT = /^(?=.{2,64}$)([a-z\d]+[-_])*[a-z\d]+(\.([a-z\d]+[-_])*[a-z\d]+)*$/;
 const OwnerFields = z.object({
   evm_address: z.string().regex(/^0x[0-9a-fA-F]{40}$/).optional(),
+  /** Extra Sepolia addresses and NEAR accounts (testnet, or mainnet *.near) the owner uses; replace the saved lists. */
+  evm_addresses: z.array(z.string().regex(/^0x[0-9a-fA-F]{40}$/)).max(5).optional(),
+  near_accounts: z.array(z.string().regex(NEAR_ACCOUNT)).max(5).optional(),
+  /** Email for the will's guardians, friends, lawyer and heirs (account → address); replaces the saved map. */
+  people_emails: z
+    .record(z.string().regex(NEAR_ACCOUNT), z.string().email().max(254))
+    .refine((m) => Object.keys(m).length <= 16, "At most 16 addresses")
+    .optional(),
   github: z.string().regex(/^[A-Za-z0-9-]{1,39}$/).optional(),
   email: z.string().email().optional(),
 });
@@ -103,7 +112,17 @@ const DemoSignalFields = z.object({
 
 /** Public view of what the agent watches: which sources are set, never the addresses or handles. */
 function watchingFlags(cfg: OwnerSignalConfig | undefined) {
-  return cfg ? { evm: !!cfg.evmAddress, github: !!cfg.github, email: !!cfg.email, since: cfg.watchedSince ?? null } : null;
+  return cfg
+    ? {
+        evm: !!cfg.evmAddress || !!cfg.evmAddresses?.length,
+        github: !!cfg.github,
+        email: !!cfg.email,
+        // Counts, not values: the public status never names the owner's other accounts or addresses.
+        near_extra: cfg.nearAccounts?.length ?? 0,
+        evm_count: (cfg.evmAddress ? 1 : 0) + (cfg.evmAddresses?.length ?? 0),
+        since: cfg.watchedSince ?? null,
+      }
+    : null;
 }
 
 export function api(deps: ApiDeps): Hono {
@@ -126,11 +145,13 @@ export function api(deps: ApiDeps): Hono {
   // Baselines live in their own cache: writes clear the read cache, and a heartbeat shouldn't refetch
   // 90 days of history. Keyed by the sources, so a newly added address is picked up at once.
   const baselines = new Map<string, { at: number; value: Promise<Baseline | null> }>();
-  function usualRhythm(owner: string, evm?: string): Promise<Baseline | null> {
-    const key = `${owner}|${evm ?? ""}`;
+  function usualRhythm(owner: string, cfg?: OwnerSignalConfig): Promise<Baseline | null> {
+    const near = [owner, ...(cfg?.nearAccounts ?? [])];
+    const evm = [...(cfg?.evmAddress ? [cfg.evmAddress] : []), ...(cfg?.evmAddresses ?? [])];
+    const key = `${near.join(",")}|${evm.join(",")}`;
     const hit = baselines.get(key);
     if (hit && Date.now() - hit.at < 86_400_000) return hit.value;
-    const value = deps.baseline ? deps.baseline([owner], evm ? [evm] : []).catch(() => null) : Promise.resolve(null);
+    const value = deps.baseline ? deps.baseline(near, evm).catch(() => null) : Promise.resolve(null);
     baselines.set(key, { at: Date.now(), value });
     if (baselines.size > 2000) baselines.delete(baselines.keys().next().value!);
     return value;
@@ -186,17 +207,31 @@ export function api(deps: ApiDeps): Hono {
   app.post("/api/owners", async (c) => {
     const r = await ownerRequest(await c.req.json(), "register_owner", OwnerFields, "Watching settings must be signed by the owner");
     if (r.error) return c.json(r.error.body, r.error.status);
-    const { evm_address, github, email } = r.data;
-    if (!(await contract.getWill(r.owner))) return c.json({ error: `No will for ${r.owner}` }, 404);
+    const { evm_address, evm_addresses, near_accounts, people_emails, github, email } = r.data;
+    const will = await contract.getWill(r.owner);
+    if (!will) return c.json({ error: `No will for ${r.owner}` }, 404);
     // The release itself must not count as a sign of life: the will's own ETH vault (its nonce rises
     // with every slice) and an heir's receive address are refused.
-    if (evm_address) {
-      const a = evm_address.toLowerCase();
+    const evms = [...(evm_address ? [evm_address] : []), ...(evm_addresses ?? [])];
+    if (evms.length) {
       const eth = deps.vaults.find((v) => v.chain === "Eth");
       const vault = eth ? (await eth.address(r.owner).catch(() => "")).toLowerCase() : "";
       const heirs = (store.get().policies[r.owner]?.heirs ?? []).map((h) => h.receive?.eth?.toLowerCase());
-      if (a === vault) return c.json({ error: "That is this will's own vault address; give an address you use yourself" }, 400);
-      if (heirs.includes(a)) return c.json({ error: "That is an heir's receive address; give an address you use yourself" }, 400);
+      for (const e of evms) {
+        const a = e.toLowerCase();
+        if (a === vault) return c.json({ error: "That is this will's own vault address; give an address you use yourself" }, 400);
+        if (heirs.includes(a)) return c.json({ error: "That is an heir's receive address; give an address you use yourself" }, 400);
+      }
+    }
+    // An heir's activity must never keep the owner "alive" (heirs would stall their own release, and it
+    // would hide the owner's silence), nor the contract's own; the owner's account already counts.
+    // Emails only for people in this will: anyone else would be a stranger the agent mails.
+    const people = new Set([...(will.guardians ?? []).map((g) => g.account_id), ...(will.contacts ?? []), ...(will.lawyer ? [will.lawyer] : []), ...(will.heirs ?? []).map((h) => h.account_id)]);
+    for (const a of Object.keys(people_emails ?? {})) if (!people.has(a)) return c.json({ error: `${a} isn't a guardian, friend, lawyer or heir in this will` }, 400);
+    for (const n of near_accounts ?? []) {
+      if (n === r.owner) return c.json({ error: "Your own account already counts" }, 400);
+      if (will.heirs.some((h) => h.account_id === n)) return c.json({ error: `${n} is an heir; give an account you use yourself` }, 400);
+      if (n === process.env.AGENT_CONTRACT_ID) return c.json({ error: "That is the will contract itself" }, 400);
     }
     const watchedSince = new Date().toISOString();
     // Fields left out keep their saved value, so re-registering (Start over, a timing switch) never
@@ -206,6 +241,9 @@ export function api(deps: ApiDeps): Hono {
       s.owners[r.owner] = {
         owner: r.owner,
         evmAddress: evm_address ?? prev?.evmAddress,
+        evmAddresses: evm_addresses ?? prev?.evmAddresses,
+        nearAccounts: near_accounts ?? prev?.nearAccounts,
+        peopleEmails: people_emails ?? prev?.peopleEmails,
         github: github ?? prev?.github,
         email: email ?? prev?.email,
         watchedSince,
@@ -240,7 +278,7 @@ export function api(deps: ApiDeps): Hono {
     const observations = Object.entries(seen).map(([source, o]) => ({ source: source as SignalSource, at: new Date(o!.at), trustWeight: o!.trustWeight, simulated: o!.simulated }));
     // The owner's usual rhythm, from their own transaction history; recomputed at most daily.
     const cfg = store.get().owners[owner];
-    const baseline = will ? await usualRhythm(owner, cfg?.evmAddress) : null;
+    const baseline = will ? await usualRhythm(owner, cfg) : null;
     const verdict = will ? explainLiveness(will, observations, new Date(), undefined, baseline?.medianGapS ?? null) : null;
     return { will, signals: { observations: seen, heartbeat: store.get().heartbeats[owner] ?? null, verdict } };
   }
