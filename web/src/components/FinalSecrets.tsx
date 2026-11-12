@@ -34,7 +34,7 @@ export function FinalSecrets({ heirs, notes, onChange }: { heirs: { account: str
               ))}
             </select>
             <input className={`${inputCls} min-w-0 flex-1`} maxLength={64} aria-label="Note title (visible on-chain)" placeholder="Title (visible on-chain)" value={n.label} onChange={(e) => set(i, { label: e.target.value })} />
-            <button type="button" className="text-sm text-muted underline" onClick={() => onChange(notes.filter((_, j) => j !== i))}>
+            <button type="button" className="min-h-11 px-2 text-sm text-muted underline" onClick={() => onChange(notes.filter((_, j) => j !== i))}>
               Remove
             </button>
           </div>

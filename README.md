@@ -14,10 +14,11 @@ Inheirit notices the signs of life you already give off, privately, and only rea
 </p>
 
 <p>
-  <img src="docs/screenshots/home-phone.png" alt="Home on a phone: the will's state in plain words, when it last saw you, I'm here, the strength bar and one next step" width="24%">
-  <img src="docs/screenshots/will-phone.png" alt="My will on a phone: the will written out in plain sentences, then heirs, guardians and the schedule" width="24%">
-  <img src="docs/screenshots/signs-phone.png" alt="Signs of life on a phone: one list, strongest first, each source connected, not connected or coming soon" width="24%">
-  <img src="docs/screenshots/heir-quotes.png" alt="An heir chooses how to be paid, with live NEAR Intents quotes from mainnet" width="24%">
+  <img src="docs/screenshots/home-phone.png" alt="Home on a phone: the will's state in plain words, when it last saw you, I'm here, the strength bar and one next step" width="19%">
+  <img src="docs/screenshots/will-phone.png" alt="My will on a phone: a status pill with Pause and Close, then the will written out in plain sentences with a Speedrun badge" width="19%">
+  <img src="docs/screenshots/profile-phone.png" alt="Profile on a phone: your people as rows with a gear to edit each, then the vault and the account" width="19%">
+  <img src="docs/screenshots/signs-phone.png" alt="Signs of life on a phone: one list, strongest first, each source connected, not connected or coming soon" width="19%">
+  <img src="docs/screenshots/heir-quotes.png" alt="An heir chooses how to be paid, with live NEAR Intents quotes from mainnet" width="19%">
 </p>
 
 <sub>Home and My will from the app against the live testnet backend; the heir's quotes from an earlier run. More in <a href="docs/screenshots">docs/screenshots</a>.</sub>
@@ -30,7 +31,7 @@ Inheirit notices the signs of life you already give off, privately, and only rea
 | Real cross-chain execution: NEAR, Ethereum (Sepolia) and Bitcoin (testnet4) released in stages, with explorer links | [Then the full run](#then-the-full-run-about-15-minutes) |
 | An attested TEE agent and private AI, verifiable on-chain | `npx tsx scripts/verify.ts`: one read-only command, PASS/FAIL per check (explained in [`docs/VERIFY.md`](docs/VERIFY.md)); the trust badges under *Signs of life*; [`deploy/tee-agent.json`](deploy/tee-agent.json) lists every deployed compose hash |
 | NEAR Intents on mainnet | two real payouts (public Base → Solana, confidential Base → Arbitrum) with explorer links on [`/mainnet`](https://inheirit.xyz/mainnet); live quotes on the heir page |
-| Tests and security work | 257 agent tests, 181 contract unit tests plus sandbox flows, run on every push ([CI](.github/workflows/ci.yml)); five adversarial review rounds logged finding by finding in [`CLAUDE.md`](CLAUDE.md) (Decision log) and summarised in [`docs/AUDITS.md`](docs/AUDITS.md) |
+| Tests and security work | 260 agent tests, 193 contract unit tests plus sandbox flows, run on every push ([CI](.github/workflows/ci.yml)); five adversarial review rounds logged finding by finding in [`CLAUDE.md`](CLAUDE.md) (Decision log) and summarised in [`docs/AUDITS.md`](docs/AUDITS.md) |
 | What's real and what's simulated | [Real vs simulated](#real-vs-simulated) |
 
 ### Real vs simulated
@@ -78,13 +79,16 @@ Billions in crypto are lost when holders die or become incapacitated. Earlier at
 
 Everything runs on testnet. One path, start to finish:
 
-1. Open **https://inheirit.xyz/account** and click **Try with a demo account**. You get a fresh, funded testnet account whose key stays in your browser, shown under a random username such as *HatYoungRace*. A NEAR testnet wallet or Google sign-in works too.
-2. Click the banner **Demo account: try a speedrun**, then **Generate my will** (under a minute). It creates test people with new names each time (an heir, three guardians, a friend and a lawyer), writes the will (everything to the heir, 10% → 20% → 30% → 40%), has the guardians accept (the will is now **armed**), funds the vaults (Ethereum and Bitcoin testnet coins from a small demo pool while it lasts) and seals a note for the heir.
-   → The speedrun page shows the *Signs of life* ladder at **All good**, and **Home** shows the will's state in plain words, when it last saw you, **I'm here**, the **Will strength** bar (tap the chevron for the signals behind it) and one suggested next step.
-3. The *Set your will in motion* card is already on scenario **a · The owner comes back**, with demo timings (quiet after 2 minutes instead of 30 days). Do nothing for about 2 minutes.
+1. Open **https://inheirit.xyz/account** and click **Try with a demo account**. You get a fresh, funded testnet account whose key stays in your browser. A NEAR testnet wallet or Google sign-in works too.
+   → **Set up your account**: a username (made up for you, editable), *Save your recovery key*, your people (a name is enough) and your vault (a name and its chains). Every step can be skipped; all of it lives in **Profile** later.
+2. On **Home**, the will form: tap ↻ next to the heir and twice next to the guardians (funded test people with new names each time). **Speedrun** is on: minutes instead of months, for trying it. Add a final secret if you like, then **Start my will** (**Save as draft** keeps it off-chain instead).
+   → **Home** shows the will at **All good**, when it last saw you, **I'm here**, the **Will strength** bar and one next step. **My will** reads like a will, in real timings, with a *Speedrun* badge.
+3. Click the banner **Demo account: try a speedrun**. The card is on scenario **a · The owner comes back** (quiet after 2 minutes instead of 30 days). Do nothing for about 2 minutes.
    → The ladder climbs to **Quiet** and then **Welfare check**; the checks are listed under **Activity** (heartbeat app, email if you added one, Telegram if linked, a SIMULATED DM).
 4. Click **I'm here (send a heartbeat)**.
    → Within seconds the ladder **snaps back to All good**, and the verdict says nothing moved. That's the whole idea: signals can stop it; only people can start it.
+
+In a hurry? On the speedrun page, **Generate my will** makes a complete will with a full cast, funded vaults and a sealed note in one click.
 
 ## Then the full run (about 15 minutes)
 
@@ -99,7 +103,7 @@ On **Try a speedrun**, pick another scenario. The card shows a checklist with a 
 
 **Advanced:** the [control panel](https://inheirit.xyz/demo) (`/demo`) is a lower-level control room for the same flow: **Make a test cast**, **Create the demo will**, then the guardian and signal buttons. The same steps run headlessly in `scripts/demo-cancel.ts` (cancel) and `scripts/demo-execute.ts` (release).
 
-**Your own will** (`/account`): one screen per job. **Home** (where the will stands, I'm here, strength, the next step) · **My will** (the will in plain sentences, who gets what, the schedule, and the people: heirs, guardians invited or accepted, invite links for people without a NEAR account, friends and lawyer; *Edit will* and *Close will* at All good) · **Signs of life** · **Final secrets** · **Vault** (holdings, withdrawals, fund from another chain, payouts) · **Activity** (messages and the timeline; hashes and attestation under *Technical details*) · **Settings** (back up your access, add a device, email and Telegram alerts, quiet period). Questions people ask first are on [`/faq`](https://inheirit.xyz/faq). On a phone the first five sit in a bottom bar. Before a will exists, Home offers **My will** (a step-by-step form; ↻ creates funded test people with test addresses) or **Will in plain English** (a private NEAR AI model drafts it, our code checks it and asks only for what's missing; you approve a summary that code, not the model, wrote); demo accounts can **Generate my will** on the speedrun page. Lost your browser? **Restore from backup** or **Use an account from another device** on the sign-in screen. Guardians accept at `/guardian/<owner>`; `/heartbeat` is an installable app.
+**Your own will** (`/account`): one screen per job. **Home** (where the will stands, I'm here, strength, the next step) · **My will** (a status pill, *Draft*, *Active*, *Paused until …* or *Completed*, with **Pause** (1 to 90 days; it resumes by itself, with reminders 7 days and 1 day before), **Resume** and **Close**; the will in plain sentences; then heirs, guardians (with a − n + stepper for how many must confirm), lawyer and friends, each edited in place with ⚙; the schedule) · **Signs of life** (one ranked list; the quiet period, which we suggest from your history and you choose) · **Final secrets** · **Vault** (holdings, withdrawals, also while paused, fund from another chain, payouts) · **Activity** (messages and the timeline; hashes and attestation under *Technical details*) · **Profile** (your people as rows, each with ⚙ for name, role, email, Telegram and wallets, saved with the agent and never on-chain; the vault's name; username, recovery key, alerts, sign out). Invite links look like `https://inheirit.xyz/i/<code>`: no owner or names in the URL. Questions people ask first are on [`/faq`](https://inheirit.xyz/faq). On a phone the first five sit in a bottom bar. The will can also be written **in plain English** (a private NEAR AI model drafts it, our code checks it and asks only for what's missing; you approve a summary that code, not the model, wrote). Lost your browser? **Restore from backup** or **Use an account from another device** on the sign-in screen. `/heartbeat` is an installable app.
 
 ## How it works
 
@@ -207,7 +211,7 @@ See [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md). In short:
 ## Honest limitations
 
 - **Experimental stack.** The Shade Agent Framework is unaudited and testnet-only. The will runs on NEAR testnet, Sepolia and BTC testnet4.
-- **Vault model.** Assets must be moved into vaults the will controls: the NEAR vault in the contract, and Sepolia/BTC addresses derived by Chain Signatures. The owner can withdraw while the will is at All good.
+- **Vault model.** Assets must be moved into vaults the will controls: the NEAR vault in the contract, and Sepolia/BTC addresses derived by Chain Signatures. The owner can withdraw while the will is at All good or paused.
 - **Signals not connected yet:** Google Calendar, Gmail, X, Instagram, TikTok, Facebook, LinkedIn are listed as *coming soon* (the control panel can send a SIMULATED one, labelled so). Real: transactions from your NEAR accounts (testnet, and mainnet `.near` read-only) and Sepolia addresses, the signed heartbeat, Telegram replies, GitHub.
 - **Email limits.** On the free sending tier (about 100 a day), demo-timing wills get one email per address per run from a smaller daily budget, so real-timing wills keep room; when a limit is reached, the message stays in the app with a note. Replies to these emails aren't read: the email says to open the heartbeat app or reply on Telegram.
 - **Heirs are hidden in the UI only.** The app and agent don't reveal heirs before the release, but heir accounts and NEAR shares are in contract state, which anyone can read. Commit-reveal is on the roadmap.
@@ -220,6 +224,8 @@ See [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md). In short:
 - **Expired guardian votes restart the ladder.** If guardians don't vote, the will returns to All good without a new sign of life, so the ladder starts again at once (about every 7 minutes on demo timings). The repeated checks and welfare messages appear in the app, but Telegram sends each of them only once per silence. The challenge alarm is always sent.
 - **NEAR Intents is SIMULATED on testnet.** NEAR Intents has no testnet. The testnet slices are real transfers; the swap that takes them on to the heir's choice runs on a simulated 1Click client (live prices, fake deposit address). On mainnet: heirs see live dry quotes, and real payouts were sent from our demo vault (see above) only by a local script (`scripts/mainnet-payout.ts`) that asks a person for approval before every transaction (caps: $5 each, $25 in total). Any made are listed at `/mainnet`. In production, the attested agent's mainnet contract would sign these legs.
 - **Payout waiting happens after the vault.** If an heir hasn't chosen how to be paid, their onward payout waits and later slices are paid together. The testnet slice itself still leaves the vault on schedule. Holding it in the vault would need a contract change (roadmap).
+- **One will and one vault per account.** Several vaults with their own rules are on the roadmap.
+- **Contact details stay off-chain.** People's email, Telegram and wallets are saved with the agent, owner-signed, inside the enclave; a person on the will can't be deleted from Profile until they're removed from the will.
 - **Closing a will.** The contract can't see other chains; the app checks the Sepolia and Bitcoin vaults (through the agent) before it offers *Close will*.
 - **Extra signal sources are private.** The agent never reveals the extra NEAR accounts or Sepolia addresses you added, so they can be removed only from the device you added them on.
 - **Names are local.** Usernames and the generated people's names live in your browser; the testnet account id stays the on-chain identity, and other browsers see the account id.
@@ -229,9 +235,10 @@ See [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md). In short:
 
 ## Roadmap
 
+- **Several vaults with their own rules (conditional gifts).** One account, several vaults, each with its own people, conditions and schedule.
 - **Beyond wills: conditional gifts.** The will is the first product of a conditional-release engine: time or milestone conditions, attested by people, with a challenge window and staged release. The `not_before` condition is the first example: parsed and shown today; enforcement is next. Milestones and dates only; never conditions on relationships, beliefs or lifestyle.
 - A human adjudicator for disputes and heir support.
-- Real Gmail, Calendar, X, Instagram and LinkedIn adapters, with OAuth tokens kept in the TEE.
+- Real wallet and email linking for Google Calendar, Gmail, X, Instagram and LinkedIn, with OAuth tokens kept in the TEE.
 - A quiet period that adapts over time, per source.
 - Incapacity mode: a capped caretaker allowance via function-call keys.
 - Fire-drill mode, and stale-will review.
@@ -259,14 +266,14 @@ The agent and its tests:
 
 ```bash
 npm ci                                  # repo root
-npm test                                # agent tests (257)
+npm test                                # agent tests (260)
 cp .env.example .env                    # AGENT_CONTRACT_ID, SPONSOR_*, NEARAI_API_KEY, DEMO_MODE=true (TELEGRAM_* optional)
 npm run dev                             # agent on :3000
 ```
 
 A local agent can't register on `inheirit.testnet`, which accepts only the attested TEE agent. Give it its own local-mode contract (`npx tsx scripts/deploy-dev-contract.ts <your agent's account id>` creates it and whitelists that agent) and point both `.env` files at it.
 
-Contract: `cd agent-contract && cargo +1.86.0 test --lib` (181 unit tests). The sandbox tests (`cargo +1.86.0 test --tests`) need the wasm at `target/near/shade_contract_template.wasm` first: `cargo +1.86.0 near build non-reproducible-wasm --no-abi` (or the pinned `sourcescan/cargo-near` Docker image).
+Contract: `cd agent-contract && cargo +1.86.0 test --lib` (193 unit tests). The sandbox tests (`cargo +1.86.0 test --tests`) need the wasm at `target/near/shade_contract_template.wasm` first: `cargo +1.86.0 near build non-reproducible-wasm --no-abi` (or the pinned `sourcescan/cargo-near` Docker image).
 
 Headless scenario scripts:
 - `scripts/demo-cancel.ts`: Scenario A.
