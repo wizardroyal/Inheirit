@@ -22,8 +22,7 @@ export const SOURCES: { source: SignalSource; simulated: boolean; weight: number
   { source: "instagram", simulated: true, weight: 0.4 },
   { source: "tiktok", simulated: true, weight: 0.4 },
   { source: "facebook", simulated: true, weight: 0.4 },
-  { source: "whatsapp", simulated: true, weight: 0.4 },
-  { source: "linkedin", simulated: true, weight: 0.4 },
+    { source: "linkedin", simulated: true, weight: 0.4 },
 ];
 
 /** strong (>= 0.9) and medium (0.7) count alone; weak needs a second source within 24 h. */
@@ -164,7 +163,7 @@ export function Releases({ will }: { will: Will }) {
             <th className="py-1">Stage</th>
             {chains.map((c) => (
               <th key={c} className="py-1">
-                {c === "Near" ? "NEAR" : c === "Eth" ? "Sepolia ETH" : "BTC testnet4"}
+                {c === "Near" ? "NEAR" : c === "Eth" ? "Ethereum" : "Bitcoin"}
               </th>
             ))}
           </tr>
@@ -197,7 +196,7 @@ export function Releases({ will }: { will: Will }) {
           ))}
         </tbody>
       </table>
-      <p className="text-xs text-muted">NEAR is paid by the contract; Sepolia and Bitcoin by the agent via Chain Signatures.</p>
+      <p className="text-xs text-muted">NEAR is paid by the contract; Ethereum and Bitcoin by the agent via Chain Signatures.</p>
       {will.halted.filter((h) => h.round === round).map((h, i) => (
         <p key={i} className="rounded-lg bg-warn-soft px-3 py-2 text-sm text-warn">
           Stopped at stage {h.stage + 1} {ago(h.at)}: {haltReason(h.reason)}.
@@ -216,7 +215,7 @@ export function WatchStatus({ owner, will, canSign }: { owner: string; will: Wil
     <div className="space-y-2 rounded-lg bg-warn-soft px-3 py-2 text-sm text-warn">
       {!data.watching && <p>The agent isn&apos;t watching this will yet.</p>}
       {!data.has_policy && will.foreign_chains.length > 0 && (
-        <p>The agent lacks the heirs&apos; Sepolia and Bitcoin addresses, so it can&apos;t release those vaults.</p>
+        <p>The agent lacks the heirs&apos; Ethereum and Bitcoin addresses, so it can&apos;t release those vaults.</p>
       )}
       {!data.has_policy && canSign && savedPolicy(owner) && (
         <ActionButton tone="quiet" onClick={async () => agent.submitPolicy(owner, savedPolicy(owner)!).then(refresh)}>

@@ -193,7 +193,7 @@ export async function generateWillAndCast(
   progress(`Sealing a note for ${heirName} (released last)…`);
   await addSealedNote(owner, heir, DEMO_NOTE.label, DEMO_NOTE.text);
   if (o.foreignChains.length) {
-    progress("Asking the demo faucet for a little Sepolia ETH and testnet BTC (while the pool lasts)…");
+    progress("Asking the demo faucet for a little Ethereum and Bitcoin test coin (while the pool lasts)…");
     await fundFromFaucet(owner, progress).catch((e) => progress(`The faucet couldn't help (${e instanceof Error ? e.message : e}). Those vaults stay empty; NEAR still moves for real.`));
   }
   return cast;
@@ -230,6 +230,6 @@ export async function addSealedNote(owner: string, heir: string, label: string, 
 /** Asks the agent's demo faucet to fund the will's empty Sepolia/BTC vaults (signed by the owner). */
 export async function fundFromFaucet(owner: string, progress: Progress): Promise<void> {
   const r = await agent.faucet(await signRequest(owner, "demo_faucet", {}));
-  for (const s of r.sends) progress(`Faucet sent ${s.chain === "Eth" ? `${Number(s.amount) / 1e18} Sepolia ETH` : `${s.amount} testnet sats`} to the ${s.chain} vault (tx ${s.txHash.slice(0, 12)}…)`);
+  for (const s of r.sends) progress(`Faucet sent ${s.chain === "Eth" ? `${Number(s.amount) / 1e18} ETH` : `${s.amount} sats`} to the ${s.chain} vault (tx ${s.txHash.slice(0, 12)}…)`);
   for (const e of r.errors) progress(`The faucet couldn't fund a vault: ${e}`);
 }

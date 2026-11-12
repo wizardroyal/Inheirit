@@ -5,12 +5,12 @@ import { REPO_URL } from "@/lib/config";
 // The first slice of a real test will (released 2026-11-05 on the hosted stack), one link per chain.
 const PROOF: [string, string][] = [
   ["NEAR", "https://testnet.nearblocks.io/address/alice.inheirit-gzdcfh.testnet"],
-  ["Ethereum Sepolia", "https://sepolia.etherscan.io/tx/0x0df06408e6ae91219b8c7fb45a3fefa8c8f2eff54d3e9f6b0e65fe8a16ef76ff"],
-  ["Bitcoin testnet4", "https://mempool.space/testnet4/tx/50876126ed1784ed78ad41e5dbbe544031e0b0fd0ded2f36efc7f7f6fdfc4dae"],
+  ["Ethereum", "https://sepolia.etherscan.io/tx/0x0df06408e6ae91219b8c7fb45a3fefa8c8f2eff54d3e9f6b0e65fe8a16ef76ff"],
+  ["Bitcoin", "https://mempool.space/testnet4/tx/50876126ed1784ed78ad41e5dbbe544031e0b0fd0ded2f36efc7f7f6fdfc4dae"],
 ];
 
 const STEPS = [
-  ["All good", "The agent reads the signs of life you already give off: transactions on your NEAR accounts (mainnet too) and Sepolia, the heartbeat app, Telegram. Socials are coming soon. You do nothing."],
+  ["All good", "The agent reads the signs of life you already give off: transactions in your NEAR, Ethereum and Bitcoin wallets, the heartbeat app, Telegram. Socials are coming soon. You do nothing."],
   ["Quiet", "Quiet longer than your usual (measured from your transactions)? It checks in. Any reply ends it."],
   ["Welfare check", "Still nothing? Your guardians, friends and lawyer are asked if they've heard from you."],
   ["Guardian vote", "Guardians are asked if you've passed away. One “they're alive” stops it."],

@@ -53,7 +53,7 @@ export function useStrength(will: Will) {
       next: "Back up your access. Your key lives only in this browser: lose it without a backup and you lose your will.",
     },
     { label: "Heartbeat app opened", done: connected.phone_heartbeat, href: "/heartbeat", next: "Open the heartbeat app on your phone and add it to your home screen." },
-    { label: `Two strong signs of life (${strongCount})`, done: strongCount >= 2, href: "/account/signs", next: "Connect another NEAR account or a Sepolia address you use." },
+    { label: `Two strong signs of life (${strongCount})`, done: strongCount >= 2, href: "/account/signs", next: "Connect another wallet you use: NEAR, Ethereum or Bitcoin." },
     { label: "Telegram for checks", done: connected.telegram, href: "/account/settings", next: "Link Telegram so a check reaches your phone." },
     { label: "Email for checks", done: !!watching.email, href: "/account/settings", next: "Add your email for checks and alerts." },
     { label: "A friend for welfare checks", done: will.contacts.length > 0, href: "/account/will", next: "Add a friend who'd notice if you went quiet." },

@@ -59,7 +59,6 @@ export type SignalSource =
   | "instagram"
   | "tiktok"
   | "facebook"
-  | "whatsapp"
   | "linkedin";
 export type Observations = Partial<Record<SignalSource, { at: string; trustWeight: number; simulated: boolean }>>;
 /** Per foreign vault: address and balance, or an error (with the derived address as `vault` when only the balance lookup failed). */

@@ -30,9 +30,14 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="flex min-h-full flex-col font-sans">
         <header className="border-b border-line">
           <nav className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-4">
-            <Link href="/" className="font-serif text-2xl">
-              Inheirit
-            </Link>
+            <span className="flex items-center gap-2">
+              <Link href="/" className="font-serif text-2xl">
+                Inheirit
+              </Link>
+              <span title="Everything runs on test networks: no real money" className="rounded-full border border-line px-2 py-0.5 text-xs text-muted">
+                Testnet
+              </span>
+            </span>
             <div className="flex flex-wrap gap-x-5 gap-y-1 text-sm">
               {NAV.map((n) => (
                 <Link key={n.href} href={n.href} className="text-muted hover:text-ink">

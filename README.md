@@ -36,7 +36,7 @@ Inheirit notices the signs of life you already give off, privately, and only rea
 
 | Real | Not real yet |
 |---|---|
-| The will contract, guardians, challenge period and staged release on NEAR testnet | Social and work signals (Google, X, Instagram, TikTok, Facebook, WhatsApp, LinkedIn): listed as *coming soon* with their weights; the control panel can send a SIMULATED one to show how weak signals are handled |
+| The will contract, guardians, challenge period and staged release on NEAR testnet | Social and work signals (Google, X, Instagram, TikTok, Facebook, LinkedIn): listed as *coming soon* with their weights; the control panel can send a SIMULATED one to show how weak signals are handled |
 | NEAR, Sepolia ETH and testnet4 BTC payouts, signed by Chain Signatures (MPC) | DM check messages |
 | The agent in an Intel TDX enclave on Phala, attested on-chain | The onward NEAR Intents swap on testnet (NEAR Intents has no testnet; priced with live quotes) |
 | Signs of life: transactions from your NEAR accounts (testnet, and mainnet `.near` read-only) and Sepolia addresses, the signed heartbeat, Telegram replies, GitHub | |
@@ -104,7 +104,7 @@ On **Try a speedrun**, pick another scenario. The card shows a checklist with a 
 
 ```
  signals (NEAR txs · Sepolia txs · heartbeat app · Telegram replies · GitHub ·
-          SIMULATED: calendar, mail, X, Instagram, TikTok, Facebook, WhatsApp, LinkedIn)
+          SIMULATED: calendar, mail, X, Instagram, TikTok, Facebook, LinkedIn)
         │  timestamps only
         ▼
  ┌──────────────────────────────┐ record_liveness / advance ┌──────────────────────────────┐
@@ -205,7 +205,7 @@ See [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md). In short:
 
 - **Experimental stack.** The Shade Agent Framework is unaudited and testnet-only. The will runs on NEAR testnet, Sepolia and BTC testnet4.
 - **Vault model.** Assets must be moved into vaults the will controls: the NEAR vault in the contract, and Sepolia/BTC addresses derived by Chain Signatures. The owner can withdraw while the will is at All good.
-- **Signals not connected yet:** Google Calendar, Gmail, X, Instagram, TikTok, Facebook, WhatsApp, LinkedIn are listed as *coming soon* (the control panel can send a SIMULATED one, labelled so). Real: transactions from your NEAR accounts (testnet, and mainnet `.near` read-only) and Sepolia addresses, the signed heartbeat, Telegram replies, GitHub.
+- **Signals not connected yet:** Google Calendar, Gmail, X, Instagram, TikTok, Facebook, LinkedIn are listed as *coming soon* (the control panel can send a SIMULATED one, labelled so). Real: transactions from your NEAR accounts (testnet, and mainnet `.near` read-only) and Sepolia addresses, the signed heartbeat, Telegram replies, GitHub.
 - **Email limits.** On the free sending tier (about 100 a day), demo-timing wills get one email per address per run from a smaller daily budget, so real-timing wills keep room; when a limit is reached, the message stays in the app with a note. Replies to these emails aren't read: the email says to open the heartbeat app or reply on Telegram.
 - **Heirs are hidden in the UI only.** The app and agent don't reveal heirs before the release, but heir accounts and NEAR shares are in contract state, which anyone can read. Commit-reveal is on the roadmap.
 - **Payload-blind gate.** The contract decides *when* and *which vault* can be signed, not *what* the transaction says. That rests on the attested agent code and a per-stage signature cap.
@@ -228,7 +228,7 @@ See [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md). In short:
 
 - **Beyond wills: conditional gifts.** The will is the first product of a conditional-release engine: time or milestone conditions, attested by people, with a challenge window and staged release. The `not_before` condition is the first example: parsed and shown today; enforcement is next. Milestones and dates only; never conditions on relationships, beliefs or lifestyle.
 - A human adjudicator for disputes and heir support.
-- Real Gmail, Calendar, X, Instagram, WhatsApp and LinkedIn adapters, with OAuth tokens kept in the TEE.
+- Real Gmail, Calendar, X, Instagram and LinkedIn adapters, with OAuth tokens kept in the TEE.
 - A quiet period that adapts over time, per source.
 - Incapacity mode: a capped caretaker allowance via function-call keys.
 - Fire-drill mode, and stale-will review.

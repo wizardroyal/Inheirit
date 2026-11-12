@@ -124,7 +124,7 @@ function steps(w: Will, scenario: Scenario, escalated: boolean): Step[] {
     detail:
       scenario === "late-heir"
         ? `After a slice or two, choose a payout in ${heir?.name ?? "the heir"}'s view; waiting slices pay out together.`
-        : "Longest wait after the first 10%. NEAR moves for real; Sepolia and Bitcoin if funded.",
+        : "Longest wait after the first 10%. NEAR moves for real; Ethereum and Bitcoin if funded.",
     done: reached(w, "SecretsBuffer"),
     link: scenario === "late-heir" && heir ? { label: `Open ${heir.name}'s view`, href: `/heir/${owner}?as=${heir.account_id}` } : undefined,
   });

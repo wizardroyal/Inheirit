@@ -180,7 +180,6 @@ export const SIMULATED_SOURCES: { source: SignalSource; trustWeight: number }[] 
   { source: "instagram", trustWeight: 0.4 },
   { source: "tiktok", trustWeight: 0.4 },
   { source: "facebook", trustWeight: 0.4 },
-  { source: "whatsapp", trustWeight: 0.4 },
   { source: "linkedin", trustWeight: 0.4 },
   { source: "google_calendar", trustWeight: 0.7 },
   { source: "gmail", trustWeight: 0.7 },

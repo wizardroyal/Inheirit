@@ -17,7 +17,6 @@ const NOUN: Record<SignalSource, string> = {
   instagram: "Instagram post",
   tiktok: "TikTok post",
   facebook: "Facebook post",
-  whatsapp: "WhatsApp reply",
   linkedin: "LinkedIn activity",
 };
 
@@ -26,7 +25,6 @@ const WHY_WEAK: Partial<Record<SignalSource, string>> = {
   instagram: "posts can be scheduled or run by someone else",
   tiktok: "posts can be scheduled or run by someone else",
   facebook: "posts can be scheduled or run by someone else",
-  whatsapp: "a messaging account can be used by someone else",
   linkedin: "profiles can be managed by someone else",
   github: "activity can come from automation or collaborators",
 };

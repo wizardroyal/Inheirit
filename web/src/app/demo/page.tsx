@@ -148,13 +148,13 @@ function WillPanel({ cast }: { cast: Cast }) {
     return (
       <Card title="2 · Write the demo will">
         <p className="text-sm text-muted">
-          Everything to {heirN} in 10/20/30/40%; two of three guardians must confirm. 0.5 NEAR in the vault; the faucet funds Sepolia and Bitcoin.
+          Everything to {heirN} in 10/20/30/40%; two of three guardians must confirm. 0.5 NEAR in the vault; the faucet funds Ethereum and Bitcoin.
         </p>
         <div className="mt-3 flex flex-wrap gap-4 text-sm">
           {(["Eth", "Btc"] as const).map((c) => (
             <label key={c} className="flex items-center gap-2">
               <input type="checkbox" checked={chains[c]} onChange={(e) => setChains({ ...chains, [c]: e.target.checked })} />
-              {c === "Eth" ? "Sepolia ETH vault" : "BTC testnet4 vault"}
+              {c === "Eth" ? "Ethereum vault" : "Bitcoin vault"}
             </label>
           ))}
           <label className="flex items-center gap-2">
@@ -188,7 +188,7 @@ function WillPanel({ cast }: { cast: Cast }) {
                 await acceptAsGuardians(cast.owner, cast.guardians, progress);
                 const foreign = (["Eth", "Btc"] as const).filter((c) => chains[c]);
                 if (foreign.length && (await agent.faucetInfo()).enabled) {
-                  progress("Asking the demo faucet to fund the Sepolia and BTC vaults (about 30 s)…");
+                  progress("Asking the demo faucet to fund the Ethereum and Bitcoin vaults (about 30 s)…");
                   await fundFromFaucet(cast.owner, progress);
                 }
                 if (withNote) {
@@ -362,7 +362,7 @@ function useEventLog(will: Will | null) {
     for (const x of will.attestations.slice(p.attestations.length))
       out.push({ text: `${accountLabel(x.guardian, names)} confirmed ${x.kind === "Deceased" ? "a passing" : "they're alive"}`, tech: `attest(${x.kind})` });
     for (const x of will.executions.slice(p.executions.length))
-      out.push({ text: `Stage ${x.stage + 1} sent on ${x.chain === "Near" ? "NEAR" : x.chain === "Eth" ? "Sepolia" : "Bitcoin testnet"} to ${/\.testnet$/.test(x.to) ? accountLabel(x.to, names) : short(x.to, 8)}`, tech: "record_execution" });
+      out.push({ text: `Stage ${x.stage + 1} sent on ${x.chain === "Near" ? "NEAR" : x.chain === "Eth" ? "Ethereum" : "Bitcoin"} to ${/\.testnet$/.test(x.to) ? accountLabel(x.to, names) : short(x.to, 8)}`, tech: "record_execution" });
     for (const x of will.released_notes.slice(p.released_notes.length))
       out.push({ text: `Sealed note "${x.label}" released to ${accountLabel(x.heir, names)}`, tech: "store_released_note" });
     for (const x of will.halted.slice(p.halted.length)) out.push({ text: `Remaining stages and sealed notes stopped: ${haltReason(x.reason)}`, tech: `halt(${x.reason})` });

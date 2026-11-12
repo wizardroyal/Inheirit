@@ -164,7 +164,7 @@ export function DraftGaps({ owner, draft, onReady }: { owner: string; draft: Raw
           )}
           {(needEth || needBtc) && (!draft.heirs[i]?.receive?.eth || !draft.heirs[i]?.receive?.btc) && (
             <span className="flex flex-col gap-2 sm:flex-row sm:items-start">
-              {needEth && <input className={`${inputCls} min-w-0 flex-1`} aria-label={`${h.name}'s Sepolia address`} placeholder="Sepolia address 0x…" value={h.receive?.eth ?? ""} onChange={(e) => setHeir(i, { receive: { eth: e.target.value.trim() } })} />}
+              {needEth && <input className={`${inputCls} min-w-0 flex-1`} aria-label={`${h.name}'s Ethereum address`} placeholder="Ethereum address 0x…" value={h.receive?.eth ?? ""} onChange={(e) => setHeir(i, { receive: { eth: e.target.value.trim() } })} />}
               {needBtc && <input className={`${inputCls} min-w-0 flex-1`} aria-label={`${h.name}'s Bitcoin testnet address`} placeholder="BTC address tb1…" value={h.receive?.btc ?? ""} onChange={(e) => setHeir(i, { receive: { btc: e.target.value.trim() } })} />}
               <RefreshButton
                 label={`Generate test addresses for ${h.name}`}

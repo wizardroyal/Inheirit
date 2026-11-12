@@ -40,7 +40,7 @@ export function Vaults({ owner, will, children }: { owner: string; will: Will; c
           return (
             <li key={c} className="space-y-0.5">
               <div className="flex justify-between gap-2">
-                <span>{c === "Eth" ? "Sepolia ETH" : "BTC testnet4"}</span>
+                <span>{c === "Eth" ? "Ethereum" : "Bitcoin"}</span>
                 <span title={stale ? "Last known balance; the latest lookup failed and will be retried" : undefined}>
                   {ok ? (c === "Eth" ? `${+(Number(v.balance) / 1e18).toFixed(5)} ETH` : `${v.balance} sats`) : v ? "balance unavailable, retrying" : "…"}
                   {stale && <span className="text-muted"> (last known)</span>}
@@ -59,7 +59,7 @@ export function Vaults({ owner, will, children }: { owner: string; will: Will; c
       {children}
       {will.foreign_chains.length > 0 && (
         <div className="mt-3">
-          <Details summary="How to fund the Sepolia and BTC vaults">
+          <Details summary="How to fund the Ethereum and Bitcoin vaults">
             <div className="font-sans">
               Chain Signatures addresses (path heirloom/&lt;owner&gt;/&lt;chain&gt;), signable only during the release or for your withdrawal. Fund
               them from any faucet or the button below; empty vaults are skipped.
@@ -69,7 +69,7 @@ export function Vaults({ owner, will, children }: { owner: string; will: Will; c
       )}
       <FaucetButton owner={owner} will={will} />
       {error && <p className="text-xs text-danger">{error}</p>}
-      {will.foreign_chains.length === 0 && <p className="mt-2 text-xs text-muted">This will holds NEAR only: no Sepolia or Bitcoin vault.</p>}
+      {will.foreign_chains.length === 0 && <p className="mt-2 text-xs text-muted">This will holds NEAR only: no Ethereum or Bitcoin vault.</p>}
     </Card>
   );
 }

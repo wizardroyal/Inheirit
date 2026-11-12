@@ -18,7 +18,7 @@ function MyWill({ will }: { will: Will }) {
   const st = schedule(will);
   const total = st.reduce((s, x) => s + x.wait_after, 0);
   const g = will.guardians;
-  const vaults = ["NEAR", ...will.foreign_chains.map((c) => (c === "Eth" ? "Sepolia ETH" : "testnet BTC"))];
+  const vaults = ["NEAR", ...will.foreign_chains.map((c) => (c === "Eth" ? "Ethereum" : "Bitcoin"))];
   return (
     <div className="space-y-6">
       <section className="rounded-2xl border border-line bg-card p-6 sm:p-8">

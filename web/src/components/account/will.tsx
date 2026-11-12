@@ -75,7 +75,7 @@ export function CloseWill({ will, refresh }: { will: Will; refresh: () => void }
       <p className="text-muted">Ends the will for good: the NEAR vault and storage deposit come back to you, and sealed notes are deleted.</p>
       {blocked ? (
         <p className="mt-3 text-warn">
-          Withdraw these first: {left.map((c) => (c === "Eth" ? "the Sepolia vault" : "the Bitcoin vault")).join(" and ") || "a withdrawal is still being sent"}. (The
+          Withdraw these first: {left.map((c) => (c === "Eth" ? "the Ethereum vault" : "the Bitcoin vault")).join(" and ") || "a withdrawal is still being sent"}. (The
           contract can&apos;t see other chains; the app checks those vaults before closing.)
         </p>
       ) : (

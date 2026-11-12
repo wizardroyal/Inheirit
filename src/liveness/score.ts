@@ -16,7 +16,6 @@ export type SignalSource =
   | "instagram"
   | "tiktok"
   | "facebook"
-  | "whatsapp"
   | "linkedin";
 
 export interface Observation {

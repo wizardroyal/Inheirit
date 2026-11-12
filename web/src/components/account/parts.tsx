@@ -133,7 +133,7 @@ export function GenerateWill({ owner, onCreating, onCreated }: { owner: string; 
         {(["Eth", "Btc"] as const).map((c) => (
           <label key={c} className="flex items-center gap-2">
             <input type="checkbox" checked={chains[c]} onChange={(e) => setChains({ ...chains, [c]: e.target.checked })} />
-            {c === "Eth" ? "Sepolia ETH vault" : "BTC testnet4 vault"}
+            {c === "Eth" ? "Ethereum vault" : "Bitcoin vault"}
           </label>
         ))}
         <label className="flex items-center gap-2">
@@ -150,7 +150,7 @@ export function GenerateWill({ owner, onCreating, onCreated }: { owner: string; 
         </label>
       </div>
       <p className="mt-2 text-xs text-muted">
-        Sepolia ETH and testnet BTC come from a small pool while it lasts; otherwise only NEAR moves.
+        Ethereum and Bitcoin test coins come from a small pool while it lasts; otherwise only NEAR moves.
       </p>
       <div className="mt-3">
         <SetupSummary stagesPct={[10, 20, 30, 40]} demoClock={demoClock} />
@@ -399,12 +399,12 @@ export function ForeignWithdraw({ owner, will, refresh }: { owner: string; will:
   const unit = chain === "Eth" ? "ETH" : "BTC";
   return (
     <details className="mt-3 text-sm">
-      <summary className="cursor-pointer text-muted hover:text-ink">Withdraw from the Sepolia or Bitcoin vault</summary>
+      <summary className="cursor-pointer text-muted hover:text-ink">Withdraw from the Ethereum or Bitcoin vault</summary>
       <div className="mt-2 flex flex-wrap items-start gap-2">
         <select className={`${inputCls} w-28`} value={chain} onChange={(e) => setChain(e.target.value as typeof chain)}>
           {will.foreign_chains.map((c) => (
             <option key={c} value={c}>
-              {c === "Eth" ? "Sepolia ETH" : "Bitcoin testnet"}
+              {c === "Eth" ? "Ethereum" : "Bitcoin"}
             </option>
           ))}
         </select>

@@ -262,7 +262,7 @@ export function MyWillSetup({
           No check-ins. Every transaction you sign already counts.
         </p>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          <Field label="Your own Sepolia address (optional)" hint="Not a vault.">
+          <Field label="Your Ethereum wallet (optional)" hint="An address you use, not the vault.">
             <input className={inputCls} value={evm} onChange={(e) => setEvm(e.target.value.trim())} placeholder="0x…" />
           </Field>
           <div className="text-sm">
@@ -320,7 +320,7 @@ export function MyWillSetup({
               {(assets.ETH || assets.BTC) && (
                 <span className="flex flex-col gap-2 sm:col-span-4 sm:flex-row sm:items-start">
                   {assets.ETH && (
-                    <input className={`${inputCls} min-w-0 flex-1`} value={h.eth} onChange={(e) => setHeir(i, { eth: e.target.value.trim() })} aria-label="Heir's Sepolia address" placeholder="Receives Sepolia ETH at 0x…" />
+                    <input className={`${inputCls} min-w-0 flex-1`} value={h.eth} onChange={(e) => setHeir(i, { eth: e.target.value.trim() })} aria-label="Heir's Ethereum address" placeholder="Receives ETH at 0x…" />
                   )}
                   {assets.BTC && (
                     <input className={`${inputCls} min-w-0 flex-1`} value={h.btc} onChange={(e) => setHeir(i, { btc: e.target.value.trim() })} aria-label="Heir's Bitcoin testnet address" placeholder="Receives BTC at tb1…" />
@@ -389,10 +389,10 @@ export function MyWillSetup({
             <input type="checkbox" checked disabled /> NEAR (held by the contract)
           </label>
           <label className="flex items-center gap-2">
-            <input type="checkbox" checked={assets.ETH} onChange={(e) => setAssets({ ...assets, ETH: e.target.checked })} /> Sepolia ETH vault
+            <input type="checkbox" checked={assets.ETH} onChange={(e) => setAssets({ ...assets, ETH: e.target.checked })} /> Ethereum vault
           </label>
           <label className="flex items-center gap-2">
-            <input type="checkbox" checked={assets.BTC} onChange={(e) => setAssets({ ...assets, BTC: e.target.checked })} /> BTC testnet4 vault
+            <input type="checkbox" checked={assets.BTC} onChange={(e) => setAssets({ ...assets, BTC: e.target.checked })} /> Bitcoin vault
           </label>
         </div>
         <label className="mt-3 flex items-start gap-2 text-sm">
@@ -485,7 +485,7 @@ export function MyWillSetup({
                 const local = list(guardians).filter((g) => keys.secret(g));
                 if (local.length) await acceptAsGuardians(owner, local, progress);
                 if (evm) {
-                  progress("Adding your Sepolia address as a sign of life…");
+                  progress("Adding your Ethereum wallet as a sign of life…");
                   await agent.registerOwner(await signRequest(owner, "register_owner", { evm_address: evm }));
                 }
                 progress("Done. Send each guardian the link on your dashboard.");
@@ -535,7 +535,7 @@ export function StrengthChecklist({ will }: { will: Will }) {
     { label: "At least one heir", done: will.heirs.length > 0, required: true },
     { label: "A strong sign-of-life source (your NEAR account)", done: true, required: true },
     { label: "Heartbeat app opened once", done: !!signals?.heartbeat, hint: "Add it to your phone's home screen" },
-    { label: `Two or more strong sources (${strongCount} connected)`, done: strongCount >= 2, hint: "Open the heartbeat app, or connect another NEAR account or Sepolia address" },
+    { label: `Two or more strong sources (${strongCount} connected)`, done: strongCount >= 2, hint: "Open the heartbeat app, or connect another NEAR or Ethereum wallet" },
     { label: "GitHub connected (weak; counts with another source)", done: !!watching.github },
     { label: "Telegram linked for checks", done: !!tg?.linked },
     { label: "Email for checks", done: !!watching.email, hint: "Add it under Email alerts" },

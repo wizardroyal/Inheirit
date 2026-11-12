@@ -163,7 +163,7 @@ export function ago(iso: string | number): string {
 
 export const SOURCE_LABELS: Record<string, string> = {
   near_onchain: "NEAR transactions",
-  evm_onchain: "Ethereum (Sepolia) transactions",
+  evm_onchain: "Ethereum wallet",
   phone_heartbeat: "Heartbeat app",
   github: "GitHub activity",
   google_calendar: "Google Calendar",
@@ -173,6 +173,5 @@ export const SOURCE_LABELS: Record<string, string> = {
   instagram: "Instagram posts",
   tiktok: "TikTok posts",
   facebook: "Facebook posts",
-  whatsapp: "WhatsApp replies",
   linkedin: "LinkedIn activity",
 };
