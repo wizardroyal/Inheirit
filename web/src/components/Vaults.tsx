@@ -46,6 +46,7 @@ export function Vaults({ owner, will, children }: { owner: string; will: Will; c
                   {stale && <span className="text-muted"> (last known)</span>}
                 </span>
               </div>
+              {ok && Number(v.balance) === 0 && <p className="text-xs text-muted">Empty: this will moves NEAR only. Fund it below or from any faucet.</p>}
               {(ok ? v.address : v?.vault) && (
                 <div className="break-all text-xs text-muted">
                   <AddressLink chain={c} address={ok ? v.address : v!.vault!} />
