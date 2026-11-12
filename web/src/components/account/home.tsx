@@ -6,7 +6,7 @@ import { useAccount } from "@/lib/account";
 import { useOverview } from "@/lib/hooks";
 import { humanize, useNames } from "@/lib/names";
 import { call, canSign } from "@/lib/near";
-import { ago, duration, LADDER, nextStepIn, SOURCE_LABELS, stateName, type Will } from "@/lib/will";
+import { ago, dateText, duration, LADDER, nextStepIn, pausedUntil, SOURCE_LABELS, stateName, type Will } from "@/lib/will";
 import { useNow } from "@/lib/hooks";
 import { ActionButton, NoWill, Skeleton } from "../ui";
 
@@ -36,7 +36,10 @@ export function StatusHero({ will, refresh }: { will: Will; refresh: () => void 
   const now = useNow();
   const s = stateName(will.state);
   const idx = LADDER.findIndex((l) => l.state === s);
-  const step = LADDER[idx];
+  const until = pausedUntil(will);
+  const step = until
+    ? { label: `Paused until ${dateText(until)}`, detail: "Nothing escalates while it's paused, and your vault is still yours to withdraw from. It resumes by itself; we remind you 7 days and 1 day before." }
+    : LADDER[idx];
   const next = nextStepIn(will, now);
   // The freshest strong or medium sign of life, as the agent saw it.
   const seen = Object.entries(overview?.signals?.observations ?? {})
@@ -54,7 +57,7 @@ export function StatusHero({ will, refresh }: { will: Will; refresh: () => void 
     }
     prev.current = s;
   }, [s]);
-  const calm = s === "Active";
+  const calm = s === "Active" || s === "Paused";
   return (
     <section aria-live="polite" className={`rounded-2xl border p-6 sm:p-8 ${calm ? "border-line bg-card" : "border-warn bg-warn-soft"} ${snapped ? "snap-wash" : ""}`}>
       <p className="text-muted">Your will is</p>

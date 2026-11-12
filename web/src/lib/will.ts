@@ -10,7 +10,9 @@ export type WillState =
   | { Executing: { stage: number; since: number; stage_started: number } }
   | { SecretsBuffer: { since: number } }
   | { SecretsReleased: { since: number } }
-  | { Completed: { at: number } };
+  | { Completed: { at: number } }
+  /** Owner pause (round 5): nothing escalates until `until`; then it resumes by itself. */
+  | { Paused: { until: number } };
 
 export type StateName =
   | "Active"
@@ -21,7 +23,8 @@ export type StateName =
   | "Executing"
   | "SecretsBuffer"
   | "SecretsReleased"
-  | "Completed";
+  | "Completed"
+  | "Paused";
 
 export interface Stage {
   pct: number;
@@ -104,7 +107,15 @@ export const LADDER: { state: StateName; label: string; detail: string }[] = [
 ];
 
 /** Plain-language name of a state, as the ladder shows it. */
-export const stateLabel = (s: StateName): string => LADDER.find((l) => l.state === s)?.label ?? s;
+export const stateLabel = (s: StateName): string => (s === "Paused" ? "Paused" : (LADDER.find((l) => l.state === s)?.label ?? s));
+
+/** When a paused will resumes by itself (unix s), or null if it isn't paused. */
+export function pausedUntil(w: Will): number | null {
+  return typeof w.state === "object" && "Paused" in w.state ? w.state.Paused.until : null;
+}
+
+/** "14 Feb 2027": a local date for pause and resume texts. */
+export const dateText = (unixS: number) => new Date(unixS * 1000).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
 
 /** Seconds until the next automatic step, given the current state and timings. */
 export function nextStepIn(w: Will, nowS: number): { label: string; seconds: number } | null {
@@ -130,6 +141,8 @@ export function nextStepIn(w: Will, nowS: number): { label: string; seconds: num
     }
     case "SecretsBuffer":
       return { label: "secrets released", seconds: since! + t.secrets_buffer - nowS };
+    case "Paused":
+      return { label: "it resumes", seconds: pausedUntil(w)! - nowS };
     default:
       return null;
   }
