@@ -4,11 +4,18 @@ import { CreateWill, LowBalance } from "@/components/account/parts";
 import { RecentLine, StatusHero } from "@/components/account/home";
 import { NextStep, StrengthBar } from "@/components/account/strength";
 import { NoWill, Skeleton } from "@/components/ui";
+import { AccountSetup } from "@/components/account/setup";
 import { useAccount } from "@/lib/account";
+import { useProfile } from "@/lib/profile";
+import { useState } from "react";
 
 export default function HomePage() {
   const { owner, will, loaded, refresh, creating, setCreating, viewing } = useAccount();
+  const [profile] = useProfile(owner);
+  const [setupClosed, setSetupClosed] = useState(false);
   if (!loaded) return <Skeleton />;
+  // First visit without a will: the account setup (every step skippable), then the will.
+  if (!will && !viewing && !creating && !profile.setupDone && !setupClosed) return <AccountSetup owner={owner} onDone={() => setSetupClosed(true)} />;
   if (!will && viewing) return <NoWill owner={owner} />;
   if (!will || creating)
     return (

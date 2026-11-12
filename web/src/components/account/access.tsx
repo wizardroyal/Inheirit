@@ -29,11 +29,11 @@ export function BackupAccess({ owner }: { owner: string }) {
   const secret = keys.secret(owner);
   const [shown, setShown] = useState(false);
   const [done, setDone] = useState(() => isBackedUp(owner));
-  if (!secret) return <Card title="Back up your access"><p className="text-muted">Your wallet holds this account&apos;s keys; back it up there.</p></Card>;
+  if (!secret) return <Card title="Save your recovery key"><p className="text-muted">Your wallet holds this account&apos;s keys; back it up there.</p></Card>;
   const b = { account: owner, key: secret };
   return (
-    <Card title="Back up your access">
-      <p>Your key lives only in this browser. Lose the browser without a backup and you lose your will. Keep the backup somewhere safe and private: anyone with it controls this account.</p>
+    <Card title="Save your recovery key">
+      <p>Your key lives only in this browser. This is your spare key if you lose it.</p>
       <div className="mt-4 flex flex-wrap gap-3">
         <ActionButton
           onClick={async () => {

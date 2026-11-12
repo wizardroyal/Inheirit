@@ -20,9 +20,29 @@ import { addedFor, saveAdded } from "./account/signs";
 import type { Watching } from "./WillParts";
 import { QuietPeriod, realSchedule } from "./QuietPeriod";
 import { type DraftNote, FinalSecrets, readyNotes } from "./FinalSecrets";
-import { ActionButton, Card, Field, inputCls, Pill, SimulatedTag } from "./ui";
+import { ActionButton, Avatar, Card, Field, inputCls, Pill, SimulatedTag, Stepper } from "./ui";
+import { localProfile, newId, saveProfile, useProfile, type Role } from "@/lib/profile";
 
 const ACCOUNT = /^[a-z0-9._-]{2,64}$/;
+
+/** A saved draft of this form (round 5); sealed notes are never part of it. */
+interface DraftForm {
+  v: 1;
+  name: string;
+  jurisdiction: string;
+  evm: string;
+  heirs: HeirRow[];
+  guardians: string;
+  threshold: string;
+  lawyer: string;
+  contacts: string;
+  assets: { ETH: boolean; BTC: boolean };
+  deposit: string;
+  notesOnly: boolean;
+  speedrun: boolean;
+  quietDays: number | null;
+  stable: boolean;
+}
 
 interface HeirRow {
   name: string;
@@ -38,13 +58,14 @@ const list = (s: string) =>
     .map((x) => x.trim())
     .filter(Boolean);
 
-/** A generated person, shown by name; the account id stays out of sight. */
+/** A chosen person, shown as a row by name (round 5: rows, never small pills); the account id stays out of sight. */
 function Chip({ label, onRemove }: { label: string; onRemove: () => void }) {
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-accent-soft px-3 py-1 text-sm font-medium text-accent">
-      {label}
-      <button type="button" aria-label={`Remove ${label}`} className="px-1 text-muted hover:text-ink" onClick={onRemove}>
-        ×
+    <span className="flex w-full items-center gap-3 rounded-lg border border-line bg-card px-3 py-1">
+      <Avatar name={label} />
+      <span className="min-w-0 flex-1 truncate">{label}</span>
+      <button type="button" aria-label={`Remove ${label}`} className="min-h-11 px-3 text-muted underline hover:text-ink" onClick={onRemove}>
+        Remove
       </button>
     </span>
   );
@@ -68,7 +89,7 @@ export function RefreshButton({ label, busy, onClick }: { label: string; busy?: 
       title={label}
       aria-label={label}
       disabled={busy}
-      className="grid h-[38px] w-[38px] shrink-0 place-items-center rounded-lg border border-field bg-card text-accent hover:bg-accent-soft disabled:opacity-50"
+      className="grid h-11 w-11 shrink-0 place-items-center rounded-lg border border-field bg-card text-accent hover:bg-accent-soft disabled:opacity-50"
       onClick={onClick}
     >
       <RefreshIcon className={busy ? "animate-spin" : ""} />
@@ -120,15 +141,31 @@ export function PeopleField({
 }) {
   const [draft, setDraft] = useState("");
   const people = list(value);
-  const add = (id: string) => {
+  const [profile] = useProfile(owner);
+  const role = (["guardian", "lawyer", "friend", "heir"] as Role[]).find((r) => r === what) ?? "guardian";
+  // People already in Profile for this role (with a NEAR account), not yet chosen here.
+  const fromProfile = profile.people.filter((p) => p.role === role && p.account && !people.includes(p.account));
+  const add = (id: string, name?: string) => {
     if (!id || people.includes(id)) return;
     onChange((single ? [id] : [...people, id]).join(", "));
     setDraft("");
+    // Added here → saved to Profile too.
+    const all = localProfile(owner).people;
+    if (!all.some((p) => p.account === id)) saveProfile(owner, { people: [...all, { id: newId(), name: name ?? label(id), role, account: id }] }).catch(() => {});
   };
   return (
     <div className="space-y-2">
-      {people.length > 0 && (
+      {(!single || people.length === 0) && fromProfile.length > 0 && (
         <div className="flex flex-wrap gap-2">
+          {fromProfile.map((p) => (
+            <button key={p.id} type="button" className="min-h-11 rounded-lg border border-dashed border-line px-3 py-2 text-sm hover:bg-accent-soft" onClick={() => add(p.account!, p.name)}>
+              + {p.name}
+            </button>
+          ))}
+        </div>
+      )}
+      {people.length > 0 && (
+        <div className="space-y-2">
           {people.map((p) => (
             <Chip key={p} label={label(p)} onRemove={() => onChange(people.filter((x) => x !== p).join(", "))} />
           ))}
@@ -149,7 +186,7 @@ export function PeopleField({
             onBlur={() => add(draft)}
             aria-label={`Add a ${what} by NEAR account`} placeholder="NEAR account, or tap ↻"
           />
-          <GenerateButton owner={owner} what={what} onMade={(p) => add(p.accountId)} />
+          <GenerateButton owner={owner} what={what} onMade={(p) => add(p.accountId, p.name)} />
         </span>
       )}
     </div>
@@ -217,6 +254,34 @@ export function MyWillSetup({
       .catch(() => (pool.current = null));
   }, []);
 
+  // Draft (round 5): the form is kept with the agent, off-chain, until Start. Secrets are never in it.
+  const [profile] = useProfile(owner);
+  const loadedDraft = useRef(false);
+  useEffect(() => {
+    const d = profile.draft as DraftForm | { v: 0; assets: { ETH: boolean; BTC: boolean } } | undefined;
+    if (loadedDraft.current || !d) return;
+    loadedDraft.current = true;
+    // Setup's vault step saved only the chains.
+    if (d.v === 0) return setAssets(d.assets);
+    setName(d.name);
+    setJurisdiction(d.jurisdiction);
+    setEvm(d.evm);
+    setHeirs(d.heirs.length ? d.heirs : [{ name: "", account: "", pct: "100", eth: "", btc: "" }]);
+    setGuardians(d.guardians);
+    setThreshold(d.threshold);
+    setLawyer(d.lawyer);
+    setContacts(d.contacts);
+    setAssets(d.assets);
+    setDeposit(d.deposit);
+    setNotesOnly(d.notesOnly);
+    setDemoClock(d.speedrun);
+    setQuietDays(d.quietDays);
+    setStable(d.stable);
+  }, [profile.draft]);
+  const [draftSaved, setDraftSaved] = useState(false);
+  const draftForm = (): DraftForm => ({ v: 1, name, jurisdiction, evm, heirs, guardians, threshold, lawyer, contacts, assets, deposit, notesOnly, speedrun: demoClock, quietDays, stable });
+  const profileHeirs = profile.people.filter((p) => p.role === "heir" && p.account && !heirs.some((h) => h.account === p.account));
+
   const label = useAccountLabel();
   const names = useNames();
   const guardianList = list(guardians);
@@ -273,7 +338,7 @@ export function MyWillSetup({
           ["Signs of life", true],
           ["Fund the vault", notesOnly || Number(deposit) > 0],
           ["Final secrets", readyNotes(notes).length > 0 || !notesOnly],
-          ["Back up access", false],
+          ["Save your recovery key", false],
           ["Review", !!policy],
         ]}
       />
@@ -372,6 +437,27 @@ export function MyWillSetup({
               Tip: <b>Pay heirs in dollars</b> and each heir needs one address. Intents converts every slice to USDC.
             </p>
           )}
+          {profileHeirs.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              <span className="text-muted">From your people:</span>
+              {profileHeirs.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  className="min-h-11 rounded-lg border border-dashed border-line px-3 py-2 hover:bg-accent-soft"
+                  onClick={() =>
+                    setHeirs((hs) => {
+                      const row = { name: p.name, account: p.account!, pct: "0", eth: p.eth ?? "", btc: p.btc ?? "" };
+                      const empty = hs.findIndex((h) => !h.name.trim() && !h.account.trim());
+                      return empty >= 0 ? hs.map((h, j) => (j === empty ? { ...row, pct: h.pct } : h)) : [...hs, row];
+                    })
+                  }
+                >
+                  + {p.name}
+                </button>
+              ))}
+            </div>
+          )}
           <div className="flex items-center gap-3 text-sm">
             <ActionButton tone="quiet" onClick={async () => setHeirs((hs) => [...hs, { name: "", account: "", pct: "0", eth: "", btc: "" }])}>
               Add an heir
@@ -383,8 +469,8 @@ export function MyWillSetup({
           <Field label="Guardians" group hint="At least two. Not heirs.">
             <PeopleField owner={owner} what="guardian" value={guardians} onChange={setGuardians} label={label} />
           </Field>
-          <Field label="How many must confirm">
-            <input className={`${inputCls} w-20`} inputMode="numeric" value={threshold} onChange={(e) => setThreshold(e.target.value)} />
+          <Field label="How many must confirm" group>
+            <Stepper label="guardians who must confirm" value={Number(threshold) || 1} min={1} max={Math.max(1, guardianList.length)} onChange={(n) => setThreshold(String(n))} />
           </Field>
           <Field label="Lawyer (optional)" group hint="Can speed up the release, never skip the challenge period.">
             <PeopleField owner={owner} what="lawyer" value={lawyer} onChange={setLawyer} label={label} single />
@@ -458,7 +544,9 @@ export function MyWillSetup({
         </>)}
         <label className="mt-3 flex items-center gap-2 text-sm">
           <input type="checkbox" checked={demoClock} onChange={(e) => setDemoClock(e.target.checked)} />
-          Demo clock (minutes instead of months)
+          <span>
+            <b>Speedrun</b>: minutes instead of months, for trying it
+          </span>
         </label>
         {!demoClock && (
           <div className="mt-3">
@@ -521,6 +609,12 @@ export function MyWillSetup({
                   await agent.registerOwner(await signRequest(owner, "register_owner", { evm_addresses: [evm] }));
                   saveAdded(owner, { ...addedFor(owner), evm: [...new Set([...addedFor(owner).evm, evm])] });
                 }
+                // Everyone on the new will is in Profile too; the draft is done.
+                const known = localProfile(owner).people;
+                const add = heirs
+                  .filter((h) => h.account.trim() && !known.some((k) => k.account === h.account.trim()))
+                  .map((h) => ({ id: newId(), name: h.name.trim(), role: "heir" as const, account: h.account.trim(), ...(h.eth ? { eth: h.eth } : {}), ...(h.btc ? { btc: h.btc } : {}) }));
+                await saveProfile(owner, { people: [...known, ...add], draft: null, setupDone: true }).catch(() => {});
                 progress("Done. Send each guardian the link on your dashboard.");
                 onCreated();
                 onCreating(false);
@@ -531,8 +625,12 @@ export function MyWillSetup({
               }
             }}
           >
-            Approve and create my will
+            Start my will
           </ActionButton>
+          <ActionButton tone="quiet" className="ml-2" onClick={async () => (await saveProfile(owner, { draft: draftForm() }), setDraftSaved(true))}>
+            Save as draft
+          </ActionButton>
+          {draftSaved && <span className="ml-2 text-sm text-accent">Draft saved. Nothing is on-chain until you start.</span>}
           {failed && (
             <ActionButton tone="quiet" className="ml-2" onClick={async () => (onCreating(false), onCreated())}>
               Go to my dashboard anyway

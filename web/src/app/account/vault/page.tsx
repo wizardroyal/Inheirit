@@ -1,54 +1,28 @@
 "use client";
-// Vault: holdings, deposit and withdraw, fund from another chain, payouts, released so far.
-import { ForeignWithdraw, NearVaultActions } from "@/components/account/parts";
+// Vault: name, holdings, deposit and withdraw, fund from another chain, payouts, released so far.
 import { WillGate } from "@/components/account/home";
-import { FundAnywhere, PayoutsPanel } from "@/components/Payouts";
-import { Card, short } from "@/components/ui";
-import { Vaults } from "@/components/Vaults";
+import { VaultSection } from "@/components/account/vault";
+import { PayoutsPanel } from "@/components/Payouts";
+import { Card } from "@/components/ui";
 import { Releases } from "@/components/WillParts";
-import { useAccount } from "@/lib/account";
-import { useAccountLabel } from "@/lib/names";
-import { stateName } from "@/lib/will";
 
 export default function VaultPage() {
-  const { refresh, viewing } = useAccount();
-  const label = useAccountLabel();
   return (
     <WillGate>
-      {(will) => {
-        const active = stateName(will.state) === "Active" && !viewing;
-        return (
-          <div className="space-y-6">
-            <h1 className="font-serif text-3xl sm:text-4xl">Vault</h1>
-            <div className="mx-auto max-w-3xl space-y-6">
-              <Vaults owner={will.owner} will={will}>
-                {active ? <NearVaultActions owner={will.owner} refresh={refresh} /> : <p className="mt-2 text-sm text-muted">Deposits and withdrawals only at All good.</p>}
-                {active && will.foreign_chains.length > 0 && <ForeignWithdraw owner={will.owner} will={will} refresh={refresh} />}
-                {will.pending_withdrawals.length > 0 && (
-                  <ul className="mt-2 space-y-1 text-sm text-muted">
-                    {will.pending_withdrawals.map((w) => (
-                      <li key={w.id}>
-                        Withdrawal to {w.chain === "Near" ? label(w.to) : short(w.to, 8)}: the agent is sending it
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </Vaults>
-              {active && (
-                <Card title="Fund from another chain">
-                  <FundAnywhere owner={will.owner} vaults={["Near", ...will.foreign_chains]} />
-                </Card>
-              )}
-              <Card title="Payouts to heirs">
-                <PayoutsPanel owner={will.owner} />
-              </Card>
-              <Card title="Released so far">
-                <Releases will={will} />
-              </Card>
-            </div>
+      {(will) => (
+        <div className="space-y-6">
+          <h1 className="font-serif text-3xl sm:text-4xl">Vault</h1>
+          <div className="mx-auto max-w-3xl space-y-6">
+            <VaultSection will={will} />
+            <Card title="Payouts to heirs">
+              <PayoutsPanel owner={will.owner} />
+            </Card>
+            <Card title="Released so far">
+              <Releases will={will} />
+            </Card>
           </div>
-        );
-      }}
+        </div>
+      )}
     </WillGate>
   );
 }

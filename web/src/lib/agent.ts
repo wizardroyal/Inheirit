@@ -28,6 +28,13 @@ async function send<T>(path: string, body?: unknown): Promise<T> {
   return json as T;
 }
 
+export interface AgentProfile {
+  people: { id: string; name: string; role: "heir" | "guardian" | "friend" | "lawyer"; account?: string; email?: string; telegram?: string; eth?: string; btc?: string }[];
+  vaultName?: string;
+  draft?: unknown;
+  setupDone?: boolean;
+}
+
 export interface AgentInfo {
   accountId: string;
   balance: number;
@@ -140,6 +147,8 @@ export const agent = {
   signals: (owner: string) => req<{ observations: Observations; heartbeat: string | null; verdict: Verdict | null }>(`/api/signals/${encodeURIComponent(owner)}`),
   vaults: (owner: string) => req<VaultInfo>(`/api/vaults/${encodeURIComponent(owner)}`),
   status: (owner: string) => req<{ state: string; watching: unknown; has_policy: boolean; simulated_signals: Record<string, string> }>(`/api/status/${encodeURIComponent(owner)}`),
+  saveProfile: (signed: SignedRequest) => send<{ ok: true }>("/api/profile", { signed }),
+  readProfile: (signed: SignedRequest) => send<{ profile: AgentProfile | null }>("/api/profile/read", { signed }),
   registerOwner: (signed: SignedRequest) => req<{ ok: true; watching: unknown }>("/api/owners", { signed }),
   heartbeat: (signed: SignedRequest) => req<{ ok: true; at: string }>("/api/heartbeat", { signed }),
   draftPolicy: (signed: SignedRequest) => req<DraftResult>("/api/policy/draft", { signed }),

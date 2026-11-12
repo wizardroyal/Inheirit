@@ -220,3 +220,39 @@ export function Skeleton() {
     </div>
   );
 }
+
+/** A count picker: − n + (round 5: every count uses this, never a free number box). */
+export function Stepper({ value, min, max, onChange, label }: { value: number; min: number; max: number; onChange: (n: number) => void; label: string }) {
+  const btn = "flex h-11 w-11 items-center justify-center rounded-lg border border-field bg-card text-xl disabled:opacity-40";
+  return (
+    <span className="inline-flex items-center gap-2" role="group" aria-label={label}>
+      <button type="button" className={btn} aria-label={`Fewer: ${label}`} disabled={value <= min} onClick={() => onChange(Math.max(min, value - 1))}>
+        −
+      </button>
+      <span className="min-w-8 text-center text-lg font-medium tabular-nums" aria-live="polite">
+        {value}
+      </span>
+      <button type="button" className={btn} aria-label={`More: ${label}`} disabled={value >= max} onClick={() => onChange(Math.min(max, value + 1))}>
+        +
+      </button>
+    </span>
+  );
+}
+
+/** A round initial for a person's row. */
+export function Avatar({ name }: { name: string }) {
+  return (
+    <span aria-hidden className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent-soft font-serif text-lg text-accent">
+      {(name.trim()[0] ?? "?").toUpperCase()}
+    </span>
+  );
+}
+
+/** A gear button that opens a section or row for editing. */
+export function GearButton({ open, onClick, label }: { open: boolean; onClick: () => void; label: string }) {
+  return (
+    <button type="button" aria-expanded={open} aria-label={label} title={label} onClick={onClick} className={`flex h-11 w-11 items-center justify-center rounded-lg border border-line text-lg hover:bg-accent-soft ${open ? "bg-accent-soft" : ""}`}>
+      ⚙
+    </button>
+  );
+}

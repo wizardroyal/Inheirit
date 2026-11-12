@@ -202,7 +202,7 @@ export async function generateWillAndCast(
 
 const POLICY_KEY = (owner: string) => `inheirit:policy:${owner}`;
 
-function savePolicy(owner: string, policy: Policy) {
+export function savePolicy(owner: string, policy: Policy) {
   try {
     window.localStorage.setItem(POLICY_KEY(owner), JSON.stringify(policy));
   } catch {

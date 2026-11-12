@@ -21,7 +21,7 @@ const MAIN = [
 ];
 const MORE = [
   { href: "/account/activity", label: "Activity" },
-  { href: "/account/settings", label: "Settings" },
+  { href: "/account/profile", label: "Profile" },
 ];
 
 export default function AccountLayout({ children }: { children: ReactNode }) {

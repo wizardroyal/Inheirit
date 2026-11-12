@@ -49,13 +49,13 @@ export function useStrength(will: Will) {
     {
       label: "Access backed up",
       done: isBackedUp(will.owner),
-      href: "/account/settings",
-      next: "Back up your access. Your key lives only in this browser: lose it without a backup and you lose your will.",
+      href: "/account/profile",
+      next: "Save your recovery key. Your key lives only in this browser; this is your spare.",
     },
     { label: "Heartbeat app opened", done: connected.phone_heartbeat, href: "/heartbeat", next: "Open the heartbeat app on your phone and add it to your home screen." },
     { label: `Two strong signs of life (${strongCount})`, done: strongCount >= 2, href: "/account/signs", next: "Connect another wallet you use: NEAR, Ethereum or Bitcoin." },
-    { label: "Telegram for checks", done: connected.telegram, href: "/account/settings", next: "Link Telegram so a check reaches your phone." },
-    { label: "Email for checks", done: !!watching.email, href: "/account/settings", next: "Add your email for checks and alerts." },
+    { label: "Telegram for checks", done: connected.telegram, href: "/account/profile", next: "Link Telegram so a check reaches your phone." },
+    { label: "Email for checks", done: !!watching.email, href: "/account/profile", next: "Add your email for checks and alerts." },
     { label: "A friend for welfare checks", done: will.contacts.length > 0, href: "/account/will", next: "Add a friend who'd notice if you went quiet." },
     { label: "A lawyer", done: !!will.lawyer, href: "/account/will", next: "Name a lawyer: they can speed up the release, never skip a step." },
     { label: "A final secret for an heir", done: will.sealed_notes.length > 0, href: "/account/secrets", next: "Leave a sealed note: where the hardware wallet is, who holds the passphrase." },
@@ -118,7 +118,7 @@ export function StrengthBar({ will }: { will: Will }) {
               </li>
             ) : (
               <li key={s.source}>
-                <Link href={s.source === "phone_heartbeat" ? "/heartbeat" : s.source === "telegram" ? "/account/settings" : "/account/signs"} className="inline-block rounded-full border border-dashed border-line px-3 py-1 text-sm text-muted hover:text-ink">
+                <Link href={s.source === "phone_heartbeat" ? "/heartbeat" : s.source === "telegram" ? "/account/profile" : "/account/signs"} className="inline-block rounded-full border border-dashed border-line px-3 py-1 text-sm text-muted hover:text-ink">
                   + Add {SOURCE_LABELS[s.source]}
                 </Link>
               </li>
