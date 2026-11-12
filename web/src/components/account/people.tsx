@@ -1,7 +1,7 @@
 "use client";
 // People on the will (shown on My will): heirs, guardians, friends and the lawyer, with their status.
 import { InviteByLink } from "@/components/account/parts";
-import { ActionButton, Card, CopyLink, Pill } from "@/components/ui";
+import { Card, ConfirmButton, CopyLink, Pill } from "@/components/ui";
 import { useAccount } from "@/lib/account";
 import { useAccountLabel } from "@/lib/names";
 import { call } from "@/lib/near";
@@ -31,27 +31,25 @@ export function People({ will }: { will: Will }) {
           {will.guardians.map((g) =>
             row(
               label(g.account_id),
-              <Pill tone={g.accepted ? "accent" : "warn"}>{g.accepted ? "accepted" : "invited"}</Pill>,
+              <span className="flex flex-wrap items-center gap-2">
+                <Pill tone={g.accepted ? "accent" : "warn"}>{g.accepted ? "accepted" : "invited"}</Pill>
+                {!g.accepted && !viewing && <CopyLink path={`/guardian/${will.owner}`} />}
+              </span>,
               active && will.guardians.length > will.guardian_threshold ? (
-                <ActionButton tone="quiet" onClick={() => call(will.owner, "remove_guardian", { account: g.account_id }).then(refresh)}>
-                  Remove
-                </ActionButton>
+                <ConfirmButton label="Remove" question={`Remove ${label(g.account_id)}?`} onConfirm={() => call(will.owner, "remove_guardian", { account: g.account_id }).then(refresh)} />
               ) : undefined,
             ),
           )}
         </ul>
         {accepted < will.guardian_threshold && !viewing && (
-          <div className="mt-3 space-y-1">
-            <p>Waiting for {will.guardian_threshold - accepted} more to accept. Send them their link (resend any time):</p>
-            <CopyLink path={`/guardian/${will.owner}`} />
-          </div>
+          <p className="mt-3">Waiting for {will.guardian_threshold - accepted} more to accept. Copy the link next to each invited guardian (resend any time).</p>
         )}
-      </Card>
-      <Card title="Friends for welfare checks">
-        {will.contacts.length ? <ul className="divide-y divide-line">{will.contacts.map((c) => row(label(c), <span className="text-muted">can only stop things</span>))}</ul> : <p className="text-muted">None yet.</p>}
       </Card>
       <Card title="Lawyer">
         {will.lawyer ? <ul>{row(label(will.lawyer), <span className="text-muted">can speed up, never skip</span>)}</ul> : <p className="text-muted">None yet.</p>}
+      </Card>
+      <Card title="Friends for welfare checks">
+        {will.contacts.length ? <ul className="divide-y divide-line">{will.contacts.map((c) => row(label(c), <span className="text-muted">can only stop things</span>))}</ul> : <p className="text-muted">None yet.</p>}
       </Card>
       {active && (
         <Card title="Add someone">
