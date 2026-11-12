@@ -8,6 +8,11 @@ Inheirit notices the signs of life you already give off, privately, and only rea
 
 **Try it:** https://inheirit.vercel.app · Live mainnet quotes: https://inheirit.vercel.app/mainnet · Agent (TEE): https://d5b714731becca502b6bd054a5cf6ffa5ce71f61-3000.dstack-pha-prod9.phala.network (if it doesn't answer, the enclave is paused to save credit) · Contract: [`inheirit.testnet`](https://testnet.nearblocks.io/address/inheirit.testnet)
 
+<p align="center">
+  <img src="docs/screenshots/snapback.gif" alt="The owner goes quiet and the ladder climbs to the guardian vote; one heartbeat snaps it back to All good and nothing moves" width="640">
+  <br><sub>Recorded on the live stack (testnet + the TEE agent): about 4 minutes of silence, sped up, then one heartbeat.</sub>
+</p>
+
 <p>
   <img src="docs/screenshots/landing.png" alt="The landing page: a will that doesn't make you prove you're alive" width="49%">
   <img src="docs/screenshots/snapback.png" alt="Signs of life: one sign of life snaps the ladder back to All good" width="49%">
