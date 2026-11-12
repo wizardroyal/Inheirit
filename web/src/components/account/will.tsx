@@ -80,6 +80,17 @@ export function CloseWill({ will, refresh }: { will: Will; refresh: () => void }
         </p>
       ) : (
         <div className="mt-3 space-y-2">
+          <p className="font-medium">If you close it:</p>
+          <ul className="list-disc space-y-1 pl-5">
+            <li>{Number(will.near_balance) / 1e24} NEAR in the vault comes back to you, with the storage deposit.</li>
+            <li>
+              {will.sealed_notes.length
+                ? `${will.sealed_notes.length} final secret${will.sealed_notes.length > 1 ? "s are" : " is"} deleted for good.`
+                : "There are no final secrets to delete."}
+            </li>
+            <li>{will.heirs.map((h) => h.name).join(" and ")} will receive nothing, and your guardians are released from their role.</li>
+            <li>It can&apos;t be undone; you can write a new will afterwards.</li>
+          </ul>
           <label className="flex items-center gap-2">
             <input type="checkbox" checked={sure} onChange={(e) => setSure(e.target.checked)} /> I understand this can&apos;t be undone
           </label>

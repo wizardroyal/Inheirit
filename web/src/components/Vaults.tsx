@@ -24,12 +24,18 @@ export function Vaults({ owner, will, children }: { owner: string; will: Will; c
   const { data, error } = usePoll(() => agent.vaults(owner), 30_000, [owner]);
   // A failed balance lookup (explorer API hiccup) keeps showing the last good value instead of flickering to "unavailable".
   const lastGood = useRef<Partial<Record<"Eth" | "Btc", { address: string; balance: string }>>>({});
+  // Live prices (NEAR Intents token list) for "≈ $" next to each holding.
+  const { data: tokens } = usePoll(() => agent.intentsTokens().catch(() => null), 10 * 60_000, []);
+  const price = (symbol: string, chain: string) => tokens?.tokens.find((t) => t.symbol === symbol && t.blockchain === chain)?.price;
+  const usd = (amount: number, p?: number) => (p && amount > 0 ? <span className="text-muted"> ≈ ${(amount * p).toLocaleString(undefined, { maximumFractionDigits: 2 })}</span> : null);
   return (
-    <Card title="Vaults">
-      <ul className="space-y-2 text-sm">
-        <li className="flex justify-between gap-2">
-          <span>NEAR (held by the contract)</span>
-          <span>{formatNear(will.near_balance)} NEAR</span>
+    <Card title="Holdings">
+      <ul className="space-y-3 text-lg">
+        <li className="flex flex-wrap justify-between gap-2">
+          <span>NEAR</span>
+          <span>
+            {formatNear(will.near_balance)} NEAR{usd(Number(formatNear(will.near_balance)), price("wNEAR", "near"))}
+          </span>
         </li>
         {will.foreign_chains.map((c) => {
           const fresh = data?.[c];
@@ -43,6 +49,7 @@ export function Vaults({ owner, will, children }: { owner: string; will: Will; c
                 <span>{c === "Eth" ? "Ethereum" : "Bitcoin"}</span>
                 <span title={stale ? "Last known balance; the latest lookup failed and will be retried" : undefined}>
                   {ok ? (c === "Eth" ? `${+(Number(v.balance) / 1e18).toFixed(5)} ETH` : `${v.balance} sats`) : v ? "balance unavailable, retrying" : "…"}
+                  {ok && (c === "Eth" ? usd(Number(v.balance) / 1e18, price("ETH", "eth")) : usd(Number(v.balance) / 1e8, price("BTC", "btc")))}
                   {stale && <span className="text-muted"> (last known)</span>}
                 </span>
               </div>

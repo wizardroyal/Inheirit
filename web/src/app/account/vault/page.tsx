@@ -20,7 +20,7 @@ export default function VaultPage() {
         return (
           <div className="space-y-6">
             <h1 className="font-serif text-3xl sm:text-4xl">Vault</h1>
-            <div className="grid gap-6 lg:grid-cols-2">
+            <div className="mx-auto max-w-3xl space-y-6">
               <Vaults owner={will.owner} will={will}>
                 {active ? <NearVaultActions owner={will.owner} refresh={refresh} /> : <p className="mt-2 text-sm text-muted">Deposits and withdrawals only at All good.</p>}
                 {active && will.foreign_chains.length > 0 && <ForeignWithdraw owner={will.owner} will={will} refresh={refresh} />}
@@ -34,17 +34,17 @@ export default function VaultPage() {
                   </ul>
                 )}
               </Vaults>
-              <Card title="Released so far">
-                <Releases will={will} />
-              </Card>
-              <Card title="Payouts to heirs">
-                <PayoutsPanel owner={will.owner} />
-              </Card>
               {active && (
                 <Card title="Fund from another chain">
                   <FundAnywhere owner={will.owner} vaults={["Near", ...will.foreign_chains]} />
                 </Card>
               )}
+              <Card title="Payouts to heirs">
+                <PayoutsPanel owner={will.owner} />
+              </Card>
+              <Card title="Released so far">
+                <Releases will={will} />
+              </Card>
             </div>
           </div>
         );
