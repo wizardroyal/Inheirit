@@ -88,8 +88,8 @@ export async function createCastAccounts(): Promise<Record<"heir" | "g1" | "g2" 
  * A test person (heir, guardian, friend or lawyer) with a random first name, key in this browser. Made by
  * the owner when the owner's key is here, else by the onboarding route (wallets won't add full-access keys).
  */
-export async function createPerson(owner: string): Promise<{ accountId: string; name: string }> {
-  const [name] = randomPeople(1);
+export async function createPerson(owner: string, given?: string): Promise<{ accountId: string; name: string }> {
+  const name = given ?? randomPeople(1)[0];
   let accountId: string;
   if (keys.secret(owner)) {
     accountId = await createSubaccount(owner, `p-${crypto.getRandomValues(new Uint32Array(1))[0].toString(36)}`, "0.1");

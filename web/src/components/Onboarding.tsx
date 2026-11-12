@@ -57,7 +57,7 @@ export function RefreshIcon({ className = "" }: { className?: string }) {
 }
 
 /** A square button the height of an input, showing the refresh mark. */
-function RefreshButton({ label, busy, onClick }: { label: string; busy?: boolean; onClick: () => void }) {
+export function RefreshButton({ label, busy, onClick }: { label: string; busy?: boolean; onClick: () => void }) {
   return (
     <button
       type="button"
@@ -73,7 +73,7 @@ function RefreshButton({ label, busy, onClick }: { label: string; busy?: boolean
 }
 
 /** Creates a funded test person (random name, key in this browser) for this role. */
-function GenerateButton({ owner, what, onMade }: { owner: string; what: string; onMade: (p: { accountId: string; name: string }) => void }) {
+export function GenerateButton({ owner, what, name, onMade }: { owner: string; what: string; name?: string; onMade: (p: { accountId: string; name: string }) => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   return (
@@ -85,7 +85,7 @@ function GenerateButton({ owner, what, onMade }: { owner: string; what: string; 
           setBusy(true);
           setError(null);
           try {
-            onMade(await createPerson(owner));
+            onMade(await createPerson(owner, name));
           } catch (e) {
             setError(e instanceof Error ? e.message : String(e));
           } finally {
@@ -278,6 +278,7 @@ export function MyWillSetup({
                 <GenerateButton
                   owner={owner}
                   what="heir"
+                  name={h.name.trim() || undefined}
                   onMade={(p) =>
                     setHeirs((hs) =>
                       hs.map((x, j) => {

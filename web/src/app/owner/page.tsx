@@ -7,6 +7,7 @@ import { AgentBadge, AiBadge } from "@/components/Attestation";
 import { Ladder } from "@/components/Ladder";
 import { ActionButton, Card, CopyLink, Details, ErrorNote, Field, inputCls, Pill, short } from "@/components/ui";
 import { MyWillSetup, StrengthChecklist } from "@/components/Onboarding";
+import { DraftGaps, hasGaps } from "@/components/DraftGaps";
 import { FundAnywhere, PayoutsPanel } from "@/components/Payouts";
 import { SignIn } from "@/components/SignIn";
 import { SignsOfLife } from "@/components/SignsOfLife";
@@ -16,7 +17,8 @@ import { NotificationLog, Releases, SignalList, WatchStatus } from "@/components
 import { agent, type DraftResult } from "@/lib/agent";
 import { DEMO_SCHEDULE, REAL_SCHEDULE } from "@/lib/config";
 import { stagesFor, summarize } from "@agent/policy/schedule";
-import { addSealedNote, createWill, generateWillAndCast } from "@/lib/demo";
+import { acceptAsGuardians, addSealedNote, createWill, generateWillAndCast } from "@/lib/demo";
+import { keys } from "@/lib/keys";
 import { useKeys, useMyAccounts, usePoll, useWill } from "@/lib/hooks";
 import { topUpAccount } from "@/lib/onboard";
 import { disconnectWallet, walletAccountId } from "@/lib/wallet";
@@ -283,7 +285,10 @@ function WriteWill({ owner, onCreating, onCreated }: { owner: string; onCreating
   const [deposit, setDeposit] = useState("0.5");
   const [log, setLog] = useState<string[]>([]);
   const [failed, setFailed] = useState(false);
-  const policy = draft?.ok ? (draft.policy as Policy) : null;
+  // A draft with gaps (no NEAR accounts, guardians as bare names…) is completed below, then re-checked.
+  const [filled, setFilled] = useState<{ policy: Policy | null; errors: string[] }>({ policy: null, errors: [] });
+  const gaps = !!draft && !draft.ok && hasGaps(draft.draft);
+  const policy = draft?.ok ? (draft.policy as Policy) : gaps ? filled.policy : null;
   const assets = new Set(policy?.allocations.map((a) => a.asset));
 
   return (
@@ -304,13 +309,26 @@ function WriteWill({ owner, onCreating, onCreated }: { owner: string; onCreating
             disabled={text.trim().length < 10}
             onClick={async () => {
               setDraft(null);
+              setFilled({ policy: null, errors: [] });
               setDraft(await agent.draftPolicy(await signRequest(owner, "draft_policy", { text })));
             }}
           >
             Draft my will
           </ActionButton>
         </div>
-        {draft && !draft.ok && (
+        {gaps && (
+          <>
+            <DraftGaps owner={owner} draft={draft!.draft as never} onReady={(p, errors) => setFilled({ policy: p, errors })} />
+            {filled.errors.length > 0 && (
+              <ul className="mt-2 list-disc pl-5 text-sm text-danger">
+                {filled.errors.map((e) => (
+                  <li key={e}>{humanize(e, names)}</li>
+                ))}
+              </ul>
+            )}
+          </>
+        )}
+        {draft && !draft.ok && !gaps && (
           <div className="mt-4 space-y-2">
             <ErrorNote>The draft doesn&apos;t add up. Reword it and try again.</ErrorNote>
             <ul className="list-disc pl-5 text-sm">
@@ -325,12 +343,12 @@ function WriteWill({ owner, onCreating, onCreated }: { owner: string; onCreating
             <h3 className="font-serif text-lg">Please check this summary</h3>
             <ul className="list-disc space-y-1 pl-5 text-sm">
               {summarizePolicy(policy).map((l) => (
-                <li key={l}>{humanize(l, names)}</li>
+                <li key={l}>{humanize(l, names).replace(/([^\s(]+) \(\1\)/g, "$1")}</li>
               ))}
             </ul>
             <p className="text-xs text-muted">
               Written by our code, not the model. Model answer:{" "}
-              {draft?.ai.signature?.ok ? "signature verified" : "signature not verified"}.
+              {draft?.ai.signature?.ok ? "signature verified" : "signature not verified"}{draft?.ok ? "" : "; missing details added by you"}.
             </p>
             <div className="grid gap-3 sm:grid-cols-2">
               <Field label="Friends for a welfare check (optional)" hint="NEAR accounts, separated by commas">
@@ -362,6 +380,9 @@ function WriteWill({ owner, onCreating, onCreated }: { owner: string; onCreating
                   },
                   (m) => setLog((l) => [...l, m]),
                 );
+                  // Test guardians generated here hold their keys in this browser: they accept at once.
+                  const local = policy.guardians.filter((g) => keys.secret(g));
+                  if (local.length) await acceptAsGuardians(owner, local, (m) => setLog((l) => [...l, m]));
                   onCreated();
                   onCreating(false);
                 } catch (e) {
