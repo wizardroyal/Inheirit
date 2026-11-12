@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Suspense, useState, type ReactNode } from "react";
 import { AccountActions } from "@/components/account/parts";
+import { NewDevice, RestoreAccess } from "@/components/account/access";
 import { SignIn } from "@/components/SignIn";
 import { AccountProvider, isDemoAccount, useAccount } from "@/lib/account";
 import { useMyAccounts } from "@/lib/hooks";
@@ -57,6 +58,8 @@ function Shell({ children }: { children: ReactNode }) {
           </div>
         )}
         <SignIn onSignedIn={(id) => (setOwner(id), setSigningIn(false))} />
+        <RestoreAccess onRestored={(id) => (setOwner(id), setSigningIn(false))} />
+        <NewDevice onApproved={(id) => (setOwner(id), setSigningIn(false))} />
       </div>
     );
   }

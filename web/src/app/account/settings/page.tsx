@@ -2,6 +2,7 @@
 // Settings: display name, email and Telegram alerts, quiet period, sign out.
 import { useState } from "react";
 import { EmailAlerts } from "@/components/account/parts";
+import { ApproveDevice, BackupAccess } from "@/components/account/access";
 import { WillGate } from "@/components/account/home";
 import { QuietSetting } from "@/components/account/will";
 import { TelegramLink } from "@/components/TelegramLink";
@@ -28,6 +29,9 @@ export default function SettingsPage() {
           {saved && <span className="text-sm text-accent">Saved.</span>}
         </div>
       </Card>
+      <BackupAccess owner={owner} />
+      <ApproveDevice owner={owner} />
+      <p className="text-sm text-muted">Your account ID (to add a device): <span className="break-all">{owner}</span></p>
       <WillGate>
         {(will) => (
           <>

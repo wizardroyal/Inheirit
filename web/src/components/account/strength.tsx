@@ -6,6 +6,7 @@ import { useState } from "react";
 import { useOverview } from "@/lib/hooks";
 import { acceptedGuardians, isArmed, SOURCE_LABELS, type Will } from "@/lib/will";
 import { SOURCES, strength as weightLabel, type Watching } from "../WillParts";
+import { isBackedUp } from "./access";
 
 export interface StrengthItem {
   label: string;
@@ -44,6 +45,12 @@ export function useStrength(will: Will) {
       required: true,
       href: "/account/people",
       next: `Waiting for ${missingGuardians} more guardian${missingGuardians === 1 ? "" : "s"} to accept. Send them their link.`,
+    },
+    {
+      label: "Access backed up",
+      done: isBackedUp(will.owner),
+      href: "/account/settings",
+      next: "Back up your access. Your key lives only in this browser: lose it without a backup and you lose your will.",
     },
     { label: "Heartbeat app opened", done: connected.phone_heartbeat, href: "/heartbeat", next: "Open the heartbeat app on your phone and add it to your home screen." },
     { label: `Two strong signs of life (${strongCount})`, done: strongCount >= 2, href: "/account/signs", next: "Connect another NEAR account or a Sepolia address you use." },
