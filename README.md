@@ -14,15 +14,12 @@ Inheirit notices the signs of life you already give off, privately, and only rea
 </p>
 
 <p>
-  <img src="docs/screenshots/landing.png" alt="The landing page: a will that doesn't make you prove you're alive" width="49%">
-  <img src="docs/screenshots/snapback.png" alt="Signs of life: one sign of life snaps the ladder back to All good" width="49%">
-</p>
-<p>
-  <img src="docs/screenshots/checks.png" alt="Gone quiet: checks go out and the ladder climbs" width="49%">
-  <img src="docs/screenshots/heir-quotes.png" alt="An heir chooses how to be paid, with live NEAR Intents quotes from mainnet" width="49%">
+  <img src="docs/screenshots/home.png" alt="Home: the will's state in plain words, when it last saw you, I'm here, the strength bar and one next step" width="49%">
+  <img src="docs/screenshots/will-phone.png" alt="My will on a phone: the will in plain sentences, who gets what and the schedule" width="24%">
+  <img src="docs/screenshots/heir-quotes.png" alt="An heir chooses how to be paid, with live NEAR Intents quotes from mainnet" width="24%">
 </p>
 
-<sub>Screenshots from a local run (its trust badge reads "local development agent"; the hosted app's agent runs in the enclave). More in <a href="docs/screenshots">docs/screenshots</a>.</sub>
+<sub>Home and My will from the app against the live testnet backend; the heir's quotes from an earlier run. More in <a href="docs/screenshots">docs/screenshots</a>.</sub>
 
 ## For judges, in one minute
 
@@ -80,28 +77,28 @@ Billions in crypto are lost when holders die or become incapacitated. Earlier at
 
 Everything runs on testnet. One path, start to finish:
 
-1. Open **https://inheirit.xyz/owner** and click **Try with a demo account**. You get a fresh, funded testnet account whose key stays in your browser, shown under a random username such as *HatYoungRace*. A NEAR testnet wallet or Google sign-in works too.
+1. Open **https://inheirit.xyz/account** and click **Try with a demo account**. You get a fresh, funded testnet account whose key stays in your browser, shown under a random username such as *HatYoungRace*. A NEAR testnet wallet or Google sign-in works too.
 2. Open the **Generate sample will** tab and click **Generate my will** (under a minute). It creates test people with new names each time (an heir, three guardians, a friend and a lawyer), writes the will (everything to the heir, 10% → 20% → 30% → 40%), has the guardians accept (the will is now **armed**), funds the vaults (Sepolia and BTC from a small demo pool while it lasts) and seals a note for the heir.
-   → The dashboard opens at **All good**: the *Signs of life* panel shows the ladder, a countdown, the agent's plain-English verdict and "What the agent saw: timestamps only".
-3. **Set your will in motion** is already on scenario **a · The owner comes back**, with demo timings (quiet after 2 minutes instead of 30 days). Do nothing for about 2 minutes.
-   → The ladder climbs to **Quiet**, and the checks appear under *Messages sent* (heartbeat app, email, Telegram if linked, a SIMULATED DM), then **Welfare check**.
+   → **Home** opens: "Your will is **All good**", when it last saw you and how, an **I'm here** button, the **Will strength** bar (tap the chevron for the signals behind it) and one suggested next step.
+3. Click the banner **Demo account: try a speedrun** (or the **Try a speedrun** tab). The *Set your will in motion* card is already on scenario **a · The owner comes back**, with demo timings (quiet after 2 minutes instead of 30 days). Do nothing for about 2 minutes.
+   → The *Signs of life* ladder climbs to **Quiet** and then **Welfare check**; the checks are listed under **Activity** (heartbeat app, email if you added one, Telegram if linked, a SIMULATED DM).
 4. Click **I'm here (send a heartbeat)**.
    → Within seconds the ladder **snaps back to All good**, and the verdict says nothing moved. That's the whole idea: signals can stop it; only people can start it.
 
 ## Then the full run (about 15 minutes)
 
-Pick another scenario on the same card. The card shows a checklist with a button for each step you take.
-- **b · The will is carried out.** Click **Create &lt;heir&gt;'s key** (buttons use the heir's generated name), wait for **Guardian vote** (about 4 minutes), then **Both guardians confirm**. → **Challenge period** (2 minutes), then **Releasing in stages**: 10% lands on NEAR, Sepolia and BTC testnet4, with explorer links under *Released so far*. The next slice waits **3 minutes**, the longest wait; then 20%, 30%, 40% a minute apart; then **Waiting before secrets**, then **Secrets released**. Click **Open &lt;heir&gt;'s view** → **Open the note**: *"The Ledger is in the blue folder in the study…"*, sealed in your browser and opened only with the heir's key.
+On **Try a speedrun**, pick another scenario. The card shows a checklist with a button for each step you take.
+- **b · The will is carried out.** Click **Create &lt;heir&gt;'s key** (buttons use the heir's generated name), wait for **Guardian vote** (about 4 minutes), then **Both guardians confirm**. → **Challenge period** (2 minutes), then **Releasing in stages**: 10% lands on NEAR, Sepolia and BTC testnet4, with explorer links under **Money** → *Released so far*. The next slice waits **3 minutes**, the longest wait; then 20%, 30%, 40% a minute apart; then **Waiting before secrets**, then **Secrets released**. Click **Open &lt;heir&gt;'s view** → **Open the note**: *"The Ledger is in the blue folder in the study…"*, sealed in your browser and opened only with the heir's key.
 - **c · A lawyer speeds it up.** Once the guardian vote has started, click **File the death certificate** (the evidence is SIMULATED), then **Both guardians confirm**. → The challenge period still runs in full; the release then follows the faster 10% → 30% → 60% schedule.
-- **d · The heir chooses late.** Don't set the heir's payout. → After the release starts, *Payouts to heirs* shows slices waiting for the heir to choose. Open the heir's view, choose e.g. **USDC on Base** with an address, and **Save my choice** → the waiting slices pay out together (SIMULATED NEAR Intents on testnet, priced live).
+- **d · The heir chooses late.** Don't set the heir's payout. → After the release starts, **Money** → *Payouts to heirs* shows slices waiting for the heir to choose. Open the heir's view, choose e.g. **USDC on Base** with an address, and **Save my choice** → the waiting slices pay out together (SIMULATED NEAR Intents on testnet, priced live).
 
-**View as** (on the same card) opens the guardian, heir, friend and lawyer pages as those accounts; each links back to the owner. On the heir's page, once an address is entered, **Get live quotes** shows real NEAR Intents quotes from mainnet, public and confidential side by side (dry runs: no money moves; the confidential column needs our partner key on the deployment). The same quote is on **https://inheirit.xyz/mainnet**. Afterwards: **Back to real timings**, or, once Completed, **Start over with the same people**.
+**View as** (on the same card) opens the guardian, heir, friend and lawyer pages as those accounts; each links back to the speedrun. On the heir's page, once an address is entered, **Get live quotes** shows real NEAR Intents quotes from mainnet, public and confidential side by side (dry runs: no money moves; the confidential column needs our partner key on the deployment). The same quote is on **https://inheirit.xyz/mainnet**. Afterwards: **Back to real timings**, or, once Completed, **Start over with the same people**.
 
 **At any step, try to break the rule "signals stop it, people start it":** on the [control panel](https://inheirit.xyz/demo), a lone **X post** (SIMULATED) is ignored on purpose, and the verdict says why (*"ignored on its own because posts can be scheduled or run by someone else"*). Two weak sources within 24 hours, or any strong one, do count. A will whose guardians haven't accepted never leaves All good, however long the silence.
 
 **Advanced:** the [control panel](https://inheirit.xyz/demo) (`/demo`) is a lower-level control room for the same flow: **Make a test cast**, **Create the demo will**, then the guardian and signal buttons. The same steps run headlessly in `scripts/demo-cancel.ts` (cancel) and `scripts/demo-execute.ts` (release).
 
-**Your own will** (`/owner`): the **My will** tab (signals, people, vault; the ↻ button next to heirs, guardians, the lawyer and friends creates a funded test person with a random name, and gives a test heir Sepolia and Bitcoin testnet addresses too; a live "who gets what" preview; "if you go quiet, the earliest anything moves is about…") or **Will in plain English** (a private NEAR AI model drafts it, our code checks it and asks only for what's missing, such as NEAR accounts or guardians, with ↻ to generate test people; you approve a summary that code, not the model, wrote). The **Will strength** checklist shows what arms the will and what makes it stronger, including **Link Telegram**: if you go quiet, the bot checks in, and any reply cancels. Guardians accept at `/guardian/<owner>`; `/heartbeat` is an installable app.
+**Your own will** (`/account`): one screen per job. **Home** (where the will stands, I'm here, strength, the next step) · **My will** (the will in plain sentences, who gets what, the schedule; *Edit will* and *Close will* at All good) · **Signs of life** (every source with its weight; connect more NEAR accounts, mainnet `.near` included, and Sepolia addresses) · **People** (invited or accepted, invite links for people without a NEAR account) · **Final secrets** (sealed notes with templates) · **Money** (vaults, withdrawals, fund from another chain, payouts) · **Activity** (messages and the timeline; hashes and attestation under *Technical details*) · **Settings** (email and Telegram alerts, quiet period). On a phone the first five sit in a bottom bar. Before a will exists, Home offers **My will** (a step-by-step form; ↻ creates funded test people with test addresses), **Will in plain English** (a private NEAR AI model drafts it, our code checks it and asks only for what's missing; you approve a summary that code, not the model, wrote) and **Generate sample will**. Guardians accept at `/guardian/<owner>`; `/heartbeat` is an installable app.
 
 ## How it works
 
@@ -220,6 +217,8 @@ See [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md). In short:
 - **Expired guardian votes restart the ladder.** If guardians don't vote, the will returns to All good without a new sign of life, so the ladder starts again at once (about every 7 minutes on demo timings). The repeated checks and welfare messages appear in the app, but Telegram sends each of them only once per silence. The challenge alarm is always sent.
 - **NEAR Intents is SIMULATED on testnet.** NEAR Intents has no testnet. The testnet slices are real transfers; the swap that takes them on to the heir's choice runs on a simulated 1Click client (live prices, fake deposit address). On mainnet: heirs see live dry quotes, and real payouts were sent from our demo vault (see above) only by a local script (`scripts/mainnet-payout.ts`) that asks a person for approval before every transaction (caps: $5 each, $25 in total). Any made are listed at `/mainnet`. In production, the attested agent's mainnet contract would sign these legs.
 - **Payout waiting happens after the vault.** If an heir hasn't chosen how to be paid, their onward payout waits and later slices are paid together. The testnet slice itself still leaves the vault on schedule. Holding it in the vault would need a contract change (roadmap).
+- **Closing a will.** The contract can't see other chains; the app checks the Sepolia and Bitcoin vaults (through the agent) before it offers *Close will*.
+- **Extra signal sources are private.** The agent never reveals the extra NEAR accounts or Sepolia addresses you added, so they can be removed only from the device you added them on.
 - **Names are local.** Usernames and the generated people's names live in your browser; the testnet account id stays the on-chain identity, and other browsers see the account id.
 - **Browser-held keys.** Demo and Google accounts keep their key in the browser that made them, so a Google account works in that browser only, and a lost browser means a lost testnet account. Wallet users keep their keys in their wallet.
 - **Speedruns expire.** On the hosted demo, the agent stops watching a will on demo timings a few hours after it started (never mid-release, in the guardian vote or in the challenge period). Wills on real timings are watched indefinitely.
