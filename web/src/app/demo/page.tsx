@@ -44,7 +44,7 @@ export default function DemoPage() {
         </p>
         <p className="text-sm text-muted">
           New here?{" "}
-          <Link href="/owner" className="text-accent underline">
+          <Link href="/account" className="text-accent underline">
             The guided version is easier
           </Link>
           .
@@ -216,7 +216,7 @@ function WillPanel({ cast }: { cast: Cast }) {
       <SignsOfLife owner={cast.owner} will={will} />
       <div className="grid gap-6 lg:grid-cols-[1fr_1.1fr]">
       <div className="min-w-0 space-y-6">
-        <Card title="Where the will stands" aside={<Link href={`/owner?as=${cast.owner}`} className="text-sm text-accent underline">{ownerN}&apos;s own view</Link>}>
+        <Card title="Where the will stands" aside={<Link href={`/account?as=${cast.owner}`} className="text-sm text-accent underline">{ownerN}&apos;s own view</Link>}>
           <WatchStatus owner={cast.owner} will={will} canSign />
           <Ladder will={will} compact />
           <div className="mt-3 flex flex-wrap gap-2">

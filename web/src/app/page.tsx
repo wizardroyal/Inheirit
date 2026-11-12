@@ -38,7 +38,7 @@ export default function Home() {
             slices, secrets last.
           </p>
           <div className="flex flex-wrap items-center gap-4">
-            <Link href="/owner" className="rounded-lg bg-accent px-6 py-3 font-medium text-accent-ink hover:opacity-90">
+            <Link href="/account" className="rounded-lg bg-accent px-6 py-3 font-medium text-accent-ink hover:opacity-90">
               Try it in 3 minutes
             </Link>
           </div>

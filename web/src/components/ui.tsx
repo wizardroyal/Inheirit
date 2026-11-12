@@ -166,7 +166,7 @@ export function NoWill({ owner }: { owner: string }) {
           No will for <span className="font-medium">{label(owner)}</span> yet. Check the link, or reload in a few seconds.
         </p>
         <p className="text-muted">
-          <Link href="/owner" className="text-accent underline">Try it with a demo account</Link>.
+          <Link href="/account" className="text-accent underline">Try it with a demo account</Link>.
         </p>
       </div>
     </Card>

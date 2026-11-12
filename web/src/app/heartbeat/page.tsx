@@ -83,7 +83,7 @@ export default function HeartbeatPage() {
       <div className="mx-auto flex max-w-md flex-col items-center gap-5 py-10 text-center">
         <h1 className="font-serif text-4xl sm:text-5xl">Heartbeat</h1>
         <p className="text-lg text-muted">Sign in. Then opening this page counts as a sign of life.</p>
-        <Link href="/owner" className="rounded-lg bg-accent px-6 py-3 font-medium text-accent-ink hover:opacity-90">
+        <Link href="/account" className="rounded-lg bg-accent px-6 py-3 font-medium text-accent-ink hover:opacity-90">
           Sign in
         </Link>
       </div>

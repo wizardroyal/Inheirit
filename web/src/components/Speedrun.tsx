@@ -143,7 +143,7 @@ export function BackToOwner({ owner }: { owner: string }) {
   useKeys();
   if (!canSign(owner)) return null;
   return (
-    <Link href={`/owner?as=${owner}`} className="text-sm text-accent underline">
+    <Link href={`/account/speedrun?as=${owner}`} className="text-sm text-accent underline">
       ← Back to the owner&apos;s view
     </Link>
   );

@@ -29,7 +29,7 @@ export function ActAs({ value, onChange, suggested, label = "Acting as" }: { val
             Connect a wallet
           </ActionButton>
           <span className="text-muted">
-            or <Link href="/owner" className="text-accent underline">try with a demo account</Link>
+            or <Link href="/account" className="text-accent underline">try with a demo account</Link>
           </span>
         </span>
       )}

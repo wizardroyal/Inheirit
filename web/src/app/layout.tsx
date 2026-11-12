@@ -19,7 +19,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = { themeColor: "#2f5d50" };
 
 const NAV = [
-  { href: "/owner", label: "Your will" },
+  { href: "/account", label: "Your will" },
   { href: "/heartbeat", label: "Heartbeat" },
   { href: "/mainnet", label: "Mainnet" },
   { href: "/demo", label: "Control panel" },

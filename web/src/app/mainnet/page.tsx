@@ -98,7 +98,7 @@ export default function MainnetPage() {
           The Shade Agent Framework is experimental and testnet-only. Public vaults need a production TEE framework and an audit first.
         </p>
         <p>
-          <Link href="/owner" className="text-accent underline">
+          <Link href="/account" className="text-accent underline">
             Try the full will on testnet
           </Link>
         </p>
