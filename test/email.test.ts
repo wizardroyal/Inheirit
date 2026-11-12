@@ -133,6 +133,14 @@ describe("email delivery", () => {
     expect(t.store.get().notifications.some((n) => n.channels.includes("email (one per run on demo timings; shown here instead)"))).toBe(true);
   });
 
+  it("messages name the owner by the display name they set, not the account id", async () => {
+    const t = setup({ WelfareCheck: { since: T0 + 150 } });
+    t.store.update((s) => (s.owners["alice.testnet"]!.displayName = "Alice Okafor"));
+    await t.driver.tick();
+    expect(t.sent.some(([, subject]) => subject === "Have you heard from Alice Okafor recently?")).toBe(true);
+    expect(t.sent.some(([, subject]) => subject.includes("alice.testnet"))).toBe(false);
+  });
+
   it("when the daily limit is reached, the message stays in the app with a note", async () => {
     const t = setup({ WelfareCheck: { since: T0 + 150 } });
     t.setResult("capped");

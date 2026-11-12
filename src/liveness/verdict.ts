@@ -57,7 +57,7 @@ function label(o: Pick<Observation, "source" | "simulated">): string {
  * `usualGapS` is the owner's typical gap between transactions (src/liveness/baseline.ts), when their
  * history is long enough to say; the verdict then puts the silence next to it.
  */
-export function explainLiveness(will: WillView, observations: Observation[], now: Date, opts = DEFAULT_SCORE_OPTIONS, usualGapS: number | null = null): Verdict {
+export function explainLiveness(will: WillView, observations: Observation[], now: Date, opts = DEFAULT_SCORE_OPTIONS, usualGapS: number | null = null, ownerName = will.owner): Verdict {
   const nowMs = now.getTime();
   const best = scoreAlive(observations, now, opts);
   const details: string[] = [];
@@ -115,13 +115,13 @@ export function explainLiveness(will: WillView, observations: Observation[], now
     case "WelfareCheck":
       const asked = ["guardians", ...(will.contacts.length ? ["friends"] : []), ...(will.lawyer ? ["the lawyer"] : [])];
       const who = asked.length > 1 ? `${asked.slice(0, -1).join(", ")} and ${asked[asked.length - 1]}` : asked[0];
-      headline = `Quiet for ${quietFor}${usual} and no reply to the checks. ${who[0].toUpperCase()}${who.slice(1)} are asked whether they've heard from ${will.owner}.`;
+      headline = `Quiet for ${quietFor}${usual} and no reply to the checks. ${who[0].toUpperCase()}${who.slice(1)} are asked whether they've heard from ${ownerName}.`;
       break;
     case "GuardianVote":
-      headline = `Quiet for ${quietFor}${usual}, and nobody has heard from ${will.owner}. Guardians are being asked whether they have passed away; a single "they're alive" stops it.`;
+      headline = `Quiet for ${quietFor}${usual}, and nobody has heard from ${ownerName}. Guardians are being asked whether they have passed away; a single "they're alive" stops it.`;
       break;
     case "Challenge":
-      headline = `Guardians have confirmed. This is the challenge period: ${will.owner} is alerted on every channel, and any sign of life cancels everything.`;
+      headline = `Guardians have confirmed. This is the challenge period: ${ownerName} is alerted on every channel, and any sign of life cancels everything.`;
       break;
     case "Executing": {
       const s = typeof will.state !== "string" && "Executing" in will.state ? will.state.Executing.stage : 0;

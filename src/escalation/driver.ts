@@ -158,6 +158,8 @@ export function inWords(seconds: number): string {
 /** Who to tell, and what, when a will enters `state` (§7.3). Quiet is handled by the checks. */
 export function notificationsFor(state: StateName, will: WillView, cfg: OwnerSignalConfig, contacts: string[]): Message[] {
   const owner = will.owner;
+  // The owner as people know them: the display name they set, else the account id.
+  const name = cfg.displayName ?? owner;
   const web = config.webUrl();
   const toOwner = [owner, ...(cfg.email ? [cfg.email] : [])];
   const msg = (to: string[], subject: string, body: string): Message[] => (to.length ? [{ event: state, to, subject, body }] : []);
@@ -166,14 +168,14 @@ export function notificationsFor(state: StateName, will: WillView, cfg: OwnerSig
       // The welfare chain: guardians, then friends, then the lawyer.
       return msg(
         [...acceptedGuardians(will), ...contacts, ...(will.lawyer ? [will.lawyer] : [])],
-        `Have you heard from ${owner} recently?`,
-        `${owner} has been quiet for a while and hasn't answered our check-ins. If you've heard from them, tell us they're fine and nothing else happens: ${web}/contact/${owner}`,
+        `Have you heard from ${name} recently?`,
+        `${name} has been quiet for a while and hasn't answered our check-ins. If you've heard from them, tell us they're fine and nothing else happens: ${web}/contact/${owner}`,
       );
     case "GuardianVote":
       return msg(
         acceptedGuardians(will),
-        `${owner}: your answer is needed as a guardian`,
-        `${owner} has been silent, and nobody in the welfare check has heard from them. Please tell us what you know. Confirm their passing only if you're sure; if you think they're alive, say so and the process stops: ${web}/guardian/${owner}`,
+        `${name}: your answer is needed as a guardian`,
+        `${name} has been silent, and nobody in the welfare check has heard from them. Please tell us what you know. Confirm their passing only if you're sure; if you think they're alive, say so and the process stops: ${web}/guardian/${owner}`,
       );
     case "Challenge":
       return msg(
@@ -184,14 +186,14 @@ export function notificationsFor(state: StateName, will: WillView, cfg: OwnerSig
     case "Executing":
       return msg(
         will.heirs.map((h) => h.account_id),
-        `${owner}'s will is being carried out`,
+        `${name}'s will is being carried out`,
         `Your inheritance is being released in stages. See what you receive, and choose how you'd like to be paid: ${web}/heir/${owner}`,
       );
     case "SecretsReleased":
       return msg(
         will.heirs.map((h) => h.account_id),
-        `${owner} left you a private note`,
-        `Everything has been distributed, and the notes ${owner} left for you can now be opened: ${web}/heir/${owner}`,
+        `${name} left you a private note`,
+        `Everything has been distributed, and the notes ${name} left for you can now be opened: ${web}/heir/${owner}`,
       );
     default:
       return [];

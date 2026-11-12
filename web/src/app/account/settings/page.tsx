@@ -9,6 +9,8 @@ import { TelegramLink } from "@/components/TelegramLink";
 import { ActionButton, Card, Field, inputCls } from "@/components/ui";
 import { useAccount } from "@/lib/account";
 import { nameOf, setName } from "@/lib/names";
+import { agent } from "@/lib/agent";
+import { signRequest } from "@/lib/near";
 
 export default function SettingsPage() {
   const { owner, setOwner, viewing } = useAccount();
@@ -20,10 +22,19 @@ export default function SettingsPage() {
       <h1 className="font-serif text-3xl sm:text-4xl">Settings</h1>
       <Card title="Your name">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-          <Field label="Shown to you in this browser">
+          <Field label="How heirs, guardians and friends see you named">
             <input className={inputCls} maxLength={64} value={name} onChange={(e) => (setNameDraft(e.target.value), setSaved(false))} />
           </Field>
-          <ActionButton tone="quiet" onClick={async () => (setName(owner, name.trim()), setSaved(true))}>
+          <ActionButton
+            tone="quiet"
+            disabled={!name.trim()}
+            onClick={async () => {
+              setName(owner, name.trim());
+              // Also with the agent (signed), so emails, Telegram and the will text use it.
+              await agent.registerOwner(await signRequest(owner, "register_owner", { display_name: name.trim() }));
+              setSaved(true);
+            }}
+          >
             Save
           </ActionButton>
           {saved && <span className="text-sm text-accent">Saved.</span>}

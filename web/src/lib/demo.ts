@@ -125,7 +125,8 @@ export async function createWill(owner: string, o: CreateWillOptions, progress: 
   progress("Giving the agent the approved will (it needs the heirs' receive addresses)…");
   await agent.submitPolicy(owner, o.policy);
   progress("Asking the agent to start watching for signs of life…");
-  await agent.registerOwner(await signRequest(owner, "register_owner", {}));
+  // The display name is how heirs, guardians and friends see the owner named in messages.
+  await agent.registerOwner(await signRequest(owner, "register_owner", o.policy.display_name ? { display_name: o.policy.display_name } : {}));
 }
 
 /** Demo only: the cast's guardians (keys in this browser) accept their role, which arms the will. */

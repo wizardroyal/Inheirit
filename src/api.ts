@@ -76,6 +76,8 @@ const OwnerFields = z.object({
   /** Extra Sepolia addresses and NEAR accounts (testnet, or mainnet *.near) the owner uses; replace the saved lists. */
   evm_addresses: z.array(z.string().regex(/^0x[0-9a-fA-F]{40}$/)).max(5).optional(),
   near_accounts: z.array(z.string().regex(NEAR_ACCOUNT)).max(5).optional(),
+  /** How heirs, guardians and friends see the owner named in messages. */
+  display_name: z.string().trim().min(1).max(64).optional(),
   /** Email for the will's guardians, friends, lawyer and heirs (account → address); replaces the saved map. */
   people_emails: z
     .record(z.string().regex(NEAR_ACCOUNT), z.string().email().max(254))
@@ -218,7 +220,7 @@ export function api(deps: ApiDeps): Hono {
   app.post("/api/owners", async (c) => {
     const r = await ownerRequest(await c.req.json(), "register_owner", OwnerFields, "Watching settings must be signed by the owner");
     if (r.error) return c.json(r.error.body, r.error.status);
-    const { evm_address, evm_addresses, near_accounts, people_emails, github, email } = r.data;
+    const { evm_address, evm_addresses, near_accounts, people_emails, github, email, display_name } = r.data;
     const will = await contract.getWill(r.owner);
     if (!will) return c.json({ error: `No will for ${r.owner}` }, 404);
     // The release itself must not count as a sign of life: the will's own ETH vault (its nonce rises
@@ -255,6 +257,7 @@ export function api(deps: ApiDeps): Hono {
         evmAddresses: evm_addresses ?? prev?.evmAddresses,
         nearAccounts: near_accounts ?? prev?.nearAccounts,
         peopleEmails: people_emails ?? prev?.peopleEmails,
+        displayName: display_name ?? prev?.displayName,
         github: github === "" ? undefined : (github ?? prev?.github),
         email: email ?? prev?.email,
         watchedSince,
@@ -290,7 +293,8 @@ export function api(deps: ApiDeps): Hono {
     // The owner's usual rhythm, from their own transaction history; recomputed at most daily.
     const cfg = store.get().owners[owner];
     const baseline = will ? await usualRhythm(owner, cfg) : null;
-    const verdict = will ? explainLiveness(will, observations, new Date(), undefined, baseline?.medianGapS ?? null) : null;
+    const name = cfg?.displayName ?? store.get().policies[owner]?.display_name ?? owner;
+    const verdict = will ? explainLiveness(will, observations, new Date(), undefined, baseline?.medianGapS ?? null, name) : null;
     return { will, signals: { observations: seen, heartbeat: store.get().heartbeats[owner] ?? null, verdict } };
   }
 
@@ -315,7 +319,7 @@ export function api(deps: ApiDeps): Hono {
           : null,
         signals,
         // The name the owner chose for heirs and guardians to see (from the approved will), if any.
-        display_name: s.policies[owner]?.display_name ?? null,
+        display_name: s.owners[owner]?.displayName ?? s.policies[owner]?.display_name ?? null,
         notifications: publicNotifications(s.notifications.filter((n) => n.owner === owner).slice(-30), will),
         telegram: deps.telegram ? { enabled: true, bot: deps.telegram.username, linked: deps.telegram.isLinked(owner) } : { enabled: false, linked: false },
       };
