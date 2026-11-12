@@ -4,6 +4,7 @@
 import { sha256 } from "@noble/hashes/sha2";
 import { bytesToHex } from "@noble/hashes/utils";
 import { nameAccounts, nameOf } from "./names";
+import { SITE_URL } from "./config";
 import { call, nearToYocto, ROLE_TGAS, view } from "./near";
 
 const PENDING = "inheirit:pending-invites";
@@ -55,8 +56,13 @@ export async function createInvite(owner: string, role: InviteRole, name: string
     .replace(/\//g, "_");
   await call(owner, "create_invite", { role, code_hash: codeHash(code), ttl_s: INVITE_TTL_S }, nearToYocto("0.01"));
   savePending([...pending(), { owner, hash: codeHash(code), role, name: name.trim() }]);
-  const q = new URLSearchParams({ c: code, r: role, ...(name.trim() ? { n: name.trim() } : {}) });
-  return `${window.location.origin}/join/${owner}#${q.toString()}`;
+  return `${SITE_URL}/i/${code}`;
+}
+
+/** Which will an open invite belongs to, from the code alone (contract index `find_invite`). */
+export async function findInvite(code: string): Promise<{ owner: string; role: string; expires_at: number } | null> {
+  const r = await view<[string, { role: string; expires_at: number }] | null>("find_invite", { code_hash: codeHash(code) });
+  return r ? { owner: r[0], ...r[1] } : null;
 }
 
 export async function inviteOpen(owner: string, code: string, hash = codeHash(code)): Promise<{ role: string; expires_at: number } | null> {

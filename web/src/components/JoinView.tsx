@@ -2,8 +2,7 @@
 // An invite link (web/src/lib/invites.ts): someone without a NEAR account opens it, signs in (Google, a
 // wallet or a demo account) and takes the role. The code stays in the #fragment, never sent to a server.
 import Link from "next/link";
-import { useParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { SignIn } from "@/components/SignIn";
 import { ActionButton, Card, ErrorNote } from "@/components/ui";
 import { useOwnerName, usePoll } from "@/lib/hooks";
@@ -17,14 +16,8 @@ const ROLE_TEXT: Record<string, string> = {
   lawyer: "their lawyer. Your death certificate speeds up the release but never skips a step.",
 };
 
-export default function JoinPage() {
-  const owner = decodeURIComponent(useParams<{ owner: string }>().owner);
+export function JoinView({ owner, code, role, name }: { owner: string; code: string; role: string; name: string }) {
   const ownerName = useOwnerName(owner);
-  const [params, setParams] = useState<URLSearchParams | null>(null);
-  useEffect(() => setParams(new URLSearchParams(window.location.hash.slice(1))), []);
-  const code = params?.get("c") ?? "";
-  const role = params?.get("r") ?? "";
-  const name = params?.get("n") ?? "";
   // The answer carries the code it was checked for, so a stale empty answer never shows as "used".
   const { data } = usePoll(async () => ({ code, invite: code ? await inviteOpen(owner, code) : null }), 30_000, [owner, code]);
   const checked = data?.code === code && !!code;
@@ -32,7 +25,6 @@ export default function JoinPage() {
   const [me, setMe] = useState<string | null>(null);
   const [done, setDone] = useState(false);
 
-  if (!params) return <p>Loading…</p>;
   if (!code) return <ErrorNote>This link is missing its code. Ask {ownerName} to send it again.</ErrorNote>;
   const page = role === "guardian" || role === "lawyer" ? "guardian" : "contact";
 

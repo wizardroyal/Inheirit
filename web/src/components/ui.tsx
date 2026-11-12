@@ -2,6 +2,7 @@
 import { useAccountLabel } from "@/lib/names";
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
+import { SITE_URL } from "@/lib/config";
 import { errorText } from "@/lib/near";
 
 export function Card({ title, aside, children, className = "" }: { title?: ReactNode; aside?: ReactNode; children: ReactNode; className?: string }) {
@@ -133,7 +134,7 @@ export function short(s: string, n = 10): string {
 /** A full link on this site with a copy button, for sending to guardians, contacts or heirs. */
 export function CopyLink({ path }: { path: string }) {
   const [copied, setCopied] = useState(false);
-  const url = typeof window === "undefined" ? path : `${window.location.origin}${path}`;
+  const url = `${SITE_URL}${path}`;
   return (
     <span className="inline-flex max-w-full flex-wrap items-center gap-2">
       <button

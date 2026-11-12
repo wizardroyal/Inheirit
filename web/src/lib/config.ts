@@ -18,5 +18,7 @@ export const explorer = {
 export { DEMO_SCHEDULE, REAL_SCHEDULE } from "@agent/policy/schedule";
 
 /** Public links judges should be one click from. The X post URL is set once the post exists. */
+/** Every link we generate (invites, copy buttons) points here, never at a preview or vercel.app host. */
+export const SITE_URL = "https://inheirit.xyz";
 export const REPO_URL = "https://github.com/wizardroyal/Inheirit";
 export const X_POST_URL = process.env.NEXT_PUBLIC_X_POST_URL || "";
