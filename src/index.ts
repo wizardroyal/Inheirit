@@ -1,4 +1,5 @@
 // Load .env before any other module reads process.env (no-op in the TEE, where there is no .env file)
+import { fetchBaseline } from "./liveness/baseline";
 import { HttpOneClickClient, SimulatedOneClickClient } from "./intents/oneclick";
 import { PayoutEngine, simulatedSender } from "./intents/payout";
 import "dotenv/config";
@@ -266,6 +267,7 @@ const app = api({
   store,
   vaults,
   demoMode: config.demoMode(),
+  baseline: (near, sepolia) => fetchBaseline(near, sepolia),
   agentInfo: async () => ({
     accountId: agent.accountId(),
     balance: await agent.balance(),

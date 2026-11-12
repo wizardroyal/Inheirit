@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { checkPolicy, summarizePolicy, type Policy } from "@agent/policy/policy";
 import { STANDARD_PCT } from "@agent/policy/schedule";
 import { agent } from "@/lib/agent";
-import { DEMO_SCHEDULE, REAL_SCHEDULE } from "@/lib/config";
+import { DEMO_SCHEDULE } from "@/lib/config";
 import { acceptAsGuardians, createWill } from "@/lib/demo";
 import { keys } from "@/lib/keys";
 import { createPerson } from "@/lib/onboard";
@@ -16,6 +16,7 @@ import { humanize, nameOf, readable, useAccountLabel, useNames } from "@/lib/nam
 import { signRequest } from "@/lib/near";
 import { acceptedGuardians, isArmed, type Will } from "@/lib/will";
 import { TelegramLink } from "./TelegramLink";
+import { QuietPeriod, realSchedule } from "./QuietPeriod";
 import { ActionButton, Card, Field, inputCls, Pill, SimulatedTag } from "./ui";
 
 const ACCOUNT = /^[a-z0-9._-]{2,64}$/;
@@ -161,7 +162,7 @@ export function MyWillSetup({
   owner: string;
   onCreating: (b: boolean) => void;
   onCreated: () => void;
-  summary: (stagesPct: number[], demoClock: boolean) => React.ReactNode;
+  summary: (stagesPct: number[], demoClock: boolean, quietDays: number | null) => React.ReactNode;
 }) {
   // The random username reads better with spaces: "ThistleProudJump" → "Thistle Proud Jump".
   const [name, setName] = useState(() => (nameOf(owner) ?? "").replace(/([a-z])([A-Z])/g, "$1 $2"));
@@ -177,6 +178,7 @@ export function MyWillSetup({
   const [assets, setAssets] = useState({ ETH: false, BTC: false });
   const [deposit, setDeposit] = useState("0.5");
   const [demoClock, setDemoClock] = useState(true);
+  const [quietDays, setQuietDays] = useState<number | null>(null);
   const [stable, setStable] = useState(false);
   const [log, setLog] = useState<string[]>([]);
   const [failed, setFailed] = useState(false);
@@ -401,7 +403,12 @@ export function MyWillSetup({
           <input type="checkbox" checked={demoClock} onChange={(e) => setDemoClock(e.target.checked)} />
           Demo clock (minutes instead of months)
         </label>
-        <div className="mt-2">{summary(STANDARD_PCT, demoClock)}</div>
+        {!demoClock && (
+          <div className="mt-3">
+            <QuietPeriod owner={owner} evm={evm} value={quietDays} onChange={setQuietDays} />
+          </div>
+        )}
+        <div className="mt-2">{summary(STANDARD_PCT, demoClock, quietDays)}</div>
       </Card>
 
       <Card title="Check and approve">
@@ -434,7 +441,7 @@ export function MyWillSetup({
                   {
                     policy: policy!,
                     contacts: list(contacts),
-                    schedule: demoClock ? DEMO_SCHEDULE : REAL_SCHEDULE,
+                    schedule: demoClock ? DEMO_SCHEDULE : realSchedule(quietDays),
                     foreignChains: [...(assets.ETH ? ["Eth" as const] : []), ...(assets.BTC ? ["Btc" as const] : [])],
                     depositNear: deposit,
                   },

@@ -7,6 +7,7 @@ import { AiBadge } from "@/components/Attestation";
 import { Ladder } from "@/components/Ladder";
 import { ActionButton, Card, CopyLink, Details, ErrorNote, Field, inputCls, NoWill, Pill, short } from "@/components/ui";
 import { MyWillSetup, PeopleField, StrengthChecklist } from "@/components/Onboarding";
+import { QuietPeriod, realSchedule } from "@/components/QuietPeriod";
 import { DraftGaps, hasGaps } from "@/components/DraftGaps";
 import { FundAnywhere, PayoutsPanel } from "@/components/Payouts";
 import { SignIn } from "@/components/SignIn";
@@ -202,7 +203,7 @@ function CreateWill(props: { owner: string; onCreating: (b: boolean) => void; on
       {mode === "generate" ? (
         <GenerateWill {...props} />
       ) : mode === "quick" ? (
-        <MyWillSetup {...props} summary={(stagesPct, demoClock) => <SetupSummary stagesPct={stagesPct} demoClock={demoClock} />} />
+        <MyWillSetup {...props} summary={(stagesPct, demoClock, quietDays) => <SetupSummary stagesPct={stagesPct} demoClock={demoClock} quietDays={quietDays} />} />
       ) : (
         <WriteWill {...props} />
       )}
@@ -306,6 +307,7 @@ function WriteWill({ owner, onCreating, onCreated }: { owner: string; onCreating
   const [draftingSince, setDraftingSince] = useState<number | null>(null);
   const now = useNow();
   const [demoClock, setDemoClock] = useState(true);
+  const [quietDays, setQuietDays] = useState<number | null>(null);
   const [contacts, setContacts] = useState("");
   const [deposit, setDeposit] = useState("0.5");
   const [log, setLog] = useState<string[]>([]);
@@ -390,9 +392,10 @@ function WriteWill({ owner, onCreating, onCreated }: { owner: string; onCreating
             </div>
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" checked={demoClock} onChange={(e) => setDemoClock(e.target.checked)} />
-              Demo clock: quiet after {duration(DEMO_SCHEDULE.timings.quiet_after)} instead of {duration(REAL_SCHEDULE.timings.quiet_after)}
+              Demo clock: quiet after {duration(DEMO_SCHEDULE.timings.quiet_after)} instead of days
             </label>
-            <SetupSummary stagesPct={policy.stages_pct} demoClock={demoClock} />
+            {!demoClock && <QuietPeriod owner={owner} value={quietDays} onChange={setQuietDays} />}
+            <SetupSummary stagesPct={policy.stages_pct} demoClock={demoClock} quietDays={quietDays} />
             <ActionButton
               onClick={async () => {
                 setLog([]);
@@ -404,7 +407,7 @@ function WriteWill({ owner, onCreating, onCreated }: { owner: string; onCreating
                   {
                     policy,
                     contacts: contacts.split(",").map((c) => c.trim()).filter(Boolean),
-                    schedule: demoClock ? DEMO_SCHEDULE : REAL_SCHEDULE,
+                    schedule: demoClock ? DEMO_SCHEDULE : realSchedule(quietDays),
                     foreignChains: [...(assets.has("ETH") ? ["Eth" as const] : []), ...(assets.has("BTC") ? ["Btc" as const] : [])],
                     depositNear: deposit,
                   },
@@ -709,8 +712,8 @@ function SealedNotes({ will, refresh }: { will: Will; refresh: () => void }) {
 }
 
 /** "If you go quiet: earliest anything moves ≈ X; full distribution ≈ Y; secrets ≈ Z." (CLAUDE.md §8) */
-function SetupSummary({ stagesPct, demoClock }: { stagesPct: number[]; demoClock: boolean }) {
-  const preset = demoClock ? DEMO_SCHEDULE : REAL_SCHEDULE;
+function SetupSummary({ stagesPct, demoClock, quietDays = null }: { stagesPct: number[]; demoClock: boolean; quietDays?: number | null }) {
+  const preset = demoClock ? DEMO_SCHEDULE : realSchedule(quietDays);
   const sum = summarize(preset.timings, stagesFor(stagesPct, preset));
   return (
     <p className="rounded-md border border-line bg-accent-soft p-3 text-sm">

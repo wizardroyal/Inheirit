@@ -2,6 +2,7 @@
 // as alive, which signals were ignored and why, and what the will's current state means. Built from
 // timestamps only; never from content.
 import { acceptedGuardians, isArmed, stateName, type WillView } from "../near/will-contract";
+import { everyPhrase } from "./baseline";
 import { DEFAULT_SCORE_OPTIONS, type Observation, scoreAlive, type SignalSource } from "./score";
 
 const NOUN: Record<SignalSource, string> = {
@@ -54,7 +55,11 @@ function label(o: Pick<Observation, "source" | "simulated">): string {
   return `${NOUN[o.source]}${o.simulated ? " (SIMULATED)" : ""}`;
 }
 
-export function explainLiveness(will: WillView, observations: Observation[], now: Date, opts = DEFAULT_SCORE_OPTIONS): Verdict {
+/**
+ * `usualGapS` is the owner's typical gap between transactions (src/liveness/baseline.ts), when their
+ * history is long enough to say; the verdict then puts the silence next to it.
+ */
+export function explainLiveness(will: WillView, observations: Observation[], now: Date, opts = DEFAULT_SCORE_OPTIONS, usualGapS: number | null = null): Verdict {
   const nowMs = now.getTime();
   const best = scoreAlive(observations, now, opts);
   const details: string[] = [];
@@ -86,6 +91,8 @@ export function explainLiveness(will: WillView, observations: Observation[], now
       : `Two independent signals agree: ${obs.map(label).join(" and ")}, ${since(nowMs - best.at.getTime())}.`;
   };
   const quietFor = since(nowMs - lastAliveMs).replace(" ago", "").replace("just now", "a few seconds");
+  // "Quiet for 9 days (usually active every 3 days)": the silence next to the owner's own normal.
+  const usual = usualGapS ? ` (usually active ${everyPhrase(usualGapS)})` : "";
 
   const state = stateName(will.state);
   let headline: string;
@@ -94,8 +101,9 @@ export function explainLiveness(will: WillView, observations: Observation[], now
       // Active but already past quiet_after (e.g. a guardian vote just expired): not a sign of life.
       headline =
         isArmed(will) && nowMs - lastAliveMs >= will.timings.quiet_after * 1000
-          ? `No sign of life for ${quietFor}; the checks start again shortly. ${lastSeen()}`
+          ? `No sign of life for ${quietFor}${usual}; the checks start again shortly. ${lastSeen()}`
           : `Alive. ${lastSeen()}`;
+      if (usualGapS) details.push(`Usually active ${everyPhrase(usualGapS)}, from the last 90 days of transactions.`);
       if (!isArmed(will)) {
         details.push(
           `Not armed: ${acceptedGuardians(will).length} of ${will.guardian_threshold} required guardians have accepted, so nothing can start, however long the silence.`,
@@ -103,16 +111,16 @@ export function explainLiveness(will: WillView, observations: Observation[], now
       }
       break;
     case "Quiet":
-      headline = `Quiet for ${quietFor}, so we're checking in: the heartbeat app, then email, Telegram and DMs. Any reply stops it.`;
+      headline = `Quiet for ${quietFor}${usual}, so we're checking in: the heartbeat app, then email, Telegram and DMs. Any reply stops it.`;
       details.push(lastSeen());
       break;
     case "WelfareCheck":
       const asked = ["guardians", ...(will.contacts.length ? ["friends"] : []), ...(will.lawyer ? ["the lawyer"] : [])];
       const who = asked.length > 1 ? `${asked.slice(0, -1).join(", ")} and ${asked[asked.length - 1]}` : asked[0];
-      headline = `Quiet for ${quietFor} and no reply to the checks. ${who[0].toUpperCase()}${who.slice(1)} are asked whether they've heard from ${will.owner}.`;
+      headline = `Quiet for ${quietFor}${usual} and no reply to the checks. ${who[0].toUpperCase()}${who.slice(1)} are asked whether they've heard from ${will.owner}.`;
       break;
     case "GuardianVote":
-      headline = `Quiet for ${quietFor}, and nobody has heard from ${will.owner}. Guardians are being asked whether they have passed away; a single "they're alive" stops it.`;
+      headline = `Quiet for ${quietFor}${usual}, and nobody has heard from ${will.owner}. Guardians are being asked whether they have passed away; a single "they're alive" stops it.`;
       break;
     case "Challenge":
       headline = `Guardians have confirmed. This is the challenge period: ${will.owner} is alerted on every channel, and any sign of life cancels everything.`;

@@ -124,7 +124,7 @@ Pick another scenario on the same card. The card shows a checklist with a button
 
 **The ladder:**
 1. **All good** (armed only once enough guardians accept).
-2. **Quiet:** checks go out to the heartbeat app, email, Telegram, then DMs.
+2. **Quiet:** after silence longer than your usual. At setup the app reads your own NEAR (and Sepolia) history, finds your typical gap between transactions, and suggests 3× it (7–90 days); you confirm or change it. The verdict then says "quiet 9 days (usually active every 3 days)". Checks go out to the heartbeat app, email, Telegram, then DMs.
 3. **Welfare check:** guardians, friends and the lawyer are asked whether they've heard from you.
 4. **Guardian vote:** one "they're alive" stops it.
 5. **Challenge period:** you're alerted everywhere.
@@ -210,8 +210,8 @@ See [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md). In short:
 - **Centralized KMS.** With Phala's KMS, whoever controls the Phala account could push new agent code that derives the same sealed-notes key. Every deployed compose hash is published (`deploy/tee-agent.json`) and must be approved on the contract to register. An on-chain KMS with a timelocked allowlist is on the roadmap.
 - **Key persistence.** The sealed-notes key is tied to one Phala app; the agent is upgraded in place and never re-created. Losing that app means owners must re-seal their notes.
 - **Not built yet:**
-  - enforcing policy `conditions` (e.g. "not before 2031"), which are parsed and shown;
-  - an adaptive "your normal" baseline: the quiet threshold is a fixed setting per will.
+  - `not_before` conditions are parsed and shown today; enforcement is next;
+  - a quiet period that keeps adapting: it is suggested from your history at setup, then stays the number you confirmed.
 - **Expired guardian votes restart the ladder.** If guardians don't vote, the will returns to All good without a new sign of life, so the ladder starts again at once (about every 7 minutes on demo timings). The repeated checks and welfare messages appear in the app, but Telegram sends each of them only once per silence. The challenge alarm is always sent.
 - **NEAR Intents is SIMULATED on testnet.** NEAR Intents has no testnet. The testnet slices are real transfers; the swap that takes them on to the heir's choice runs on a simulated 1Click client (live prices, fake deposit address). On mainnet: heirs see live dry quotes, and real payouts were sent from our demo vault (see above) only by a local script (`scripts/mainnet-payout.ts`) that asks a person for approval before every transaction (caps: $5 each, $25 in total). Any made are listed at `/mainnet`. In production, the attested agent's mainnet contract would sign these legs.
 - **Payout waiting happens after the vault.** If an heir hasn't chosen how to be paid, their onward payout waits and later slices are paid together. The testnet slice itself still leaves the vault on schedule. Holding it in the vault would need a contract change (roadmap).
@@ -222,10 +222,10 @@ See [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md). In short:
 
 ## Roadmap
 
-- **Beyond wills: conditional gifts.** The will is the first product of a conditional-release engine: time or milestone conditions, attested by people, with a challenge window and staged release. The `not_before` condition (parsed and shown today) is the first example. Milestones and dates only; never conditions on relationships, beliefs or lifestyle.
+- **Beyond wills: conditional gifts.** The will is the first product of a conditional-release engine: time or milestone conditions, attested by people, with a challenge window and staged release. The `not_before` condition is the first example: parsed and shown today; enforcement is next. Milestones and dates only; never conditions on relationships, beliefs or lifestyle.
 - A human adjudicator for disputes and heir support.
 - Real Gmail, Calendar, X, Instagram, WhatsApp and LinkedIn adapters, with OAuth tokens kept in the TEE.
-- An adaptive baseline per source.
+- A quiet period that adapts over time, per source.
 - Incapacity mode: a capped caretaker allowance via function-call keys.
 - Fire-drill mode, and stale-will review.
 - A lawyer companion letter.

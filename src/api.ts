@@ -13,6 +13,7 @@ import { stateName, type WillContract, type WillView } from "./near/will-contrac
 import { checkPolicy, policyHash, type Policy } from "./policy/policy";
 import { SIMULATED_SOURCES } from "./signals/adapters";
 import type { SignalSource } from "./liveness/score";
+import type { Baseline } from "./liveness/baseline";
 import { explainLiveness } from "./liveness/verdict";
 import type { Notification, OwnerSignalConfig, Store } from "./state/store";
 import type { TelegramBot } from "./telegram/bot";
@@ -20,6 +21,8 @@ import { type OneClickClient, quoteRequest, usdValue } from "./intents/oneclick"
 import { checkPayoutPref, MIN_PAYOUT_USD, ORIGIN_ASSET, payoutTokens, pendingSlices, slicesFor } from "./intents/payout";
 
 export interface ApiDeps {
+  /** The owner's transaction history (NEAR accounts, Sepolia addresses) → their usual rhythm. Optional: tests leave it out. */
+  baseline?: (near: string[], sepolia: string[]) => Promise<Baseline>;
   contract: WillContract;
   store: Store;
   vaults: ChainVault[];
@@ -120,6 +123,19 @@ export function api(deps: ApiDeps): Hono {
   // Many open pages poll these routes; each call costs the agent RPC/Sepolia/mempool requests from one
   // IP, so answers are shared for a few seconds.
   const cache = new Map<string, { at: number; value: Promise<unknown> }>();
+  // Baselines live in their own cache: writes clear the read cache, and a heartbeat shouldn't refetch
+  // 90 days of history. Keyed by the sources, so a newly added address is picked up at once.
+  const baselines = new Map<string, { at: number; value: Promise<Baseline | null> }>();
+  function usualRhythm(owner: string, evm?: string): Promise<Baseline | null> {
+    const key = `${owner}|${evm ?? ""}`;
+    const hit = baselines.get(key);
+    if (hit && Date.now() - hit.at < 86_400_000) return hit.value;
+    const value = deps.baseline ? deps.baseline([owner], evm ? [evm] : []).catch(() => null) : Promise.resolve(null);
+    baselines.set(key, { at: Date.now(), value });
+    if (baselines.size > 2000) baselines.delete(baselines.keys().next().value!);
+    return value;
+  }
+
   function cached<T>(key: string, ttlMs: number, fn: () => Promise<T>): Promise<T> {
     const hit = cache.get(key);
     if (hit && Date.now() - hit.at < ttlMs) return hit.value as Promise<T>;
@@ -222,7 +238,10 @@ export function api(deps: ApiDeps): Hono {
     const seen = store.get().observations[owner] ?? {};
     const will = await cached(`will:${owner}`, 5000, () => contract.getWill(owner)).catch(() => null);
     const observations = Object.entries(seen).map(([source, o]) => ({ source: source as SignalSource, at: new Date(o!.at), trustWeight: o!.trustWeight, simulated: o!.simulated }));
-    const verdict = will ? explainLiveness(will, observations, new Date()) : null;
+    // The owner's usual rhythm, from their own transaction history; recomputed at most daily.
+    const cfg = store.get().owners[owner];
+    const baseline = will ? await usualRhythm(owner, cfg?.evmAddress) : null;
+    const verdict = will ? explainLiveness(will, observations, new Date(), undefined, baseline?.medianGapS ?? null) : null;
     return { will, signals: { observations: seen, heartbeat: store.get().heartbeats[owner] ?? null, verdict } };
   }
 

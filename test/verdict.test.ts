@@ -66,6 +66,15 @@ describe("explainLiveness", () => {
     const v = explainLiveness(will("Active", { guardians: [{ account_id: "g1.testnet", accepted: true }, { account_id: "g2.testnet", accepted: false }] }), [], now);
     expect(v.details.join(" ")).toMatch(/Not armed: 1 of 2 required guardians have accepted/);
   });
+  it("puts the silence next to the owner's usual rhythm when the history says what's usual", () => {
+    const q = explainLiveness(will({ Quiet: { since: nowS - 60 } }, { last_alive_at: nowS - 9 * 86400 }), [], now, undefined, 3 * 86400);
+    expect(q.headline).toBe("Quiet for 9 days (usually active every 3 days), so we're checking in: the heartbeat app, then email, Telegram and DMs. Any reply stops it.");
+    const a = explainLiveness(will(), [], now, undefined, 8 * 3600);
+    expect(a.details).toContain("Usually active every 8 hours, from the last 90 days of transactions.");
+    // No history: no claim about what's usual.
+    expect(explainLiveness(will({ Quiet: { since: nowS - 60 } }, { last_alive_at: nowS - 9 * 86400 }), [], now).headline).not.toContain("usually");
+  });
+
   it("describes Quiet with how long and what happens next", () => {
     const v = explainLiveness(will({ Quiet: { since: nowS - 60 } }, { last_alive_at: nowS - 9 * 86400 }), [], now);
     expect(v.headline).toBe("Quiet for 9 days, so we're checking in: the heartbeat app, then email, Telegram and DMs. Any reply stops it.");
