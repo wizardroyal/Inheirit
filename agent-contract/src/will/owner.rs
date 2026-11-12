@@ -27,6 +27,11 @@ impl Contract {
             // At most the latest MAX_NOTES: repeated Start overs must not grow contract-paid storage forever.
             let keep = old.released_notes.len().saturating_sub(MAX_NOTES);
             will.released_notes = old.released_notes[keep..].to_vec();
+        } else if let Some(raw) = env::storage_read(&closed_key(&owner)) {
+            // A will this owner closed earlier: keep counting rounds and note ids from where it stopped.
+            let (round, next_note): (u32, u32) = near_sdk::borsh::from_slice(&raw).expect("closed record");
+            will.execution_round = round;
+            will.next_note_id = next_note;
         }
         emit(
             "will_created",
@@ -303,4 +308,33 @@ impl Contract {
         );
         self.save(will);
     }
+
+    /// Closes the caller's will for good: only at All good, never with a withdrawal still being sent.
+    /// The NEAR vault and the will's storage deposit go back to the owner; sealed notes are dropped.
+    /// The contract can't see Sepolia or Bitcoin balances, so the app checks those vaults are empty
+    /// before it offers this (coins left there could no longer be withdrawn through the will).
+    pub fn close_will(&mut self) {
+        let owner = env::predecessor_account_id();
+        let will = self.will(&owner);
+        require!(will.state == WillState::Active, "A will can be closed only at All good");
+        require!(will.pending_withdrawals.is_empty(), "A withdrawal is still being sent; wait for it first");
+        let vault = will.near_balance.0;
+        let initial = env::storage_usage();
+        // The agent keys executions and payouts by round and notes by id: a later will continues them.
+        env::storage_write(&closed_key(&owner), &near_sdk::borsh::to_vec(&(will.execution_round, will.next_note_id)).unwrap());
+        self.wills.remove(&owner);
+        self.wills.flush();
+        self.total_vault_near -= vault;
+        emit("will_closed", serde_json::json!({ "owner": owner, "near_returned": vault.to_string(), "notes_dropped": will.sealed_notes.len() }));
+        // Freed storage is refunded by settle_storage; the vault goes back in the same transfer batch.
+        if vault > 0 {
+            Promise::new(owner.clone()).transfer(NearToken::from_yoctonear(vault)).detach();
+        }
+        self.settle_storage(&owner, initial, NearToken::from_yoctonear(0));
+    }
+}
+
+/// Raw storage key for a closed will's counters (outside the `Contract` struct: no layout change).
+fn closed_key(owner: &AccountId) -> Vec<u8> {
+    format!("closed:{owner}").into_bytes()
 }

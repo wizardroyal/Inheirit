@@ -1801,3 +1801,77 @@ fn owner_can_cancel_an_invite() {
 fn invite_role_validated() {
     with_invite("heir", "x", 3600);
 }
+
+// ---------------------------------------------------------------- close_will (2026-11-12)
+
+#[test]
+fn close_will_returns_the_vault_and_removes_the_will() {
+    let mut t = T::with_will();
+    t.pay(OWNER, STORAGE_DEPOSIT).add_sealed_note(acc(H1), "Ledger".into(), vec![7u8; 100].into());
+    let before = t.c.get_total_vault_near().0;
+    assert_eq!(t.will().near_balance.0, near(10));
+    t.as_(OWNER).close_will();
+    assert!(t.c.wills.get(&acc(OWNER)).is_none(), "will and its notes are gone");
+    assert_eq!(t.c.get_total_vault_near().0, before - near(10));
+}
+
+#[test]
+fn close_will_lets_the_owner_start_again() {
+    let mut t = T::with_will();
+    t.as_(OWNER).close_will();
+    t.pay(OWNER, STORAGE_DEPOSIT).create_will(config());
+    assert_eq!(t.will().state, WillState::Active);
+}
+
+#[test]
+#[should_panic(expected = "A will can be closed only at All good")]
+fn close_will_refused_while_escalating() {
+    let mut t = T::with_will();
+    t.to_quiet();
+    t.as_(OWNER).close_will();
+}
+
+#[test]
+#[should_panic(expected = "A will can be closed only at All good")]
+fn close_will_refused_during_release() {
+    let mut t = T::with_will();
+    t.to_executing();
+    t.as_(OWNER).close_will();
+}
+
+#[test]
+#[should_panic(expected = "A will can be closed only at All good")]
+fn close_will_refused_after_completion() {
+    let mut t = T::with_will();
+    t.to_completed();
+    t.as_(OWNER).close_will();
+}
+
+#[test]
+#[should_panic(expected = "A withdrawal is still being sent")]
+fn close_will_refused_with_a_pending_withdrawal() {
+    let mut t = T::with_will();
+    t.as_(OWNER).request_withdrawal(Chain::Eth, "0x1111111111111111111111111111111111111111".into(), U128(1000));
+    t.as_(OWNER).close_will();
+}
+
+#[test]
+#[should_panic(expected = "No will for this owner")]
+fn close_will_refused_without_a_will() {
+    let mut t = T::new();
+    t.as_(STRANGER).close_will();
+}
+
+#[test]
+fn a_will_created_after_close_continues_round_and_note_numbering() {
+    let mut t = T::with_will();
+    t.to_executing();
+    t.as_(OWNER).i_am_alive(); // halted mid-release: round 1 used
+    t.pay(OWNER, STORAGE_DEPOSIT).add_sealed_note(acc(H1), "Ledger".into(), vec![7u8; 100].into());
+    let (round, next_note) = (t.will().execution_round, t.will().next_note_id);
+    assert!(round >= 1 && next_note >= 1);
+    t.as_(OWNER).close_will();
+    t.pay(OWNER, STORAGE_DEPOSIT).create_will(config());
+    assert_eq!(t.will().execution_round, round);
+    assert_eq!(t.will().next_note_id, next_note);
+}
