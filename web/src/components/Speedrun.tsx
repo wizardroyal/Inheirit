@@ -253,7 +253,7 @@ export function Speedrun({ will, refresh }: { will: Will; refresh: () => void })
           {s === "Active" ? (
             <button
               type="button"
-              className="text-accent underline"
+              className="min-h-11 text-accent underline"
               onClick={() => {
                 setScenario(SCENARIOS[SCENARIOS.findIndex((x) => x.id === scenario) + 1].id);
                 setEscalated("0");

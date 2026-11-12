@@ -8,12 +8,12 @@ import { humanize, useNames } from "@/lib/names";
 import { call, canSign } from "@/lib/near";
 import { ago, duration, LADDER, nextStepIn, SOURCE_LABELS, stateName, type Will } from "@/lib/will";
 import { useNow } from "@/lib/hooks";
-import { ActionButton, NoWill } from "../ui";
+import { ActionButton, NoWill, Skeleton } from "../ui";
 
 /** Screens that need a will: a gentle pointer to Home when there is none yet. */
 export function WillGate({ children }: { children: (will: Will) => ReactNode }) {
   const { owner, will, loaded, viewing } = useAccount();
-  if (!loaded) return <p className="text-muted">Loading…</p>;
+  if (!loaded) return <Skeleton />;
   if (!will) {
     if (viewing) return <NoWill owner={owner} />;
     return (

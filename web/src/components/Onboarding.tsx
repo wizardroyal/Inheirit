@@ -156,6 +156,25 @@ export function PeopleField({
   );
 }
 
+/** Where the owner is in setup: the steps, done ones ticked, and a bar. Backing up comes right after creation. */
+function SetupProgress({ steps }: { steps: [string, boolean][] }) {
+  const done = steps.filter(([, d]) => d).length;
+  return (
+    <div className="sticky top-0 z-10 -mx-1 rounded-xl bg-bg/95 px-1 py-3 backdrop-blur">
+      <div className="h-2 overflow-hidden rounded-full bg-line" role="progressbar" aria-valuemin={0} aria-valuemax={steps.length} aria-valuenow={done}>
+        <div className="h-full rounded-full bg-accent transition-all" style={{ width: `${(done / steps.length) * 100}%` }} />
+      </div>
+      <ol className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm">
+        {steps.map(([label, d], i) => (
+          <li key={label} className={d ? "text-accent" : "text-muted"}>
+            {d ? "✓" : `${i + 1}.`} {label}
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
 export function MyWillSetup({
   owner,
   onCreating,
@@ -247,6 +266,17 @@ export function MyWillSetup({
 
   return (
     <div className="space-y-6" onChangeCapture={() => setTouched(true)} onClickCapture={(e) => (e.target as HTMLElement).closest("button") && setTouched(true)}>
+      <SetupProgress
+        steps={[
+          ["Who gets what", heirs.some((h) => h.account.trim() && h.name.trim())],
+          ["Who confirms", list(guardians).length >= 2],
+          ["Signs of life", true],
+          ["Fund the vault", notesOnly || Number(deposit) > 0],
+          ["Final secrets", readyNotes(notes).length > 0 || !notesOnly],
+          ["Back up access", false],
+          ["Review", !!policy],
+        ]}
+      />
       <Card title="About you">
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Display name" hint="Shown to heirs and guardians.">

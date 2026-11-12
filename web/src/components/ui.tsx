@@ -57,7 +57,7 @@ export function ActionButton({
             setBusy(false);
           }
         }}
-        className={`rounded-lg px-4 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${TONES[tone]} ${className}`}
+        className={`min-h-11 rounded-lg px-4 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${TONES[tone]} ${className}`}
       >
         {busy ? "Working…" : children}
       </button>
@@ -116,7 +116,7 @@ export function Field({ label, children, hint, group }: { label: string; childre
   );
 }
 
-export const inputCls = "rounded-lg border border-field bg-card px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent";
+export const inputCls = "min-h-11 rounded-lg border border-field bg-card px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent";
 
 export function ExtLink({ href, children }: { href: string; children: ReactNode }) {
   return (
@@ -206,5 +206,16 @@ export function ConfirmButton({ label, question, onConfirm }: { label: string; q
         Cancel
       </button>
     </span>
+  );
+}
+
+/** A calm placeholder while a screen loads (instead of "Loading…"). */
+export function Skeleton() {
+  return (
+    <div aria-busy="true" aria-label="Loading" className="space-y-4">
+      <div className="h-40 animate-pulse rounded-2xl bg-line/60" />
+      <div className="h-20 animate-pulse rounded-2xl bg-line/50" />
+      <div className="h-12 w-2/3 animate-pulse rounded-xl bg-line/40" />
+    </div>
   );
 }

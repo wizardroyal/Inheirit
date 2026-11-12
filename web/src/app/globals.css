@@ -55,6 +55,11 @@
 }
 
 @theme inline {
+  /* Readability: small text is 16px and captions 14px everywhere. */
+  --text-sm: 1rem;
+  --text-sm--line-height: 1.5rem;
+  --text-xs: 0.875rem;
+  --text-xs--line-height: 1.25rem;
   --color-bg: var(--bg);
   --color-card: var(--card);
   --color-ink: var(--ink);
@@ -91,7 +96,7 @@ body {
 /* ---- Technical layer ---- */
 .tech {
   font-family: var(--font-mono);
-  font-size: 12.5px;
+  font-size: 14px;
   line-height: 1.5;
 }
 .tech .border,

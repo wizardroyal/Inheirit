@@ -54,6 +54,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               <span className="font-serif text-ink">Inheirit</span> · built at NEAR HACKATHON · NEAR testnet, free to try
             </span>
             <span className="flex gap-5">
+              <Link href="/faq" className="hover:text-ink">
+                FAQ
+              </Link>
               <a href={REPO_URL} target="_blank" rel="noreferrer" className="hover:text-ink">
                 Code on GitHub
               </a>

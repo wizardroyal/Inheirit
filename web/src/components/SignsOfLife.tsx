@@ -44,7 +44,7 @@ export function SignsOfLife({ owner, will }: { owner: string; will: Will }) {
             style={{ width: `${((Math.max(idx, 0) + 1) / LADDER.length) * 100}%` }}
           />
         </div>
-        <ol className="tech mt-2 grid gap-x-2 text-[11px] leading-tight text-muted [overflow-wrap:anywhere]" style={{ gridTemplateColumns: `repeat(${LADDER.length}, minmax(0, 1fr))` }}>
+        <ol className="tech mt-2 grid gap-x-2 text-xs leading-tight text-muted [overflow-wrap:anywhere]" style={{ gridTemplateColumns: `repeat(${LADDER.length}, minmax(0, 1fr))` }}>
           {LADDER.map((r, i) => (
             <li key={r.state} className={`pr-1 ${i === idx ? "font-semibold text-ink" : ""} ${i > idx ? "text-muted" : ""}`}>
               <span className="hidden sm:inline">{r.label}</span>

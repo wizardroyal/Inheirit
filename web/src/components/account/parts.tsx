@@ -48,11 +48,11 @@ export function AccountActions({ owner, onSignIn, onSignedOut }: { owner: string
   return (
     <div className="flex flex-wrap items-center gap-3 text-xs">
       {wallet && (
-        <button type="button" className="text-accent underline" onClick={() => disconnectWallet().then(onSignedOut)}>
+        <button type="button" className="min-h-11 px-1 text-accent underline" onClick={() => disconnectWallet().then(onSignedOut)}>
           Disconnect wallet
         </button>
       )}
-      <button type="button" className="text-muted underline hover:text-ink" onClick={onSignIn}>
+      <button type="button" className="min-h-11 px-1 text-muted underline hover:text-ink" onClick={onSignIn}>
         Use another account
       </button>
     </div>

@@ -104,7 +104,7 @@ function Shell({ children }: { children: ReactNode }) {
             ))}
           </div>
         )}
-        <div className="grid grid-cols-6 text-center text-[11px]">
+        <div className="grid grid-cols-6 text-center text-xs">
           {MAIN.map((l) => (
             <Link key={l.href} href={l.href} aria-current={active(l.href) ? "page" : undefined} className={`px-1 py-3 ${active(l.href) ? "font-semibold text-accent" : "text-muted"}`}>
               {l.label}

@@ -83,7 +83,7 @@ export function StrengthBar({ will }: { will: Will }) {
       <div className="flex items-center gap-3">
         <h2 className="font-serif text-xl">Will strength</h2>
         <span className="ml-auto flex items-center gap-1">
-          <Link href="/account/signs" aria-label="Signs of life settings" title="Signs of life" className="rounded-lg p-2 text-muted hover:bg-accent-soft hover:text-ink">
+          <Link href="/account/signs" aria-label="Signs of life settings" title="Signs of life" className="grid min-h-11 min-w-11 place-items-center rounded-lg text-muted hover:bg-accent-soft hover:text-ink">
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
               <circle cx="12" cy="12" r="3" />
               <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z" />
@@ -93,7 +93,7 @@ export function StrengthBar({ will }: { will: Will }) {
             type="button"
             aria-expanded={open}
             aria-label={open ? "Hide signals" : "Show signals"}
-            className="rounded-lg p-2 text-muted hover:bg-accent-soft hover:text-ink"
+            className="grid min-h-11 min-w-11 place-items-center rounded-lg text-muted hover:bg-accent-soft hover:text-ink"
             onClick={() => setOpen((v) => !v)}
           >
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden className={open ? "rotate-180 transition-transform" : "transition-transform"}>

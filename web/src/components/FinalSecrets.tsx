@@ -45,11 +45,11 @@ export function FinalSecrets({ heirs, notes, onChange }: { heirs: { account: str
         <Field label="Add a note" group>
           <div className="flex flex-wrap gap-2">
             {TEMPLATES.map((t) => (
-              <button key={t.label} type="button" className="rounded-full border border-line bg-card px-3 py-1 text-sm hover:bg-accent-soft" onClick={() => add(t)}>
+              <button key={t.label} type="button" className="min-h-11 rounded-full border border-line bg-card px-4 py-2 text-sm hover:bg-accent-soft" onClick={() => add(t)}>
                 {t.label}
               </button>
             ))}
-            <button type="button" className="rounded-full border border-line bg-card px-3 py-1 text-sm hover:bg-accent-soft" onClick={() => add()}>
+            <button type="button" className="min-h-11 rounded-full border border-line bg-card px-4 py-2 text-sm hover:bg-accent-soft" onClick={() => add()}>
               Blank
             </button>
           </div>

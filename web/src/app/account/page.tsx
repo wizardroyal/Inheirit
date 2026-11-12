@@ -3,12 +3,12 @@
 import { CreateWill, LowBalance } from "@/components/account/parts";
 import { RecentLine, StatusHero } from "@/components/account/home";
 import { NextStep, StrengthBar } from "@/components/account/strength";
-import { NoWill } from "@/components/ui";
+import { NoWill, Skeleton } from "@/components/ui";
 import { useAccount } from "@/lib/account";
 
 export default function HomePage() {
   const { owner, will, loaded, refresh, creating, setCreating, viewing } = useAccount();
-  if (!loaded) return <p className="text-muted">Loading…</p>;
+  if (!loaded) return <Skeleton />;
   if (!will && viewing) return <NoWill owner={owner} />;
   if (!will || creating)
     return (
