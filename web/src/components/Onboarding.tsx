@@ -16,6 +16,7 @@ import { humanize, nameOf, readable, useAccountLabel, useNames } from "@/lib/nam
 import { signRequest } from "@/lib/near";
 import { acceptedGuardians, isArmed, type Will } from "@/lib/will";
 import { TelegramLink } from "./TelegramLink";
+import { addedFor, saveAdded } from "./account/signs";
 import type { Watching } from "./WillParts";
 import { QuietPeriod, realSchedule } from "./QuietPeriod";
 import { type DraftNote, FinalSecrets, readyNotes } from "./FinalSecrets";
@@ -486,7 +487,9 @@ export function MyWillSetup({
                 if (local.length) await acceptAsGuardians(owner, local, progress);
                 if (evm) {
                   progress("Adding your Ethereum wallet as a sign of life…");
-                  await agent.registerOwner(await signRequest(owner, "register_owner", { evm_address: evm }));
+                  // As a listed wallet, so it can be removed later from Signs of life on this device.
+                  await agent.registerOwner(await signRequest(owner, "register_owner", { evm_addresses: [evm] }));
+                  saveAdded(owner, { ...addedFor(owner), evm: [...new Set([...addedFor(owner).evm, evm])] });
                 }
                 progress("Done. Send each guardian the link on your dashboard.");
                 onCreated();

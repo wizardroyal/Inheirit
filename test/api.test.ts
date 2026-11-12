@@ -103,6 +103,15 @@ describe("owner-signed routes", () => {
     expect(status).not.toContain("alice.near");
     expect(status).not.toContain("e".repeat(40));
   });
+  it("an empty GitHub or Ethereum address clears it (removal from Signs of life)", async () => {
+    const t = setup(false);
+    const post = (data: unknown) => t.post("/api/owners", { signed: { owner: "alice.testnet", action: "register_owner", data } });
+    await post({ github: "alice", evm_address: "0x" + "e".repeat(40) });
+    expect(t.store.get().owners["alice.testnet"]).toMatchObject({ github: "alice", evmAddress: "0x" + "e".repeat(40) });
+    expect((await post({ github: "", evm_address: "" })).status).toBe(200);
+    expect(t.store.get().owners["alice.testnet"]?.github).toBeUndefined();
+    expect(t.store.get().owners["alice.testnet"]?.evmAddress).toBeUndefined();
+  });
   it("refuses an heir's NEAR account, the owner's own, and more than five extras", async () => {
     const t = setup(false);
     const post = (near_accounts: string[]) => t.post("/api/owners", { signed: { owner: "alice.testnet", action: "register_owner", data: { near_accounts } } });

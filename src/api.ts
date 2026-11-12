@@ -71,7 +71,8 @@ const GuideRequest = z.object({
 
 const NEAR_ACCOUNT = /^(?=.{2,64}$)([a-z\d]+[-_])*[a-z\d]+(\.([a-z\d]+[-_])*[a-z\d]+)*$/;
 const OwnerFields = z.object({
-  evm_address: z.string().regex(/^0x[0-9a-fA-F]{40}$/).optional(),
+  /** An empty string clears it (owner-signed removal from Signs of life). */
+  evm_address: z.union([z.string().regex(/^0x[0-9a-fA-F]{40}$/), z.literal("")]).optional(),
   /** Extra Sepolia addresses and NEAR accounts (testnet, or mainnet *.near) the owner uses; replace the saved lists. */
   evm_addresses: z.array(z.string().regex(/^0x[0-9a-fA-F]{40}$/)).max(5).optional(),
   near_accounts: z.array(z.string().regex(NEAR_ACCOUNT)).max(5).optional(),
@@ -80,7 +81,7 @@ const OwnerFields = z.object({
     .record(z.string().regex(NEAR_ACCOUNT), z.string().email().max(254))
     .refine((m) => Object.keys(m).length <= 16, "At most 16 addresses")
     .optional(),
-  github: z.string().regex(/^[A-Za-z0-9-]{1,39}$/).optional(),
+  github: z.union([z.string().regex(/^[A-Za-z0-9-]{1,39}$/), z.literal("")]).optional(),
   email: z.string().email().optional(),
 });
 
@@ -222,7 +223,7 @@ export function api(deps: ApiDeps): Hono {
     if (!will) return c.json({ error: `No will for ${r.owner}` }, 404);
     // The release itself must not count as a sign of life: the will's own ETH vault (its nonce rises
     // with every slice) and an heir's receive address are refused.
-    const evms = [...(evm_address ? [evm_address] : []), ...(evm_addresses ?? [])];
+    const evms = [...(evm_address ? [evm_address] : []), ...(evm_addresses ?? [])]; // "" clears, nothing to check
     if (evms.length) {
       const eth = deps.vaults.find((v) => v.chain === "Eth");
       const vault = eth ? (await eth.address(r.owner).catch(() => "")).toLowerCase() : "";
@@ -250,11 +251,11 @@ export function api(deps: ApiDeps): Hono {
       const prev = s.owners[r.owner];
       s.owners[r.owner] = {
         owner: r.owner,
-        evmAddress: evm_address ?? prev?.evmAddress,
+        evmAddress: evm_address === "" ? undefined : (evm_address ?? prev?.evmAddress),
         evmAddresses: evm_addresses ?? prev?.evmAddresses,
         nearAccounts: near_accounts ?? prev?.nearAccounts,
         peopleEmails: people_emails ?? prev?.peopleEmails,
-        github: github ?? prev?.github,
+        github: github === "" ? undefined : (github ?? prev?.github),
         email: email ?? prev?.email,
         watchedSince,
       };

@@ -172,3 +172,39 @@ export function NoWill({ owner }: { owner: string }) {
     </Card>
   );
 }
+
+/** A destructive action that asks first: the first tap shows "Sure? Yes · Cancel". */
+export function ConfirmButton({ label, question, onConfirm }: { label: string; question: string; onConfirm: () => Promise<unknown> }) {
+  const [asking, setAsking] = useState(false);
+  const [busy, setBusy] = useState(false);
+  if (!asking)
+    return (
+      <button type="button" className="min-h-11 rounded-lg border border-line px-4 py-2 hover:bg-danger-soft hover:text-danger" onClick={() => setAsking(true)}>
+        {label}
+      </button>
+    );
+  return (
+    <span className="inline-flex flex-wrap items-center gap-2">
+      <span>{question}</span>
+      <button
+        type="button"
+        disabled={busy}
+        className="min-h-11 rounded-lg border border-danger px-4 py-2 text-danger hover:bg-danger-soft disabled:opacity-50"
+        onClick={async () => {
+          setBusy(true);
+          try {
+            await onConfirm();
+          } finally {
+            setBusy(false);
+            setAsking(false);
+          }
+        }}
+      >
+        {busy ? "…" : "Yes"}
+      </button>
+      <button type="button" className="min-h-11 px-3 py-2 text-muted underline" onClick={() => setAsking(false)}>
+        Cancel
+      </button>
+    </span>
+  );
+}
