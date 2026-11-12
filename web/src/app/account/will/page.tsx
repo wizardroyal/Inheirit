@@ -2,6 +2,7 @@
 // My will: the will in plain sentences, who gets what, the schedule; edit it or close it.
 import { EditWill, CloseWill } from "@/components/account/will";
 import { WillGate } from "@/components/account/home";
+import { People } from "@/components/account/people";
 import { Card } from "@/components/ui";
 import { useAccount } from "@/lib/account";
 import { useAccountLabel } from "@/lib/names";
@@ -55,6 +56,7 @@ function MyWill({ will }: { will: Will }) {
           </ol>
         </Card>
       </div>
+      <People will={will} />
       {!viewing && stateName(will.state) === "Active" && (
         <div className="grid gap-6 lg:grid-cols-2">
           <EditWill will={will} refresh={refresh} />

@@ -22,7 +22,6 @@ const NAV = [
   { href: "/account", label: "Your will" },
   { href: "/heartbeat", label: "Heartbeat" },
   { href: "/mainnet", label: "Mainnet" },
-  { href: "/demo", label: "Control panel" },
 ];
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

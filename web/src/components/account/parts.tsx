@@ -80,7 +80,7 @@ export function useSessionState<T>(key: string, initial: T): [T, (v: T) => void]
   return [v, set];
 }
 
-/** Three tabs: My will (default), Will in plain English (drafted by NEAR AI), Generate sample will. */
+/** Two ways to write it: My will (default) or Will in plain English (drafted by NEAR AI). A sample will is on the speedrun page. */
 export function CreateWill(props: { owner: string; onCreating: (b: boolean) => void; onCreated: () => void }) {
   const [mode, setMode] = useSessionState<"generate" | "quick" | "english">(`inheirit:tab:${props.owner}`, "quick");
   return (
@@ -90,7 +90,6 @@ export function CreateWill(props: { owner: string; onCreating: (b: boolean) => v
           [
             ["quick", "My will"],
             ["english", "Will in plain English"],
-            ["generate", "Generate sample will"],
           ] as const
         ).map(([m, label]) => (
           <button
@@ -104,9 +103,7 @@ export function CreateWill(props: { owner: string; onCreating: (b: boolean) => v
           </button>
         ))}
       </div>
-      {mode === "generate" ? (
-        <GenerateWill {...props} />
-      ) : mode === "quick" ? (
+      {mode !== "english" ? (
         <MyWillSetup {...props} summary={(stagesPct, demoClock, quietDays) => <SetupSummary stagesPct={stagesPct} demoClock={demoClock} quietDays={quietDays} />} />
       ) : (
         <WriteWill {...props} />

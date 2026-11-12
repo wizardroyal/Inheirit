@@ -16,11 +16,10 @@ const MAIN = [
   { href: "/account", label: "Home" },
   { href: "/account/will", label: "My will" },
   { href: "/account/signs", label: "Signs of life" },
-  { href: "/account/people", label: "People" },
   { href: "/account/secrets", label: "Final secrets" },
+  { href: "/account/vault", label: "Vault" },
 ];
 const MORE = [
-  { href: "/account/money", label: "Money" },
   { href: "/account/activity", label: "Activity" },
   { href: "/account/settings", label: "Settings" },
 ];

@@ -43,7 +43,7 @@ export function useStrength(will: Will) {
       label: `Guardians accepted (${accepted} of ${will.guardian_threshold} needed)`,
       done: isArmed(will),
       required: true,
-      href: "/account/people",
+      href: "/account/will",
       next: `Waiting for ${missingGuardians} more guardian${missingGuardians === 1 ? "" : "s"} to accept. Send them their link.`,
     },
     {
@@ -56,10 +56,10 @@ export function useStrength(will: Will) {
     { label: `Two strong signs of life (${strongCount})`, done: strongCount >= 2, href: "/account/signs", next: "Connect another NEAR account or a Sepolia address you use." },
     { label: "Telegram for checks", done: connected.telegram, href: "/account/settings", next: "Link Telegram so a check reaches your phone." },
     { label: "Email for checks", done: !!watching.email, href: "/account/settings", next: "Add your email for checks and alerts." },
-    { label: "A friend for welfare checks", done: will.contacts.length > 0, href: "/account/people", next: "Add a friend who'd notice if you went quiet." },
-    { label: "A lawyer", done: !!will.lawyer, href: "/account/people", next: "Name a lawyer: they can speed up the release, never skip a step." },
+    { label: "A friend for welfare checks", done: will.contacts.length > 0, href: "/account/will", next: "Add a friend who'd notice if you went quiet." },
+    { label: "A lawyer", done: !!will.lawyer, href: "/account/will", next: "Name a lawyer: they can speed up the release, never skip a step." },
     { label: "A final secret for an heir", done: will.sealed_notes.length > 0, href: "/account/secrets", next: "Leave a sealed note: where the hardware wallet is, who holds the passphrase." },
-    { label: "Something in the vault", done: BigInt(will.near_balance) > 0n || will.sealed_notes.length > 0, href: "/account/money", next: "Put some NEAR in the vault (or keep it notes-only)." },
+    { label: "Something in the vault", done: BigInt(will.near_balance) > 0n || will.sealed_notes.length > 0, href: "/account/vault", next: "Put some NEAR in the vault (or keep it notes-only)." },
   ];
   const optional = items.filter((i) => !i.required);
   const score = Math.round((optional.filter((i) => i.done).length / optional.length) * 100);
