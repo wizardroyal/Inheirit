@@ -9,7 +9,8 @@ describe("baseline", () => {
   it("median gap and a suggestion of 3× it, in whole days", () => {
     const b = computeBaseline(every(3, 20), NOW);
     expect(b.medianGapS).toBe(3 * DAY);
-    expect(b.suggestedQuietS).toBe(9 * DAY);
+    expect(b.suggestedQuietS).toBe(30 * DAY); // 3 × 3 days, raised to the 30-day minimum
+    expect(computeBaseline(every(15, 6), NOW).suggestedQuietS).toBe(45 * DAY);
     expect(b.sessions).toBe(20);
   });
 
@@ -18,7 +19,7 @@ describe("baseline", () => {
     expect(computeBaseline(times, NOW).medianGapS).toBe(2 * DAY);
   });
 
-  it("clamps to 7 days for very active owners and 90 days for rare ones", () => {
+  it("never suggests under 30 days, and caps rare owners at 180", () => {
     expect(computeBaseline(every(0.5, 40), NOW).suggestedQuietS).toBe(MIN_QUIET_S);
     expect(computeBaseline(every(20, 5), NOW).suggestedQuietS).toBe(60 * DAY);
     // 5 sessions in 90 days keep the median gap ≤ 22.5 days, so the cap is a guard, never hit with real data.

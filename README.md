@@ -127,12 +127,12 @@ On **Try a speedrun**, pick another scenario. The card shows a checklist with a 
 
 **The ladder:**
 1. **All good** (armed only once enough guardians accept).
-2. **Quiet:** after silence longer than your usual. At setup the app reads your own NEAR (and Sepolia) history, finds your typical gap between transactions, and suggests 3× it (7–90 days); you confirm or change it. The verdict then says "quiet 9 days (usually active every 3 days)". Checks go out to the heartbeat app, email, Telegram, then DMs.
-3. **Welfare check:** guardians, friends and the lawyer are asked whether they've heard from you.
-4. **Guardian vote:** one "they're alive" stops it.
-5. **Challenge period:** you're alerted everywhere.
-6. **Releasing in stages:** 10% → *longest wait* → 20% → 30% → 40%.
-7. **Waiting before secrets.**
+2. **Quiet:** after silence longer than your usual. At setup the app reads your own NEAR (and Sepolia) history, finds your typical gap between transactions, and suggests 3× it (at least 30 days); you choose the number. The verdict then says "quiet 9 days (usually active every 3 days)". Checks go out to the heartbeat app, email, Telegram, then DMs.
+3. **Welfare check** (14 days): guardians, friends and the lawyer are asked whether they've heard from you.
+4. **Guardian vote** (30 days): one "they're alive" stops it.
+5. **Challenge period** (60 days): you're alerted everywhere.
+6. **Releasing in stages:** 10% → *6 months, the longest wait* → 20% → 3 months → 30% → 3 months → 40%.
+7. **Waiting before secrets** (3 months).
 8. **Secrets released.**
 9. **Completed.**
 
@@ -141,7 +141,9 @@ On **Try a speedrun**, pick another scenario. The card shows a checklist with a 
 - A weak signal (a social post, GitHub) counts only if a second, different source agrees within 24 hours.
 - Any counted sign of life sends the will back to the top, even mid-release or while waiting before secrets.
 
-**Acceleration.** A lawyer, or the guardian quorum with evidence, can attest a death certificate. That switches the remaining stages to a faster schedule (10/30/60, shorter waits). It never skips the guardian vote, the challenge period or a stage.
+These are the real defaults; every number is the owner's to change, and the speedrun runs the same ladder in minutes. A will shouldn't panic; the accelerated path covers urgent needs like funeral costs.
+
+**Acceleration.** A lawyer, or the guardian quorum with evidence, can attest a death certificate. That switches the remaining stages to a faster schedule (10/30/60, 14 days apart). It never skips the guardian vote, the challenge period or a stage.
 
 ## NEAR Intents on mainnet
 

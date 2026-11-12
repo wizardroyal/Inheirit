@@ -15,8 +15,8 @@ const STEPS = [
   ["Welfare check", "Still nothing? Your guardians, friends and lawyer are asked if they've heard from you."],
   ["Guardian vote", "Guardians are asked if you've passed away. One “they're alive” stops it."],
   ["Challenge period", "Enough guardians confirm; you're alerted everywhere. Any sign of life cancels."],
-  ["Released in stages", "10% first, then the longest wait: a slice leaving is the loudest alarm. Then 20/30/40% on NEAR, Ethereum and Bitcoin. A sign of life stops the rest."],
-  ["Secrets last", "Sealed notes open per heir after everything is handed over, plus one more wait. A secret can't be taken back."],
+  ["Released in stages", "10% first, then six months, the longest wait: a slice leaving is the loudest alarm. Then 20/30/40%, three months apart, on NEAR, Ethereum and Bitcoin. A sign of life stops the rest."],
+  ["Secrets last", "Sealed notes open per heir three months after everything is handed over. A secret can't be taken back."],
 ];
 
 const PROBLEMS = [

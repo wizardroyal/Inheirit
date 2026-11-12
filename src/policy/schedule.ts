@@ -25,18 +25,21 @@ export const DEMO_SCHEDULE: SchedulePreset = {
   accelerated: [10, 30, 60].map((pct) => ({ pct, wait_after: 60 })),
 };
 
-/** Documented real defaults (not used by the demo). */
+/**
+ * Real defaults (round 5): a will shouldn't panic. Six months after the first slice, three months
+ * between the rest, three months before secrets. The accelerated path covers urgent needs.
+ */
 export const REAL_SCHEDULE: SchedulePreset = {
   timings: {
     quiet_after: 30 * DAY,
     nudge_period: 7 * DAY,
-    welfare_period: 7 * DAY,
+    welfare_period: 14 * DAY,
     vote_period: 30 * DAY,
-    challenge_period: 30 * DAY,
-    secrets_buffer: 30 * DAY,
+    challenge_period: 60 * DAY,
+    secrets_buffer: 90 * DAY,
   },
-  firstWait: 90 * DAY,
-  wait: 30 * DAY,
+  firstWait: 180 * DAY,
+  wait: 90 * DAY,
   accelerated: [10, 30, 60].map((pct) => ({ pct, wait_after: 14 * DAY })),
 };
 

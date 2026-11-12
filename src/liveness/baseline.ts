@@ -10,8 +10,8 @@ export const MIN_SESSIONS = 5;
 export const WINDOW_DAYS = 90;
 /** Suggested quiet period: this many typical gaps, between the bounds below. */
 export const SUGGEST_FACTOR = 3;
-export const MIN_QUIET_S = 7 * DAY;
-export const MAX_QUIET_S = 90 * DAY;
+export const MIN_QUIET_S = 30 * DAY;
+export const MAX_QUIET_S = 180 * DAY;
 /** With too little history, the default real-timing quiet period. */
 export const DEFAULT_QUIET_S = 30 * DAY;
 
