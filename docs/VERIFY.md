@@ -1,6 +1,6 @@
 # Verify it yourself
 
-Everything below is a read-only call to NEAR testnet; nothing needs an account or a wallet. It checks the claims behind "the agent runs in a TEE and only approved code can move money".
+Run all of it at once: `npx tsx scripts/verify.ts` (prints PASS/FAIL per check and also asks the running agent which key it derived). Everything below is a read-only call to NEAR testnet; nothing needs an account or a wallet. It checks the claims behind "the agent runs in a TEE and only approved code can move money".
 
 ```bash
 view() {  # view <method> [json args]

@@ -166,3 +166,11 @@ export function useNames(): Record<string, string> {
   return JSON.parse(raw) as Record<string, string>;
 }
 
+
+/** A summary line for people: account ids as names, a name said once, long addresses shortened. */
+export function readable(text: string, names: Record<string, string>): string {
+  return humanize(text, names)
+    .replace(/([^\s(]+) \(\1\)/g, "$1")
+    .replace(/\b(0x[0-9a-fA-F]{4})[0-9a-fA-F]{32}([0-9a-fA-F]{4})\b/g, "$1…$2")
+    .replace(/\b(tb1[a-z0-9]{4})[a-z0-9]{20,}([a-z0-9]{4})\b/g, "$1…$2");
+}

@@ -10,7 +10,7 @@ import { SignalList } from "@/components/WillParts";
 import { useActingAs, useWill, useOwnerName } from "@/lib/hooks";
 import { useAccountLabel } from "@/lib/names";
 import { call, ROLE_TGAS } from "@/lib/near";
-import { ago, guardianIds, stateName } from "@/lib/will";
+import { ago, duration, guardianIds, stateName } from "@/lib/will";
 
 async function sha256Hex(file: File): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", await file.arrayBuffer());
@@ -21,13 +21,13 @@ async function sha256Hex(file: File): Promise<string> {
  * The lawyer's death proof (§5.5): it only shortens the remaining waits. It never skips the guardian vote
  * or the challenge period, and it's accepted only in GuardianVote, Challenge or Executing.
  */
-function LawyerCard({ owner, lawyer, state, accelerated, refresh }: { owner: string; lawyer: string; state: string; accelerated: boolean; refresh: () => void }) {
+function LawyerCard({ owner, lawyer, state, accelerated, faster, refresh }: { owner: string; lawyer: string; state: string; accelerated: boolean; faster: string; refresh: () => void }) {
   const [evidence, setEvidence] = useState<{ name: string; hash: string } | null>(null);
   const open = ["GuardianVote", "Challenge", "Executing"].includes(state);
   return (
     <Card title="Lawyer: death certificate" aside={accelerated ? <Pill tone="warn">faster schedule on</Pill> : undefined}>
       <p className="text-sm text-muted">
-        Shortens the remaining waits (10/30/60%, 14 days apart). Never skips the guardian vote or the challenge period.
+        Switches to {faster}. Never skips the guardian vote or the challenge period.
       </p>
       {accelerated ? (
         <p className="mt-3 text-sm">Certificate on record: faster schedule.</p>
@@ -84,7 +84,7 @@ export default function GuardianPage() {
         <ActAs value={me} onChange={setMe} suggested={[...guardianIds(will), ...(will.lawyer ? [will.lawyer] : [])]} label="I am" />
         {me && !entry && me !== will.lawyer && <ErrorNote>{label(me)} isn&apos;t a guardian or the lawyer for this will.</ErrorNote>}
       </div>
-      {me && me === will.lawyer && <LawyerCard owner={owner} lawyer={me} state={s} accelerated={will.accelerated} refresh={refresh} />}
+      {me && me === will.lawyer && <LawyerCard owner={owner} lawyer={me} state={s} accelerated={will.accelerated} faster={`${will.accelerated_stages.map((x) => x.pct).join("/")}%, ${duration(will.accelerated_stages[0]?.wait_after ?? 0)} apart`} refresh={refresh} />}
       {entry && !entry.accepted && (
         <Card title="You've been invited">
           <p className="text-sm">

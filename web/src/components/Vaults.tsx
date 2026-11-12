@@ -42,7 +42,7 @@ export function Vaults({ owner, will, children }: { owner: string; will: Will; c
               <div className="flex justify-between gap-2">
                 <span>{c === "Eth" ? "Sepolia ETH" : "BTC testnet4"}</span>
                 <span title={stale ? "Last known balance; the latest lookup failed and will be retried" : undefined}>
-                  {ok ? (c === "Eth" ? `${(Number(v.balance) / 1e18).toFixed(5)} ETH` : `${v.balance} sats`) : v ? "balance unavailable, retrying" : "…"}
+                  {ok ? (c === "Eth" ? `${+(Number(v.balance) / 1e18).toFixed(5)} ETH` : `${v.balance} sats`) : v ? "balance unavailable, retrying" : "…"}
                   {stale && <span className="text-muted"> (last known)</span>}
                 </span>
               </div>

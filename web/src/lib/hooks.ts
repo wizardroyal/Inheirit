@@ -84,7 +84,8 @@ export function useWill(owner: string | null | undefined, ms = 8000) {
   const latest = useRef<Will | null>(null);
   return usePoll(
     async () => {
-      const w = owner ? await view<Will | null>("get_will", { owner }) : null;
+      // A malformed id (e.g. /heir/bad name) can't have a will: answer "none" instead of an RPC error.
+      const w = owner && /^(?=.{2,64}$)([a-z\d]+[-_])*[a-z\d]+(\.([a-z\d]+[-_])*[a-z\d]+)*$/.test(owner) ? await view<Will | null>("get_will", { owner }) : null;
       latest.current = w;
       return w;
     },

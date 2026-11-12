@@ -66,7 +66,7 @@ export default function HeirPage() {
       {heir && (
         <Step n={3} title="What you receive">
           <p className="mb-3 text-sm text-muted">
-            In stages ({schedule(will).map((st) => `${st.pct}%`).join(", ")}){will.accelerated ? "" : ", longest wait after the first"}. If {ownerName}
+            In stages ({schedule(will).map((st) => `${st.pct}%`).join(", ")}){will.accelerated ? "" : ", longest wait after the first"}. If {ownerName}{" "}
             is alive after all, it stops. Notes come last.
           </p>
           <Releases will={will} />

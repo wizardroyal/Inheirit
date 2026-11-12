@@ -17,7 +17,8 @@ export const isAccount = (s: unknown) => typeof s === "string" && (/^[a-z0-9_-]+
 type Heir = { id: string; name: string; near_account?: string; receive?: { eth?: string; btc?: string }; [k: string]: unknown };
 type Raw = Partial<Omit<Policy, "heirs" | "guardians">> & { heirs: Heir[]; guardians?: string[] };
 
-const title = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+/** "luka" → "Luka", "mary jane" → "Mary Jane"; names already capitalised stay as written. */
+const title = (s: string) => s.replace(/(^|[\s-])(\p{Ll})/gu, (_, a: string, b: string) => a + b.toUpperCase());
 
 /** True if the draft names at least one heir: everything else missing can be asked for here. */
 export function hasGaps(draft: unknown): draft is Raw {
@@ -33,19 +34,23 @@ function ownShare(h: Heir): number | null {
 
 export function DraftGaps({ owner, draft, onReady }: { owner: string; draft: Raw; onReady: (p: Policy | null, errors: string[]) => void }) {
   // Shares the model didn't record are asked for (pre-filled from the draft, else an equal split).
-  const sharesGiven = Array.isArray(draft.allocations) && draft.allocations.some((a) => a?.asset === "NEAR" && a.shares);
+  // Shares are always editable here: a draft that adds up to 110% must be fixable without redrafting.
+  const given = Array.isArray(draft.allocations) ? draft.allocations.find((a) => a?.asset === "NEAR" && a.shares) : undefined;
   const [pct, setPct] = useState<string[]>(() => {
     const n = draft.heirs.length;
-    return draft.heirs.map((h, i) => String(ownShare(h) ?? Math.floor(100 / n) + (i === n - 1 ? 100 - Math.floor(100 / n) * n : 0)));
+    return draft.heirs.map((h, i) => String(given?.shares?.[h.id] ?? ownShare(h) ?? Math.floor(100 / n) + (i === n - 1 ? 100 - Math.floor(100 / n) * n : 0)));
   });
-  const allocations: Policy["allocations"] = sharesGiven
-    ? draft.allocations!
-    : [{ asset: "NEAR", shares: Object.fromEntries(draft.heirs.map((h, i) => [h.id, Number(pct[i]) || 0])) }];
+  const assetList = Array.isArray(draft.allocations) && draft.allocations.length ? [...new Set(draft.allocations.map((a) => a.asset))] : ["NEAR"];
+  const shares = Object.fromEntries(draft.heirs.map((h, i) => [h.id, Number(pct[i])]));
+  const allocations = assetList.map((asset) => ({ asset, shares })) as Policy["allocations"];
   const assets = new Set(allocations.map((a) => a.asset));
-  const [heirs, setHeirs] = useState<Heir[]>(() => draft.heirs.map((h, i) => ({ id: h.id ?? `h${i + 1}`, name: h.name, near_account: h.near_account ?? "", receive: { ...h.receive } })));
+  const [heirs, setHeirs] = useState<Heir[]>(() => draft.heirs.map((h, i) => ({ id: h.id ?? `h${i + 1}`, name: title(h.name), near_account: h.near_account ?? "", receive: { ...h.receive } })));
   // Guardians the model wrote as bare names keep the name as a label; at least two slots.
+  // A name given as both heir and guardian can't be both: it stays an heir, and a guardian slot opens.
+  const heirNames = new Set(draft.heirs.map((h) => title(h.name)));
+  const clashes = (draft.guardians ?? []).filter((x) => !isAccount(x) && heirNames.has(title(x))).map(title);
   const [guardians, setGuardians] = useState<{ label: string; account: string }[]>(() => {
-    const g = (draft.guardians ?? []).map((x) => (isAccount(x) ? { label: x, account: x } : { label: title(x), account: "" }));
+    const g = (draft.guardians ?? []).filter((x) => isAccount(x) || !heirNames.has(title(x))).map((x) => (isAccount(x) ? { label: x, account: x } : { label: title(x), account: "" }));
     while (g.length < 2) g.push({ label: `Guardian ${g.length + 1}`, account: "" });
     return g;
   });
@@ -113,25 +118,25 @@ export function DraftGaps({ owner, draft, onReady }: { owner: string; draft: Raw
     }
   }
 
-  if (!missing && sharesGiven) return null;
   const total = pct.reduce((a, b) => a + (Number(b) || 0), 0);
   return (
     <div className="mt-4 space-y-3 rounded-lg border border-line p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="font-serif text-lg">{missing ? "A few details are missing" : "Check the shares"}</h3>
+        <h3 className="font-serif text-lg">{missing ? "A few details are missing" : "Details"}</h3>
         {missing > 0 && (
           <ActionButton tone="quiet" disabled={busy} onClick={fillAll}>
             {busy ? "Generating…" : "Fill all with test people"}
           </ActionButton>
         )}
       </div>
-      {!sharesGiven && <p className={`text-xs ${total === 100 ? "text-muted" : "text-danger"}`}>Shares of your NEAR: {total}% of 100%</p>}
+      <p className={`text-xs ${total === 100 ? "text-muted" : "text-danger"}`}>Shares: {total}% of 100%</p>
+      {clashes.length > 0 && <p className="text-xs text-muted">{clashes.join(", ")} can&apos;t be both heir and guardian, so stays an heir. Pick another guardian.</p>}
       {error && <p className="text-xs text-danger">{error}</p>}
       {heirs.map((h, i) => (
         <div key={h.id} className="space-y-2">
           <span className="flex items-center justify-between gap-2">
             <p className="text-sm font-medium">{h.name}</p>
-            {!sharesGiven && (
+            {(
               <span className="relative w-24">
                 <input
                   className={`${inputCls} w-full pr-7`}

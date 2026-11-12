@@ -30,7 +30,7 @@ export function SignsOfLife({ owner, will }: { owner: string; will: Will }) {
   const unseen = SOURCES.filter((s) => !data?.observations[s.source] && !s.simulated);
 
   return (
-    <section key={snapped || undefined} className={`space-y-4 rounded-2xl border border-line bg-card p-6 ${snapped ? "snap-wash" : ""}`} aria-label="Signs of life">
+    <section id="signs-of-life" key={snapped || undefined} className={`scroll-mt-4 space-y-4 rounded-2xl border border-line bg-card p-6 ${snapped ? "snap-wash" : ""}`} aria-label="Signs of life">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="font-serif text-2xl">Signs of life</h2>
         {!isArmed(will) && <Pill tone="warn">not armed yet: guardians haven&apos;t accepted</Pill>}
@@ -44,7 +44,7 @@ export function SignsOfLife({ owner, will }: { owner: string; will: Will }) {
             style={{ width: `${((Math.max(idx, 0) + 1) / LADDER.length) * 100}%` }}
           />
         </div>
-        <ol className="tech mt-2 grid text-[11px] leading-tight text-muted" style={{ gridTemplateColumns: `repeat(${LADDER.length}, minmax(0, 1fr))` }}>
+        <ol className="tech mt-2 grid gap-x-2 text-[11px] leading-tight text-muted [overflow-wrap:anywhere]" style={{ gridTemplateColumns: `repeat(${LADDER.length}, minmax(0, 1fr))` }}>
           {LADDER.map((r, i) => (
             <li key={r.state} className={`pr-1 ${i === idx ? "font-semibold text-ink" : ""} ${i > idx ? "text-muted" : ""}`}>
               <span className="hidden sm:inline">{r.label}</span>

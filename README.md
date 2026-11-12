@@ -2,7 +2,7 @@
 
 Built at **NEAR HACKATHON** (November 2026).
 
-**Testnet: fully self-serve. Mainnet: live NEAR Intents quotes, and real payouts only through a script a person approves one transaction at a time. Public mainnet vaults wait for a production TEE framework and an audit.**
+**Testnet: fully self-serve. Mainnet: live NEAR Intents quotes, and two real payouts already made (public Base → Solana, confidential Base → Arbitrum), signed by Chain Signatures and approved by a person one transaction at a time. Public mainnet vaults wait for a production TEE framework and an audit.**
 
 Inheirit notices the signs of life you already give off, privately, and only reaches out when you've gone quiet for longer than usual. It **never acts on silence alone**: people have to confirm you're gone, and you get a loud challenge period to say otherwise. Only then does it hand your assets on across **NEAR, Ethereum and Bitcoin**, in small, reversible slices. Sealed instructions for everything else reach the right heir **last**.
 
@@ -25,8 +25,8 @@ Inheirit notices the signs of life you already give off, privately, and only rea
 |---|---|
 | The core moment: silence climbs the ladder, one sign of life snaps it back | [Try it in 3 minutes](#try-it-in-3-minutes-no-wallet-no-money) on the live app |
 | Real cross-chain execution: NEAR, Ethereum (Sepolia) and Bitcoin (testnet4) released in stages, with explorer links | [Then the full run](#then-the-full-run-about-15-minutes) |
-| An attested TEE agent and private AI, verifiable on-chain | [`docs/VERIFY.md`](docs/VERIFY.md): read-only calls that check it yourself; the trust badges under *Signs of life*; [`deploy/tee-agent.json`](deploy/tee-agent.json) lists every deployed compose hash |
-| NEAR Intents on mainnet | live quotes (public and confidential) on [`/mainnet`](https://inheirit.vercel.app/mainnet) and the heir page; the payout runbook in [`docs/MAINNET.md`](docs/MAINNET.md) |
+| An attested TEE agent and private AI, verifiable on-chain | `npx tsx scripts/verify.ts`: one read-only command, PASS/FAIL per check (explained in [`docs/VERIFY.md`](docs/VERIFY.md)); the trust badges under *Signs of life*; [`deploy/tee-agent.json`](deploy/tee-agent.json) lists every deployed compose hash |
+| NEAR Intents on mainnet | two real payouts (public Base → Solana, confidential Base → Arbitrum) with explorer links on [`/mainnet`](https://inheirit.vercel.app/mainnet); live quotes on the heir page |
 | Tests and security work | 228 agent tests, 163 contract unit tests plus sandbox flows, run on every push ([CI](.github/workflows/ci.yml)); five adversarial review rounds logged finding by finding in [`CLAUDE.md`](CLAUDE.md) (Decision log) and summarised in [`docs/AUDITS.md`](docs/AUDITS.md) |
 | What's real and what's simulated | [Real vs simulated](#real-vs-simulated) |
 
@@ -139,7 +139,11 @@ Pick another scenario on the same card. The card shows a checklist with a button
 
 On testnet the onward swap to each heir runs on a SIMULATED 1Click client, because NEAR Intents has no testnet. On mainnet:
 - heirs see **live quotes**, public and confidential side by side, for the asset and chain they choose (`/api/quote`, dry runs);
-- **real payouts** go out from a demo vault on Base, a Chain Signatures address derived from a NEAR mainnet account and signed by the MPC network, through `scripts/mainnet-payout.ts`, which a person approves one transaction at a time (caps: $5 each, $25 in total). Payouts made are listed on [`/mainnet`](https://inheirit.vercel.app/mainnet) with explorer links on both sides;
+- **real payouts** go out from a demo vault on Base, a Chain Signatures address derived from a NEAR mainnet account and signed by the MPC network, through `scripts/mainnet-payout.ts`, which a person approves one transaction at a time (caps: $5 each, $25 in total). Two are done (2026-11-12), both 1.90 USDC from the vault:
+  - public, to USDC on Solana: [MPC signature](https://nearblocks.io/txns/FWPUnhyCSJrCHqzJBahCazgeLmURHGVPSsHdWtxdXcYH) · [sent on Base](https://basescan.org/tx/0xb70144f0f8ec0e99ab98c168a1925d2b69476d57aa1c2d59a1f306fe1a099c18) · [received on Solana](https://solscan.io/tx/65BJcb63tQkQnQ57Nsopv1v6cZKppy2GmnLmqiYJ2bCAsg9XYL1VuKyPyokGdzRyrw4kaDisvYvzhb8sbuRzpSaU);
+  - confidential (Confidential Intents, `basic`), to USDC on Arbitrum: [MPC signature](https://nearblocks.io/txns/4RW7R4CsXYpYWaumCfT7DDCGs89Ph7faiJ797ypn8dDB) · [sent on Base](https://basescan.org/tx/0x2716595c73b267af1c03a87d737e24fdea4960274a99972af31209ca6b8f8790) · [received on Arbitrum](https://arbiscan.io/tx/0x448b42caa4165351684f87dede862c10d493aa36c5a01e50670e8e9e1d73e3d6).
+
+  They are sends from the demo vault, not slices of a testnet will (Intents has no testnet). Both are listed on [`/mainnet`](https://inheirit.vercel.app/mainnet);
 - the step-by-step, including a read-only `preflight` check, is [`docs/MAINNET.md`](docs/MAINNET.md).
 
 ## NEAR technology used, and where
@@ -150,7 +154,7 @@ On testnet the onward swap to each heir runs on a SIMULATED 1Click client, becau
 | **Chain Signatures** (`v1.signer-prod.testnet`) | Vault addresses on Sepolia and BTC testnet4, derived from the contract account (`heirloom/<owner>/eth\|btc`); release and withdrawal signatures | gate: `agent-contract/src/will/agent.rs`; tx building: `src/chains/evm.ts`, `src/chains/btc.ts` (chainsig.js) |
 | **Shade Agent Framework** (TEE on Phala) | The will agent: liveness scoring and verdict, escalation and checks, execution, sealed-note crypto, Telegram bot. Registered with a real TDX attestation; measurements approved on-chain. | `src/index.ts`, `src/escalation/`, `src/liveness/`, `src/executor/`, `src/sealed/`, `src/telegram/`, `scripts/tee-agent.ts` |
 | **NEAR AI Cloud** (private inference) | Plain-English will → structured policy; heir claim guide. Will text goes only to a model whose attestation passes (TDX quote, NVIDIA GPU, signer bound to a fresh nonce; checked at startup and before each use), and every answer's signature must recover to the attested signer. | `src/ai/attestation.ts`, `src/ai/nearai.ts`, `src/ai/policy-parser.ts`, `src/ai/heir-guide.ts` |
-| **NEAR Intents** (1Click API) | Universal payout: each released slice goes on to the heir's chosen asset and chain; stable value (USDC); fund from anywhere. On testnet the agent uses a SIMULATED 1Click client with live prices. Heirs see live mainnet dry quotes, public and confidential. Real mainnet payouts can be sent from a Chain Signatures-derived Base vault, only through an approval-gated script (none yet; see `/mainnet`). | `src/intents/oneclick.ts`, `src/intents/payout.ts`, `web/src/app/api/quote/route.ts`, `web/src/components/Payouts.tsx`, `web/src/app/mainnet/page.tsx`, `scripts/mainnet-payout.ts` |
+| **NEAR Intents** (1Click API) | Universal payout: each released slice goes on to the heir's chosen asset and chain; stable value (USDC); fund from anywhere. On testnet the agent uses a SIMULATED 1Click client with live prices. Heirs see live mainnet dry quotes, public and confidential. Two real mainnet payouts (public and confidential) were sent from a Chain Signatures-derived Base vault, through an approval-gated script (listed on `/mainnet`). | `src/intents/oneclick.ts`, `src/intents/payout.ts`, `web/src/app/api/quote/route.ts`, `web/src/components/Payouts.tsx`, `web/src/app/mainnet/page.tsx`, `scripts/mainnet-payout.ts` |
 | NEAR Wallet Selector + named accounts | Sign in with MyNearWallet, Meteor or Intear; Google and demo users get `<id>.inheirit-users.testnet` accounts whose key is generated in their browser | `web/src/lib/wallet.ts`, `web/src/lib/onboard.ts`, `web/src/app/api/onboard/route.ts` |
 | NEP-413 signed messages | Owner-signed requests to the agent (heartbeat, watch settings, Telegram link, drafting, guide, demo faucet), and heir-signed payout choices, checked against the account's on-chain keys | `src/auth/nep413.ts`, `web/src/lib/near.ts`, `web/src/lib/wallet.ts` |
 
@@ -177,7 +181,7 @@ Named accounts and function-call keys make the human side workable: readable nam
 - **What runs in the TEE:** the agent. It polls signal sources, scores liveness, signs releases, runs the Telegram bot, and holds the sealed-notes private key. That key is derived from Phala's KMS for this app (`getKey`) and kept only in memory.
 - **What leaves it:** timestamps (`record_liveness`), state transitions, signed transfers, and notes re-sealed to an heir's key. Signal adapters return the time of the latest activity, never content. A Telegram reply is recorded as its receive time only; its text is never stored or logged.
 - **Sealed notes:** encrypted in the owner's browser (libsodium sealed box) to the agent's key, sealed together with the owner and heir they were written for; only ciphertext goes on-chain, and the agent releases a note only inside that will and only to that heir. Once the will reaches *Secrets released*, the agent opens each note inside the TEE and re-seals it to the heir's X25519 key, and the heir decrypts it in their browser.
-- **Will text** is processed only by an attested NEAR AI Cloud model. We verified that only 12 of 61 listed models attest; proxied models are refused.
+- **Will text** is processed only by an attested NEAR AI Cloud model. When we checked (2026-10-27), only 12 of 61 listed models returned an attestation; the agent refuses any model that doesn't.
 - **Minimal data:** sign-up asks for a display name and, optionally, a jurisdiction. Nothing else: no date of birth, nationality or photo. Google sign-in names the account after a hash of Google's user id; the email never goes on-chain, and we never hold the account's key.
 - **In the UI:** the *Signs of life* panel says "What the agent saw: timestamps only", next to badges for the attested TEE agent (approved compose hashes, registered agent, sealed-notes key match) and for the NEAR AI model (each check of a fresh attestation).
 
@@ -204,7 +208,7 @@ See [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md). In short:
   - enforcing policy `conditions` (e.g. "not before 2031"), which are parsed and shown;
   - an adaptive "your normal" baseline: the quiet threshold is a fixed setting per will.
 - **Expired guardian votes restart the ladder.** If guardians don't vote, the will returns to All good without a new sign of life, so the ladder starts again at once (about every 7 minutes on demo timings). The repeated checks and welfare messages appear in the app, but Telegram sends each of them only once per silence. The challenge alarm is always sent.
-- **NEAR Intents is SIMULATED on testnet.** NEAR Intents has no testnet. The testnet slices are real transfers; the swap that takes them on to the heir's choice runs on a simulated 1Click client (live prices, fake deposit address). On mainnet: heirs see live dry quotes, and real payouts can be sent from our demo vault only by a local script (`scripts/mainnet-payout.ts`) that asks a person for approval before every transaction (caps: $5 each, $25 in total). Any made are listed at `/mainnet`. In production, the attested agent's mainnet contract would sign these legs.
+- **NEAR Intents is SIMULATED on testnet.** NEAR Intents has no testnet. The testnet slices are real transfers; the swap that takes them on to the heir's choice runs on a simulated 1Click client (live prices, fake deposit address). On mainnet: heirs see live dry quotes, and real payouts were sent from our demo vault (see above) only by a local script (`scripts/mainnet-payout.ts`) that asks a person for approval before every transaction (caps: $5 each, $25 in total). Any made are listed at `/mainnet`. In production, the attested agent's mainnet contract would sign these legs.
 - **Payout waiting happens after the vault.** If an heir hasn't chosen how to be paid, their onward payout waits and later slices are paid together. The testnet slice itself still leaves the vault on schedule. Holding it in the vault would need a contract change (roadmap).
 - **Names are local.** Usernames and the generated people's names live in your browser; the testnet account id stays the on-chain identity, and other browsers see the account id.
 - **Browser-held keys.** Demo and Google accounts keep their key in the browser that made them, so a Google account works in that browser only, and a lost browser means a lost testnet account. Wallet users keep their keys in their wallet.
@@ -222,7 +226,7 @@ See [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md). In short:
 - A lawyer companion letter.
 - Gasless heir claims.
 - Real-world contacts: guardians, friends and lawyers reached by phone number or email instead of NEAR accounts, and bank or Cash App payouts for heirs without crypto.
-- **Private inheritance with Confidential Intents:** payouts that observers can't trace from the will's release to the heir's receipt. Confidential quotes already work with our partner key; heirs see them next to public ones when the deployment has it.
+- **Private inheritance with Confidential Intents:** payouts that observers can't trace from the will's release to the heir's receipt. A confidential payout has already gone through on mainnet (above); heirs see confidential quotes next to public ones.
 - **Intents-native vault:** the will holds every asset as a NEAR Intents balance, distributes by internal transfer, and heirs withdraw to any chain. One vault for every asset, and instant cross-chain payout. A dry 1Click quote from an Intents balance to USDC on Base already succeeds.
 - Self-funding upkeep: the agent pays its own inference and hosting via Intents, and tops up gas for vaults and heirs.
 - Contract-level heir hiding (commit-reveal).

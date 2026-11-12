@@ -3,7 +3,7 @@
 The will runs on NEAR testnet. NEAR Intents has no testnet, so the last step (paying an heir in the asset and chain they chose) is shown on mainnet with small real amounts, from a demo vault, by `scripts/mainnet-payout.ts`. That script is the only code that can move mainnet value. It never sends without a typed `yes`, and Claude never runs a sending command without the human's explicit "yes" in chat for that transaction. Caps: $5 per transaction, $25 in total (`INTENTS_MAX_USD_PER_TX`, `INTENTS_MAX_USD_TOTAL`), tracked in `~/.config/inheirit/mainnet-ledger.json`.
 
 What it proves, and where a judge sees it:
-- **Universal payout:** a released slice paid out as USDC on Solana or Arbitrum, though the vault holds USDC on Base. Shown on `/mainnet` with explorer links on both sides.
+- **Universal payout:** what a released slice goes through: USDC paid out on Solana or Arbitrum, though the vault holds USDC on Base. Shown on `/mainnet` with explorer links on both sides.
 - **Confidential payout:** the same through Confidential Intents (`confidentiality: basic`).
 - **Fund from anywhere** (optional): a deposit from another chain into the vault.
 - **Chain Signatures on mainnet:** the vault is a Base address derived from a NEAR mainnet account; each payout is signed by the MPC network (`v1.signer`), with the `sign` transaction linked in the output.

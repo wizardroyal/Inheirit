@@ -12,7 +12,7 @@ import { keys } from "@/lib/keys";
 import { createPerson } from "@/lib/onboard";
 import { newTestReceive, testReceiveFor } from "@/lib/test-wallets";
 import { useOverview } from "@/lib/hooks";
-import { humanize, nameOf, useAccountLabel, useNames } from "@/lib/names";
+import { humanize, nameOf, readable, useAccountLabel, useNames } from "@/lib/names";
 import { signRequest } from "@/lib/near";
 import { acceptedGuardians, isArmed, type Will } from "@/lib/will";
 import { TelegramLink } from "./TelegramLink";
@@ -99,7 +99,7 @@ export function GenerateButton({ owner, what, name, onMade }: { owner: string; w
 }
 
 /** A comma-separated list of NEAR accounts shown as name chips, with a box to add one and a refresh button to generate one. */
-function PeopleField({
+export function PeopleField({
   owner,
   what,
   value,
@@ -163,7 +163,10 @@ export function MyWillSetup({
   onCreated: () => void;
   summary: (stagesPct: number[], demoClock: boolean) => React.ReactNode;
 }) {
-  const [name, setName] = useState(() => nameOf(owner) ?? "");
+  // The random username reads better with spaces: "ThistleProudJump" → "Thistle Proud Jump".
+  const [name, setName] = useState(() => (nameOf(owner) ?? "").replace(/([a-z])([A-Z])/g, "$1 $2"));
+  // Errors stay grey until the owner has changed something: a fresh form shouldn't open in red.
+  const [touched, setTouched] = useState(false);
   const [jurisdiction, setJurisdiction] = useState("");
   const [evm, setEvm] = useState("");
   const [heirs, setHeirs] = useState<HeirRow[]>([{ name: "", account: "", pct: "100", eth: "", btc: "" }]);
@@ -216,11 +219,16 @@ export function MyWillSetup({
     ...(jurisdiction.trim() ? { jurisdiction: jurisdiction.trim() } : {}),
     ...(stable ? { payout_value_mode: "stable" } : {}),
   });
+  const deposit_ = Number(deposit);
   const errors = [
-    ...(name.trim() ? [] : ["Add your display name."]),
-    ...(guardianList.length < 2 ? ["Choose at least two guardians."] : []),
-    ...badAccounts.map((a) => `“${a}” isn't a valid NEAR account name.`),
-    ...(check.ok ? [] : check.errors),
+    ...new Set([
+      ...(name.trim() ? [] : ["Add your display name."]),
+      ...(guardianList.length < 2 ? ["Choose at least two guardians."] : []),
+      ...badAccounts.map((a) => `“${a}” isn't a valid NEAR account name.`),
+      ...(Number.isFinite(deposit_) && deposit_ > 0 && deposit_ <= 1000 ? [] : ["Put between 0 and 1,000 NEAR in the vault."]),
+      // The checker's own guardian-count messages repeat the line above.
+      ...(check.ok ? [] : check.errors.filter((e) => !(guardianList.length < 2 && /guardian/i.test(e) && !/heir|own guardian|twice/.test(e)))),
+    ]),
   ];
   const policy = check.ok && !errors.length ? (check.policy as Policy) : null;
   const pctTotal = heirs.reduce((s, h) => s + (Number(h.pct) || 0), 0);
@@ -229,11 +237,11 @@ export function MyWillSetup({
   const setHeir = (i: number, patch: Partial<HeirRow>) => setHeirs((hs) => hs.map((h, j) => (j === i ? { ...h, ...patch } : h)));
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" onChangeCapture={() => setTouched(true)} onClickCapture={(e) => (e.target as HTMLElement).closest("button") && setTouched(true)}>
       <Card title="About you">
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Display name" hint="Shown to heirs and guardians.">
-            <input className={inputCls} value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Sam" />
+            <input className={inputCls} maxLength={64} value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Sam" />
           </Field>
           <Field label="Country or state (optional)" hint="That's all we ask.">
             <input className={inputCls} value={jurisdiction} onChange={(e) => setJurisdiction(e.target.value)} placeholder="Nigeria" />
@@ -266,7 +274,7 @@ export function MyWillSetup({
         <div className="space-y-3">
           {heirs.map((h, i) => (
             <div key={i} className="grid gap-2 rounded-lg border border-line p-3 sm:grid-cols-[1fr_1.4fr_5rem_auto]">
-              <input className={inputCls} value={h.name} onChange={(e) => setHeir(i, { name: e.target.value })} aria-label="Heir's name" placeholder="Heir's name" />
+              <input className={`${inputCls} min-w-0`} maxLength={64} value={h.name} onChange={(e) => setHeir(i, { name: e.target.value })} aria-label="Heir's name" placeholder="Heir's name" />
               <span className="flex items-start gap-2">
                 {h.account && keys.secret(h.account) ? (
                   <span className="self-center">
@@ -337,7 +345,7 @@ export function MyWillSetup({
             <PeopleField owner={owner} what="guardian" value={guardians} onChange={setGuardians} label={label} />
           </Field>
           <Field label="How many must confirm">
-            <input className={inputCls} value={threshold} onChange={(e) => setThreshold(e.target.value)} />
+            <input className={`${inputCls} w-20`} inputMode="numeric" value={threshold} onChange={(e) => setThreshold(e.target.value)} />
           </Field>
           <Field label="Lawyer (optional)" group hint="Can speed up the release, never skip the challenge period.">
             <PeopleField owner={owner} what="lawyer" value={lawyer} onChange={setLawyer} label={label} single />
@@ -376,12 +384,12 @@ export function MyWillSetup({
           <p className="font-medium">Who gets what</p>
           <ul className="mt-1 space-y-0.5">
             {heirs.map((h, i) => {
-              const pct = Number(h.pct) || 0;
-              const parts = [`${+(nearDeposit * pct / 100).toFixed(4)} NEAR`];
+              const pct = Math.max(0, Math.min(100, Number(h.pct) || 0));
+              const parts = [`${+(Math.max(0, nearDeposit) * pct / 100).toFixed(4)} NEAR`];
               if (assets.ETH) parts.push(`${pct}% of the ETH vault`);
               if (assets.BTC) parts.push(`${pct}% of the BTC vault`);
               return (
-                <li key={i}>
+                <li key={i} className="break-words">
                   {parts.join(" + ")} → <b>{h.name || `heir ${i + 1}`}</b>
                 </li>
               );
@@ -398,7 +406,7 @@ export function MyWillSetup({
 
       <Card title="Check and approve">
         {errors.length > 0 ? (
-          <ul className="list-disc space-y-1 pl-5 text-sm text-danger">
+          <ul className={`list-disc space-y-1 pl-5 text-sm ${touched ? "text-danger" : "text-muted"}`}>
             {errors.map((e) => (
               <li key={e}>{humanize(e, names)}</li>
             ))}
@@ -407,8 +415,7 @@ export function MyWillSetup({
           policy && (
             <ul className="list-disc space-y-1 pl-5 text-sm">
               {summarizePolicy(policy).map((l) => (
-                // "Anouk (anouk.…testnet)" humanizes to "Anouk (Anouk)": say the name once.
-                <li key={l}>{humanize(l, names).replace(/([^\s(]+) \(\1\)/g, "$1")}</li>
+                <li key={l}>{readable(l, names)}</li>
               ))}
             </ul>
           )
@@ -507,7 +514,7 @@ export function StrengthChecklist({ will }: { will: Will }) {
             </span>
             <span>
               {i.label}
-              {i.required && <span className="ml-1 text-xs text-muted">(needed to arm)</span>}
+              {i.required && <span className="text-xs text-muted"> · needed to arm</span>}
               {!i.done && i.hint && <span className="block text-xs text-muted">{i.hint}</span>}
             </span>
           </li>
@@ -515,7 +522,7 @@ export function StrengthChecklist({ will }: { will: Will }) {
       </ul>
       {!tg?.linked && (
         <div className="mt-3">
-          <TelegramLink account={owner} purpose="So the agent can check in there if you go quiet." />
+          <TelegramLink account={owner} purpose="Checks reach you there first." />
         </div>
       )}
     </Card>

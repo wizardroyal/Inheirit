@@ -1,12 +1,12 @@
 "use client";
-import { accountLabel, ensureName, humanize, rememberOwner, useAccountLabel, useNames } from "@/lib/names";
+import { accountLabel, ensureName, humanize, readable, rememberOwner, useAccountLabel, useNames } from "@/lib/names";
 import { summarizePolicy, type Policy } from "@agent/policy/policy";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
-import { AgentBadge, AiBadge } from "@/components/Attestation";
+import { AiBadge } from "@/components/Attestation";
 import { Ladder } from "@/components/Ladder";
-import { ActionButton, Card, CopyLink, Details, ErrorNote, Field, inputCls, Pill, short } from "@/components/ui";
-import { MyWillSetup, StrengthChecklist } from "@/components/Onboarding";
+import { ActionButton, Card, CopyLink, Details, ErrorNote, Field, inputCls, NoWill, Pill, short } from "@/components/ui";
+import { MyWillSetup, PeopleField, StrengthChecklist } from "@/components/Onboarding";
 import { DraftGaps, hasGaps } from "@/components/DraftGaps";
 import { FundAnywhere, PayoutsPanel } from "@/components/Payouts";
 import { SignIn } from "@/components/SignIn";
@@ -19,7 +19,7 @@ import { DEMO_SCHEDULE, REAL_SCHEDULE } from "@/lib/config";
 import { stagesFor, summarize } from "@agent/policy/schedule";
 import { acceptAsGuardians, addSealedNote, createWill, generateWillAndCast } from "@/lib/demo";
 import { keys } from "@/lib/keys";
-import { useKeys, useMyAccounts, usePoll, useWill } from "@/lib/hooks";
+import { useKeys, useMyAccounts, useNow, usePoll, useWill } from "@/lib/hooks";
 import { topUpAccount } from "@/lib/onboard";
 import { disconnectWallet, walletAccountId } from "@/lib/wallet";
 import { balanceOf, call, canSign, formatNear, nearToYocto, signRequest } from "@/lib/near";
@@ -112,8 +112,9 @@ function Owner() {
           />
         )}
       </div>
-      {owner && loaded && (!will || creating) && <LowBalance owner={owner} />}
-      {owner && loaded && (!will || creating) && <CreateWill owner={owner} onCreating={setCreating} onCreated={refresh} />}
+      {owner && loaded && !will && !creating && canSign(owner) && <LowBalance owner={owner} />}
+      {owner && loaded && (!will || creating) && canSign(owner) && <CreateWill owner={owner} onCreating={setCreating} onCreated={refresh} />}
+      {owner && loaded && !will && !canSign(owner) && <NoWill owner={owner} />}
       {owner && will && !creating && <Dashboard will={will} refresh={refresh} />}
     </div>
   );
@@ -153,9 +154,30 @@ function AccountActions({ owner, onSignIn, onSignedOut }: { owner: string; onSig
   );
 }
 
+/** useState that survives a reload of this tab (sessionStorage), e.g. a 2-minute AI draft. */
+function useSessionState<T>(key: string, initial: T): [T, (v: T) => void] {
+  const [v, setV] = useState<T>(() => {
+    try {
+      const raw = sessionStorage.getItem(key);
+      return raw === null ? initial : (JSON.parse(raw) as T);
+    } catch {
+      return initial;
+    }
+  });
+  const set = (next: T) => {
+    setV(next);
+    try {
+      sessionStorage.setItem(key, JSON.stringify(next));
+    } catch {
+      // storage blocked: still works for this page view
+    }
+  };
+  return [v, set];
+}
+
 /** Three tabs: My will (default), Will in plain English (drafted by NEAR AI), Generate sample will. */
 function CreateWill(props: { owner: string; onCreating: (b: boolean) => void; onCreated: () => void }) {
-  const [mode, setMode] = useState<"generate" | "quick" | "english">("quick");
+  const [mode, setMode] = useSessionState<"generate" | "quick" | "english">(`inheirit:tab:${props.owner}`, "quick");
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap gap-2 text-sm" role="group" aria-label="How to write your will">
@@ -278,8 +300,11 @@ function GenerateWill({ owner, onCreating, onCreated }: { owner: string; onCreat
 
 function WriteWill({ owner, onCreating, onCreated }: { owner: string; onCreating: (b: boolean) => void; onCreated: () => void }) {
   const names = useNames();
-  const [text, setText] = useState("");
-  const [draft, setDraft] = useState<DraftResult | null>(null);
+  const label = useAccountLabel();
+  const [text, setText] = useSessionState(`inheirit:draft-text:${owner}`, "");
+  const [draft, setDraft] = useSessionState<DraftResult | null>(`inheirit:draft:${owner}`, null);
+  const [draftingSince, setDraftingSince] = useState<number | null>(null);
+  const now = useNow();
   const [demoClock, setDemoClock] = useState(true);
   const [contacts, setContacts] = useState("");
   const [deposit, setDeposit] = useState("0.5");
@@ -292,7 +317,7 @@ function WriteWill({ owner, onCreating, onCreated }: { owner: string; onCreating
   const assets = new Set(policy?.allocations.map((a) => a.asset));
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[1.3fr_1fr]">
+    <div className="grid items-start gap-6 lg:grid-cols-[1.3fr_1fr]">
       <Card title="Write it in plain English">
         <p className="mb-3 text-sm text-muted">
           Who gets what, and who your guardians are. Nothing is saved until you approve the summary.
@@ -302,7 +327,7 @@ function WriteWill({ owner, onCreating, onCreated }: { owner: string; onCreating
           className={`${inputCls} h-40 w-full`}
           value={text}
           onChange={(e) => setText(e.target.value)}
-          placeholder={`I leave all my NEAR to my son Tobi (tobi.testnet). My guardians are g1.testnet, g2.testnet and g3.testnet; two of them must confirm.`}
+          placeholder="Everything to my son Tobi. My guardians are Ada and Ben; both must confirm."
         />
         <div className="mt-3">
           <ActionButton
@@ -310,11 +335,21 @@ function WriteWill({ owner, onCreating, onCreated }: { owner: string; onCreating
             onClick={async () => {
               setDraft(null);
               setFilled({ policy: null, errors: [] });
-              setDraft(await agent.draftPolicy(await signRequest(owner, "draft_policy", { text })));
+              setDraftingSince(Math.floor(Date.now() / 1000));
+              try {
+                setDraft(await agent.draftPolicy(await signRequest(owner, "draft_policy", { text })));
+              } finally {
+                setDraftingSince(null);
+              }
             }}
           >
             Draft my will
           </ActionButton>
+          {draftingSince !== null && (
+            <span className="ml-3 text-xs text-muted">
+              Usually 1–2 min · {Math.floor((now - draftingSince) / 60)}:{String((now - draftingSince) % 60).padStart(2, "0")}
+            </span>
+          )}
         </div>
         {gaps && (
           <>
@@ -338,7 +373,7 @@ function WriteWill({ owner, onCreating, onCreated }: { owner: string; onCreating
             <h3 className="font-serif text-lg">Please check this summary</h3>
             <ul className="list-disc space-y-1 pl-5 text-sm">
               {summarizePolicy(policy).map((l) => (
-                <li key={l}>{humanize(l, names).replace(/([^\s(]+) \(\1\)/g, "$1")}</li>
+                <li key={l}>{readable(l, names)}</li>
               ))}
             </ul>
             <p className="text-xs text-muted">
@@ -346,8 +381,8 @@ function WriteWill({ owner, onCreating, onCreated }: { owner: string; onCreating
               {draft?.ai.signature?.ok ? "signature verified" : "signature not verified"}{draft?.ok ? "" : "; missing details added by you"}.
             </p>
             <div className="grid gap-3 sm:grid-cols-2">
-              <Field label="Friends for a welfare check (optional)" hint="NEAR accounts, separated by commas">
-                <input className={inputCls} value={contacts} onChange={(e) => setContacts(e.target.value)} placeholder="friend.testnet" />
+              <Field label="Friends for a welfare check (optional)" group hint="Can only stop it, never start it.">
+                <PeopleField owner={owner} what="friend" value={contacts} onChange={setContacts} label={label} />
               </Field>
               <Field label="NEAR to put in the vault now">
                 <input className={inputCls} value={deposit} onChange={(e) => setDeposit(e.target.value)} />
@@ -478,6 +513,9 @@ function Dashboard({ will, refresh }: { will: Will; refresh: () => void }) {
             </Details>
           </div>
         </Card>
+        <Card title="Messages sent">
+          <NotificationLog owner={owner} />
+        </Card>
       </div>
       <div className="min-w-0 space-y-6">
         <StrengthChecklist will={will} />
@@ -510,12 +548,6 @@ function Dashboard({ will, refresh }: { will: Will; refresh: () => void }) {
             <FundAnywhere owner={owner} vaults={["Near", ...will.foreign_chains]} />
           </Card>
         )}
-        <Card title="Messages sent">
-          <NotificationLog owner={owner} />
-        </Card>
-        <Card title="Why you can trust the agent">
-          <AgentBadge />
-        </Card>
       </div>
       </div>
     </div>

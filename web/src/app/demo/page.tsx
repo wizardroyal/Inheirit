@@ -3,7 +3,6 @@
 import { accountLabel, useAccountLabel, useNames } from "@/lib/names";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { AgentBadge } from "@/components/Attestation";
 import { Ladder } from "@/components/Ladder";
 import { ActionButton, Card, ExtLink, Pill, short, SimulatedTag } from "@/components/ui";
 import { SignsOfLife } from "@/components/SignsOfLife";
@@ -332,9 +331,6 @@ function WillPanel({ cast }: { cast: Cast }) {
         </Card>
         <Card title="Messages the agent sent">
           <NotificationLog owner={cast.owner} />
-        </Card>
-        <Card title="Why you can trust the agent">
-          <AgentBadge />
         </Card>
       </div>
       </div>

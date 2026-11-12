@@ -166,7 +166,7 @@ export async function generateWillAndCast(
   const check = checkPolicy({
     version: 1,
     owner,
-    display_name: nameOf(owner) ?? owner.split(".")[0],
+    display_name: (nameOf(owner) ?? owner.split(".")[0]).replace(/([a-z])([A-Z])/g, "$1 $2"),
     heirs: [
       {
         id: "h1",

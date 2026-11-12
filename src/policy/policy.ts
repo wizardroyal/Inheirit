@@ -72,12 +72,16 @@ function describeIssue(path: PropertyKey[], message: string): string {
   if (field === "heirs" && sub === "receive" && leaf === "btc") return `${heir}'s Bitcoin address should be a Bitcoin testnet address starting with tb1.`;
   if (field === "heirs" && path.length === 1) return "Add at least one heir (at most 10).";
   if (field === "guardians" && path.length === 1) return "Add at least one guardian (at most 10).";
+  if (field === "guardians") return `Guardian ${typeof index === "number" ? index + 1 : ""} needs a NEAR account.`.replace("  ", " ");
+  if (field === "allocations" && path.length <= 1) return "Say who gets what share.";
+  if (field === "allocations" && sub === "shares") return "Shares must be whole numbers from 0 to 100.";
   if (field === "guardian_threshold") return "Say how many guardians must confirm (at least 1).";
   if (field === "stages_pct") return "Each release stage needs a whole percentage between 1 and 100 (at most 10 stages).";
   if (field === "contacts") return "Add at most 10 welfare-check friends.";
   if (field === "display_name") return "Your display name can be up to 64 characters.";
   if (field === "jurisdiction") return "The jurisdiction can be up to 64 characters.";
-  return `${path.map(String).join(".") || "policy"}: ${message}`;
+  // Anything else: name the part, not the schema message.
+  return `Part of the will is incomplete or invalid (${String(field ?? "will")}).`;
 }
 
 /**
@@ -128,7 +132,7 @@ export function checkPolicy(input: unknown): PolicyCheck {
   if (p.heirs.length * Math.max(p.stages_pct.length, 3) > 40) errors.push(`${p.heirs.length} heirs × ${p.stages_pct.length} stages is more than 40 payments; use fewer stages or fewer heirs.`);
   const stageSum = p.stages_pct.reduce((s, v) => s + v, 0);
   if (stageSum !== 100) errors.push(`The release stages add up to ${stageSum}%, not 100%.`);
-  if (p.guardian_threshold > p.guardians.length) errors.push("More guardians must confirm than there are guardians.");
+  if (p.guardian_threshold > p.guardians.length) errors.push(`Only ${p.guardians.length} guardian${p.guardians.length === 1 ? "" : "s"}: lower “How many must confirm” to ${p.guardians.length} or fewer.`);
   if (new Set(p.guardians).size !== p.guardians.length) errors.push("The same guardian is listed twice.");
   for (const g of p.guardians) {
     if (accounts.has(g)) errors.push(`${g} can't be both a guardian and an heir.`);

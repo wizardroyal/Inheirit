@@ -68,7 +68,7 @@ export default function MainnetPage() {
                   <span>
                     {r.from.amount} {r.from.symbol} on {chain(r.from.chain)} → <b>{r.to.amount}</b> {r.to.symbol} on {chain(r.to.chain)}
                   </span>
-                  <span className="text-xs text-muted">{new Date(r.at).toUTCString()}</span>
+                  <span className="text-xs text-muted">{new Date(r.at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}</span>
                 </div>
                 <p className="mt-1 text-xs text-muted">
                   {r.confidentiality === "public" ? "Public" : `Confidential (${r.confidentiality})`} · {r.status.toLowerCase()} · to {mask(r.to.recipient)}

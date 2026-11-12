@@ -12,17 +12,8 @@ Demo vault: `0x6248aD326e4c7394BA23E552C4dd5C86939d3925` on Base, derived by Cha
 | 2 | Confidential payout (`confidentiality: basic`) | 1.90 USDC, Base | 1.894476 USDC, Arbitrum | [nearblocks](https://nearblocks.io/txns/4RW7R4CsXYpYWaumCfT7DDCGs89Ph7faiJ797ypn8dDB) | [basescan](https://basescan.org/tx/0x2716595c73b267af1c03a87d737e24fdea4960274a99972af31209ca6b8f8790) | [arbiscan](https://arbiscan.io/tx/0x448b42caa4165351684f87dede862c10d493aa36c5a01e50670e8e9e1d73e3d6) | SUCCESS, 2026-11-12, ~40 s |
 | 3 | Fund from anywhere | — | — | — | — | — | not run (SIMULATED in the app) |
 
-### What the human needs first
-1. **A NEAR mainnet account** whose private key you hold. Create it with the NEAR CLI; near.com passkey accounts may not export a key. Put it in `.env` as `MAINNET_DEMO_ACCOUNT` and `MAINNET_DEMO_PRIVATE_KEY`. It needs a little NEAR for the gas of each MPC `sign` call.
-2. `npx tsx scripts/mainnet-payout.ts vault` prints the Base vault address, derived by Chain Signatures from that account and `inheirit/demo/base`.
-3. Fund that address on Base with about $25 USDC plus a little ETH for gas.
-4. Dry run, which spends nothing: `npx tsx scripts/mainnet-payout.ts quote --to sol:USDC --amount 2 --recipient <heir address>`.
-5. Real payout, which stops for your typed `yes`:
-   - `npx tsx scripts/mainnet-payout.ts pay --to sol:SOL --amount 2 --recipient <addr> --link "<testnet owner>:1:0:<heir>"` (universal payout);
-   - `… pay --to arb:USDC …` (stable value).
-6. Funding: `npx tsx scripts/mainnet-payout.ts fund --from arb:USDC --amount 3 --refund <your Arbitrum address>`, then send from your own wallet, then `… status <depositAddress>`.
-
-Fallback if the Chain Signatures path takes too long: set `MAINNET_DEMO_EVM_KEY` (a plain EVM wallet) instead. The README then says so.
+### How these were made
+See [`MAINNET.md`](MAINNET.md) for the runbook. In short: `scripts/mainnet-payout.ts preflight` (read-only checks), then `pay --to sol:USDC …` and `pay --to arb:USDC … --confidential basic`, each stopping for a person's typed `yes`. No stable-mode (`payout_value_mode: stable`) payout was made on mainnet; on testnet it runs on the SIMULATED client.
 
 ## Dry-run quotes (read-only, 2026-11-06)
 

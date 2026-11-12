@@ -67,7 +67,11 @@ function steps(w: Will, scenario: Scenario, escalated: boolean): Step[] {
         label: "Send a sign of life",
         detail: "Send a heartbeat. The ladder snaps back to All good.",
         done: escalated && s === "Active",
-        action: { label: "I'm here (send a heartbeat)", run: () => signOfLife(owner), enabled: s !== "Active" && s !== "Completed" },
+        action: { label: "I'm here (send a heartbeat)", run: () => {
+          // Bring the ladder into view first, so the snap-back is seen, not just the tick.
+          document.getElementById("signs-of-life")?.scrollIntoView({ behavior: "smooth", block: "start" });
+          return signOfLife(owner);
+        }, enabled: s !== "Active" && s !== "Completed" },
       },
     ];
   }
@@ -222,7 +226,7 @@ export function Speedrun({ will, refresh }: { will: Will; refresh: () => void })
         {list.map((st, i) => (
           <li key={st.label} className={`rounded-lg border px-3 py-2 ${i === current ? "border-accent bg-accent-soft" : "border-line"}`}>
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className={`text-sm ${st.done ? "text-muted line-through" : i === current ? "font-semibold" : ""}`}>
+              <span className={`text-sm ${st.done ? "text-muted" : i === current ? "font-semibold" : ""}`}>
                 {st.done ? "✓ " : `${i + 1}. `}
                 {st.label}
               </span>
@@ -243,6 +247,25 @@ export function Speedrun({ will, refresh }: { will: Will; refresh: () => void })
           </li>
         ))}
       </ol>
+      {current === -1 && SCENARIOS.findIndex((x) => x.id === scenario) < SCENARIOS.length - 1 && (
+        <p className="mt-3 text-sm">
+          Done.{" "}
+          {s === "Active" ? (
+            <button
+              type="button"
+              className="text-accent underline"
+              onClick={() => {
+                setScenario(SCENARIOS[SCENARIOS.findIndex((x) => x.id === scenario) + 1].id);
+                setEscalated("0");
+              }}
+            >
+              Try {SCENARIOS[SCENARIOS.findIndex((x) => x.id === scenario) + 1].title} →
+            </button>
+          ) : (
+            "Start over below to try another scenario."
+          )}
+        </p>
+      )}
       <div className="mt-4 space-y-3">
         <RoleSwitcher will={will} />
         <div className="flex flex-wrap gap-2">
