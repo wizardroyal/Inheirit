@@ -60,6 +60,7 @@ class FakeContract implements WillContract {
     this.calls.push("advance");
     const n = this.nowS();
     if (this.w.state === "Active") this.w.state = { Quiet: { since: n } };
+    else if ("Paused" in this.w.state) this.w.state = "Active";
     else if ("Quiet" in this.w.state) this.w.state = { WelfareCheck: { since: n } };
     else if ("WelfareCheck" in this.w.state) this.w.state = { GuardianVote: { since: n } };
     return true;
@@ -109,6 +110,36 @@ function setup(state: WillState = "Active", adapters: SignalAdapter[] = [], extr
   });
   return { driver, contract, store, logs, executed, noted, setNow: (s: number) => (nowS = s), getNow: () => nowS };
 }
+
+describe("paused wills (round 5)", () => {
+  const DAY = 86_400;
+  it("advance is due only once the pause ends, and then resumes the will", async () => {
+    expect(isAdvanceDue(will({ Paused: { until: T0 + 10 * DAY } }), T0 + 10 * DAY - 1)).toBe(false);
+    expect(isAdvanceDue(will({ Paused: { until: T0 + 10 * DAY } }), T0 + 10 * DAY)).toBe(true);
+    const t = setup({ Paused: { until: T0 + 100 } });
+    t.setNow(T0 + 100);
+    await t.driver.tick();
+    expect(t.contract.calls).toContain("advance");
+    expect(t.contract.w.state).toBe("Active");
+  });
+  it("reminds the owner 7 days and 1 day before the pause ends, once each", async () => {
+    const until = T0 + 30 * DAY;
+    const t = setup({ Paused: { until } });
+    const reminders = () => t.store.get().notifications.filter((n) => n.subject.startsWith("Your will resumes in"));
+    t.setNow(until - 20 * DAY);
+    await t.driver.tick();
+    expect(reminders()).toHaveLength(0);
+    t.setNow(until - 7 * DAY);
+    await t.driver.tick();
+    await t.driver.tick();
+    expect(reminders().map((n) => n.subject)).toEqual(["Your will resumes in 7 days"]);
+    t.setNow(until - DAY + 60);
+    await t.driver.tick();
+    await t.driver.tick();
+    expect(reminders()).toHaveLength(2);
+    expect(reminders()[1].subject).toMatch(/resumes in (23|24) hours/);
+  });
+});
 
 describe("isAdvanceDue", () => {
   it("follows each period", () => {

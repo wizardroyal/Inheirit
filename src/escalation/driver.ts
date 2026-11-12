@@ -133,6 +133,7 @@ export function isAdvanceDue(will: WillView, nowS: number): boolean {
     );
   }
   if ("SecretsBuffer" in s) return elapsed(s.SecretsBuffer.since) >= t.secrets_buffer;
+  if ("Paused" in s) return nowS >= s.Paused.until;
   if ("SecretsReleased" in s) return will.sealed_notes.every((n) => will.released_notes.some((r) => r.note_id === n.id));
   return false;
 }
@@ -198,6 +199,17 @@ export function notificationsFor(state: StateName, will: WillView, cfg: OwnerSig
     default:
       return [];
   }
+}
+
+/** The owner's reminder that a pause is ending (round 5). */
+export function pauseReminderMessage(will: WillView, cfg: OwnerSignalConfig, until: number, nowS: number): Message {
+  const when = new Date(until * 1000).toUTCString().replace(/:\d\d GMT$/, " UTC");
+  return {
+    event: "pause_reminder",
+    to: [will.owner, ...(cfg.email ? [cfg.email] : [])],
+    subject: `Your will resumes in ${inWords(until - nowS)}`,
+    body: `Your will is paused until ${when}. After that it watches for signs of life again. To pause again or resume now, open your will: ${config.webUrl()}/account/will`,
+  };
 }
 
 type EmailOutcome = "sent" | "repeat" | "capped" | "per-run" | null;
@@ -336,14 +348,15 @@ export class Driver {
         // Outside Active every newer sign of life is recorded (it's what halts). In Active the record only
         // keeps the quiet clock fresh, so it's written at most every max(60 s, quiet_after/10): otherwise
         // anyone with a free account could burn the agent's gas with a heartbeat every few seconds.
-        const active = stateName(will.state) === "Active";
+        // A paused will is throttled the same way: its records only keep the clock fresh.
+        const active = ["Active", "Paused"].includes(stateName(will.state));
         const minStep = active ? Math.max(60, Math.floor(will.timings.quiet_after / 10)) : 1;
         // ...unless a step is due now: then any newer sign of life is recorded, so the will never goes Quiet
         // on an owner who just tapped the heartbeat (audit round 3).
         // Recorded early enough that the quiet clock can't run out first, even if someone else calls advance.
         // Only for armed wills (an unarmed one never goes Quiet), and with a per-will daily cap on records made
         // in Active, so a will set to the shortest quiet period can't turn heartbeats into unlimited gas (round 5).
-        const stepSoon = active && isArmed(will) && nowS - will.last_alive_at >= will.timings.quiet_after - minStep;
+        const stepSoon = stateName(will.state) === "Active" && isArmed(will) && nowS - will.last_alive_at >= will.timings.quiet_after - minStep;
         const worth = atS - will.last_alive_at >= minStep || (stepSoon && atS > will.last_alive_at);
         if (worth && (!active || this.activeRecords.take(cfg.owner) === 0)) {
           await contract.recordLiveness(cfg.owner, atS);
@@ -378,6 +391,7 @@ export class Driver {
       for (const m of notificationsFor(state, will, cfg, contacts)) await this.deliver(cfg.owner, m, will.last_alive_at, isSpeedrun(will));
     }
     if (typeof will.state !== "string" && "Quiet" in will.state) await this.runChecks(cfg, will, will.state.Quiet.since, nowS);
+    if (typeof will.state !== "string" && "Paused" in will.state) await this.pauseReminder(cfg, will, will.state.Paused.until, nowS);
 
     // Queued, not awaited: a slow MPC signature must not delay this tick for other wills. One entry per
     // owner, so a run still in flight is not started twice; the next tick picks up whatever is left.
@@ -390,11 +404,13 @@ export class Driver {
         if (fresh && stateName(fresh.state) === "Executing") await executor.run(cfg.owner, fresh);
       });
     }
-    if (state === "Active" && will.pending_withdrawals.some((w) => w.chain !== "Near") && executor?.withdraw) {
+    // Withdrawals go out while Active or Paused (the contract allows signing in both).
+    const canWithdraw = (st: string) => st === "Active" || st === "Paused";
+    if (canWithdraw(state) && will.pending_withdrawals.some((w) => w.chain !== "Near") && executor?.withdraw) {
       const withdraw = executor.withdraw.bind(executor);
       this.execution.add(cfg.owner, async () => {
         const fresh = await contract.getWill(cfg.owner);
-        if (fresh && stateName(fresh.state) === "Active") await withdraw(cfg.owner, fresh);
+        if (fresh && canWithdraw(stateName(fresh.state))) await withdraw(cfg.owner, fresh);
       });
     }
     // Secrets last: only once distribution and the buffer are over (the contract enforces it too).
@@ -426,12 +442,28 @@ export class Driver {
     return true;
   }
 
+  /** Reminds the owner 7 days and 1 day before a pause ends (once each per pause). */
+  private async pauseReminder(cfg: OwnerSignalConfig, will: WillView, until: number, nowS: number): Promise<void> {
+    const left = until - nowS;
+    if (left <= 0) return;
+    const kind = left <= 86_400 ? "1d" : left <= 7 * 86_400 ? "7d" : null;
+    if (!kind) return;
+    const key = `${until}:${kind}`;
+    const sent = this.deps.store.get().pauseReminders?.[cfg.owner] ?? [];
+    if (sent.includes(key)) return;
+    this.deps.store.update((s) => ((s.pauseReminders ??= {})[cfg.owner] = [...sent.filter((k) => k.startsWith(`${until}:`)), key]));
+    const m = pauseReminderMessage(will, cfg, until, nowS);
+    await this.deliver(cfg.owner, { ...m, event: `pause_${kind}` }, will.last_alive_at, isSpeedrun(will));
+  }
+
   /** The email address for a recipient: an address as is, the owner's own, or one the owner gave for that person. */
   private emailFor(owner: string, to: string): string | null {
     if (isEmail(to)) return to;
     const cfg = this.deps.store.get().owners[owner];
     if (to === owner) return cfg?.email ?? null;
-    return cfg?.peopleEmails?.[to] ?? null;
+    // Profile people (round 5) are matched by account; the driver only addresses people in the will.
+    const fromProfile = this.deps.store.get().profiles?.[owner]?.people.find((p) => p.account === to)?.email;
+    return cfg?.peopleEmails?.[to] ?? fromProfile ?? null;
   }
 
   /**

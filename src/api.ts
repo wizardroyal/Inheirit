@@ -87,6 +87,25 @@ const OwnerFields = z.object({
   email: z.string().email().optional(),
 });
 
+const ProfilePersonSchema = z.object({
+  id: z.string().min(1).max(40),
+  name: z.string().trim().min(1).max(64),
+  role: z.enum(["heir", "guardian", "friend", "lawyer"]),
+  account: z.string().regex(NEAR_ACCOUNT).optional(),
+  email: z.string().email().max(254).optional(),
+  telegram: z.string().max(64).optional(),
+  eth: z.string().regex(/^0x[0-9a-fA-F]{40}$/).optional(),
+  btc: z.string().regex(/^(tb1|bc1|[mn2])[0-9a-zA-Z]{20,90}$/).optional(),
+});
+const ProfileFields = z.object({
+  people: z.array(ProfilePersonSchema).max(30).optional(),
+  vault_name: z.string().trim().max(64).optional(),
+  /** `null` clears the draft. */
+  draft: z.unknown().optional(),
+  setup_done: z.boolean().optional(),
+});
+const MAX_DRAFT_CHARS = 10_000;
+
 const PayoutChoice = z.object({
   owner: z.string().min(2),
   blockchain: z.string().min(2).max(16),
@@ -264,6 +283,33 @@ export function api(deps: ApiDeps): Hono {
       };
     });
     return c.json({ ok: true, signed: r.signed, watching: store.get().owners[r.owner] });
+  });
+
+  // The owner's profile (round 5): people and their contact details, the vault's name, a draft will.
+  // Read and written only with the owner's signature; works before a will exists; never on-chain.
+  app.post("/api/profile", async (c) => {
+    const r = await ownerRequest(await c.req.json(), "profile", ProfileFields, "A profile change must be signed by the owner");
+    if (r.error) return c.json(r.error.body, r.error.status);
+    const { people, vault_name, draft, setup_done } = r.data;
+    if (draft !== undefined && JSON.stringify(draft ?? null).length > MAX_DRAFT_CHARS) return c.json({ error: "The draft is too long" }, 400);
+    if (people && new Set(people.map((p) => p.id)).size !== people.length) return c.json({ error: "Duplicate person id" }, 400);
+    store.update((s) => {
+      const prev = s.profiles[r.owner];
+      s.profiles[r.owner] = {
+        people: people ?? prev?.people ?? [],
+        vaultName: vault_name ?? prev?.vaultName,
+        draft: draft === undefined ? prev?.draft : draft === null ? undefined : draft,
+        setupDone: setup_done ?? prev?.setupDone,
+        updatedAt: new Date().toISOString(),
+      };
+    });
+    return c.json({ ok: true, profile: store.get().profiles[r.owner] });
+  });
+
+  app.post("/api/profile/read", async (c) => {
+    const r = await ownerRequest(await c.req.json(), "profile_read", z.object({}).passthrough(), "Reading a profile must be signed by the owner");
+    if (r.error) return c.json(r.error.body, r.error.status);
+    return c.json({ profile: store.get().profiles[r.owner] ?? null });
   });
 
   // Heartbeat app ping: a real, strong signal, because it is signed by a key on the owner's account

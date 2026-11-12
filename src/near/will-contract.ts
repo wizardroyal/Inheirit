@@ -14,7 +14,9 @@ export type WillState =
   | { Executing: { stage: number; since: number; stage_started: number } }
   | { SecretsBuffer: { since: number } }
   | { SecretsReleased: { since: number } }
-  | { Completed: { at: number } };
+  | { Completed: { at: number } }
+  /** Owner pause (round 5): no escalation until `until`; advance() then resumes it. */
+  | { Paused: { until: number } };
 
 export type StateName =
   | "Active"
@@ -25,7 +27,8 @@ export type StateName =
   | "Executing"
   | "SecretsBuffer"
   | "SecretsReleased"
-  | "Completed";
+  | "Completed"
+  | "Paused";
 
 /** One release slice (CLAUDE.md §5.5): `pct` of the snapshot, then `wait_after` s to the next. */
 export interface Stage {

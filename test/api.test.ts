@@ -87,6 +87,26 @@ describe("demo-only routes", () => {
 });
 
 describe("owner-signed routes", () => {
+  it("keeps the owner's profile private: signed write, signed read, no will needed (round 5)", async () => {
+    const t = setup(true);
+    const people = [{ id: "p1", name: "Ada", role: "heir", email: "ada@example.com" }, { id: "p2", name: "Tobi", role: "guardian" }];
+    const w = await t.post("/api/profile", { signed: { owner: "nowill.testnet", action: "profile", data: { people, vault_name: "Family", draft: { text: "half to Ada" } } } });
+    expect(w.status).toBe(200);
+    const r = await t.post("/api/profile/read", { signed: { owner: "nowill.testnet", action: "profile_read", data: {} } });
+    const body = (await r.json()) as { profile: { people: unknown[]; vaultName: string; draft: unknown } };
+    expect(body.profile.people).toHaveLength(2);
+    expect(body.profile.vaultName).toBe("Family");
+    // Fields left out keep their value; null clears the draft.
+    await t.post("/api/profile", { signed: { owner: "nowill.testnet", action: "profile", data: { draft: null } } });
+    const again = (await (await t.post("/api/profile/read", { signed: { owner: "nowill.testnet", action: "profile_read", data: {} } })).json()) as { profile: { people: unknown[]; draft?: unknown } };
+    expect(again.profile.people).toHaveLength(2);
+    expect(again.profile.draft).toBeUndefined();
+    expect((await t.post("/api/profile", {})).status).toBe(401);
+    expect((await t.post("/api/profile/read", { signed: { owner: "nowill.testnet", action: "profile", data: {} } })).status).toBe(401);
+    const bad = await t.post("/api/profile", { signed: { owner: "nowill.testnet", action: "profile", data: { people: [{ id: "x", name: "X", role: "boss" }] } } });
+    expect(bad.status).toBe(400);
+  });
+
   it("registers signal identities from a signed request outside demo mode", async () => {
     const t = setup(false);
     const res = await t.post("/api/owners", { signed: { owner: "alice.testnet", action: "register_owner", data: { github: "alice" } } });

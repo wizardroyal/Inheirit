@@ -166,6 +166,33 @@ export interface AgentState {
   payouts: Record<string, PayoutBatch[]>;
   /** Demo faucet top-ups already sent: owner -> sends (one funding per will). */
   faucetSends: Record<string, { chain: "Eth" | "Btc"; to: string; amount: string; txHash: string }[]>;
+  /**
+   * The owner's profile (round 5): people with their contact details, the vault's name, a draft will.
+   * Owner-signed, kept here in the enclave, never on-chain, never in a public route.
+   */
+  profiles: Record<string, OwnerProfile>;
+  /** Pause reminders already sent: owner -> `${until}:${days}` keys. */
+  pauseReminders: Record<string, string[]>;
+}
+
+export interface ProfilePerson {
+  id: string;
+  name: string;
+  role: "heir" | "guardian" | "friend" | "lawyer";
+  account?: string;
+  email?: string;
+  telegram?: string;
+  eth?: string;
+  btc?: string;
+}
+
+export interface OwnerProfile {
+  people: ProfilePerson[];
+  vaultName?: string;
+  /** The will being written, before Start (any JSON the web app keeps; size-capped by the route). */
+  draft?: unknown;
+  setupDone?: boolean;
+  updatedAt: string;
 }
 
 const EMPTY: AgentState = {
@@ -190,6 +217,8 @@ const EMPTY: AgentState = {
   payoutPrefs: {},
   payouts: {},
   faucetSends: {},
+  profiles: {},
+  pauseReminders: {},
 };
 
 export class Store {
