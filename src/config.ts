@@ -34,7 +34,7 @@ export const config = {
   telegramUsername: () => (process.env.TELEGRAM_BOT_USERNAME || "").replace(/^@/, "") || undefined,
   // NEAR Intents 1Click (§J). The agent only reads its public token list; it never moves mainnet funds.
   /** The web app, for links in Telegram messages and notifications. */
-  webUrl: () => env("WEB_URL", "https://inheirit.vercel.app").replace(/\/$/, ""),
+  webUrl: () => env("WEB_URL", "https://inheirit.xyz").replace(/\/$/, ""),
   oneclickBaseUrl: () => process.env.ONECLICK_BASE_URL || "https://1click.chaindefuser.com",
 };
 

@@ -19,7 +19,7 @@ import {
 import type { SignalAdapter } from "../signals/adapters";
 import type { OwnerSignalConfig, Store } from "../state/store";
 import { CHECK_TEXT, type TelegramBot } from "../telegram/bot";
-import { isEmail, type Mailer } from "../notify/email";
+import { EMAIL_FOOTER, isEmail, type Mailer } from "../notify/email";
 
 /** Seconds of margin so a reported time is never ahead of the chain's block time. */
 const CHAIN_CLOCK_MARGIN_S = 5;
@@ -198,6 +198,15 @@ export function notificationsFor(state: StateName, will: WillView, cfg: OwnerSig
   }
 }
 
+type EmailOutcome = "sent" | "repeat" | "capped" | "per-run" | null;
+/** How each email outcome reads in the app's message log (the fallback note when it wasn't sent). */
+const EMAIL_CHANNEL: Record<Exclude<EmailOutcome, null>, string> = {
+  sent: "email",
+  repeat: "email (already sent during this silence)",
+  capped: "email (daily limit reached; shown here instead)",
+  "per-run": "email (one per run on demo timings; shown here instead)",
+};
+
 /** Minimum gap between two immediate ticks of the same will triggered by signs of life. */
 export const POKE_GAP_MS = 5_000;
 
@@ -364,7 +373,7 @@ export class Driver {
       // Friends from the will on-chain and from the approved policy (which may also hold plain addresses).
       const contacts = [...new Set([...(will.contacts ?? []), ...(store.get().policies[cfg.owner]?.contacts ?? [])])];
       store.update((s) => (s.notifiedState[cfg.owner] = state));
-      for (const m of notificationsFor(state, will, cfg, contacts)) await this.deliver(cfg.owner, m, will.last_alive_at);
+      for (const m of notificationsFor(state, will, cfg, contacts)) await this.deliver(cfg.owner, m, will.last_alive_at, isSpeedrun(will));
     }
     if (typeof will.state !== "string" && "Quiet" in will.state) await this.runChecks(cfg, will, will.state.Quiet.since, nowS);
 
@@ -423,26 +432,42 @@ export class Driver {
     return cfg?.peopleEmails?.[to] ?? null;
   }
 
-  /** Emails one message to every recipient who has an address; returns how many went out. */
-  private async email(owner: string, m: Message, lastAliveAt: number): Promise<"sent" | "repeat" | null> {
+  /**
+   * Emails one message to every recipient with an address the owner entered (generated test people
+   * never have one). Demo-timing wills: at most one email per address per run, from a smaller daily budget.
+   */
+  private async email(owner: string, m: Message, lastAliveAt: number, demo: boolean): Promise<EmailOutcome> {
     if (!this.deps.mailer) return null;
     const addrs = [...new Set(m.to.map((t) => this.emailFor(owner, t)).filter((a): a is string => !!a))];
     if (!addrs.length) return null;
     if (!this.firstTelegramThisSilence(owner, m.event, lastAliveAt, "email")) return "repeat";
+    const run = this.deps.store.get().owners[owner]?.watchedSince ?? "";
+    const text = `${m.body}\n\n${EMAIL_FOOTER}`;
     let sent = 0;
+    let capped = 0;
+    let perRun = 0;
     for (const a of addrs) {
+      const key = `${owner}|${a.toLowerCase()}|${run}`;
+      if (demo && this.deps.store.get().emailedDemo[key]) {
+        perRun++;
+        continue;
+      }
       try {
-        if (await this.deps.mailer.send(a, m.subject, m.body)) sent++;
+        const r = await this.deps.mailer.send(a, m.subject, text, { demo });
+        if (r === "sent") {
+          sent++;
+          if (demo) this.deps.store.update((s) => (s.emailedDemo[key] = this.now().toISOString()));
+        } else if (r === "capped") capped++;
       } catch (e) {
         // Status only: never the address or the content.
         this.log(`[email] ${owner}: a message failed: ${e instanceof Error ? e.message : String(e)}`);
       }
     }
-    return sent ? "sent" : null;
+    return sent ? "sent" : capped ? "capped" : perRun ? "per-run" : null;
   }
 
   /** Records one notification and sends it on Telegram to every recipient with a linked chat. */
-  private async deliver(owner: string, m: Message, lastAliveAt: number, channels: string[] = ["ui"]): Promise<void> {
+  private async deliver(owner: string, m: Message, lastAliveAt: number, demo = false, channels: string[] = ["ui"]): Promise<void> {
     const out = [...channels];
     if (this.deps.telegram && m.to.some((a) => this.deps.telegram!.isLinked(a)) && !this.firstTelegramThisSilence(owner, m.event, lastAliveAt)) {
       out.push("telegram (already sent during this silence)");
@@ -457,9 +482,8 @@ export class Driver {
       }
       if (sent) out.push("telegram");
     }
-    const mailed = await this.email(owner, m, lastAliveAt);
-    if (mailed === "sent") out.push("email");
-    else if (mailed === "repeat") out.push("email (already sent during this silence)");
+    const mailed = await this.email(owner, m, lastAliveAt, demo);
+    if (mailed) out.push(EMAIL_CHANNEL[mailed]);
     this.record(owner, m, out);
   }
 
@@ -491,8 +515,9 @@ export class Driver {
       if (step === "heartbeat") this.record(owner, check("Check: heartbeat app"), ["ui", "heartbeat app"]);
       else if (step === "email" && cfg.email) {
         if (this.deps.mailer) {
-          const r = await this.email(owner, { ...check("Inheirit: just checking in"), to: [cfg.email] }, will.last_alive_at);
-          this.record(owner, { ...check("Check: email"), to: [cfg.email] }, r === "sent" ? ["email"] : r === "repeat" ? ["email (already sent during this silence)"] : ["ui"]);
+          const body = `We haven't seen any activity from you for a while. If you're fine, show any sign of life and that's it: nothing else happens.\n\nHeartbeat app: ${config.webUrl()}/heartbeat`;
+          const r = await this.email(owner, { ...check("Inheirit: just checking in", body), to: [cfg.email] }, will.last_alive_at, isSpeedrun(will));
+          this.record(owner, { ...check("Check: email"), to: [cfg.email] }, r ? [EMAIL_CHANNEL[r]] : ["ui"]);
         } else this.record(owner, { ...check("Check: email"), to: [cfg.email], body: `${CHECK_TEXT} (Email isn't configured on this agent; the check is shown here instead.)` }, ["ui"]);
       }
       else if (step === "telegram" && this.deps.telegram?.isLinked(owner)) {

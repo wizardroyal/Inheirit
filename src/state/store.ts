@@ -156,6 +156,8 @@ export interface AgentState {
    * check and welfare messages are not sent to phones again (§7.3 known noise).
    */
   telegramSent: Record<string, { lastAliveAt: number; events: string[] }>;
+  /** Demo-timing wills: "owner|address|run" → when that address got its one email for that run. */
+  emailedDemo: Record<string, string>;
   /** Heirs' payout choices (§J.3): owner -> heir account -> where they want to receive. */
   payoutPrefs: Record<string, Record<string, PayoutPref>>;
   /** Onward payouts through NEAR Intents (§J.3): owner -> batches. */
@@ -182,6 +184,7 @@ const EMPTY: AgentState = {
   telegramOffset: 0,
   checks: {},
   telegramSent: {},
+  emailedDemo: {},
   payoutPrefs: {},
   payouts: {},
   faucetSends: {},

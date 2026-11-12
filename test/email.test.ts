@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Driver } from "../src/escalation/driver";
-import { EMAIL_PER_ADDRESS_PER_DAY, ResendMailer, type Mailer } from "../src/notify/email";
+import { EMAIL_DEMO_PER_DAY, EMAIL_FOOTER, EMAIL_GLOBAL_PER_DAY, EMAIL_PER_ADDRESS_PER_DAY, ResendMailer, type Mailer, type SendResult } from "../src/notify/email";
+import { allowedOrigin } from "../src/api";
 import { Store } from "../src/state/store";
 import type { WillState, WillView } from "../src/near/will-contract";
 
@@ -9,7 +10,7 @@ describe("ResendMailer", () => {
     const calls: { url: string; init: RequestInit }[] = [];
     const fetchImpl = (async (url: string, init: RequestInit) => (calls.push({ url, init }), new Response("{}"))) as unknown as typeof fetch;
     const m = new ResendMailer("re_key", "checks@mail.example", fetchImpl);
-    expect(await m.send("bola@example.com", "Hi", "Body")).toBe(true);
+    expect(await m.send("bola@example.com", "Hi", "Body")).toBe("sent");
     expect(calls[0].url).toBe("https://api.resend.com/emails");
     expect((calls[0].init.headers as Record<string, string>).Authorization).toBe("Bearer re_key");
     expect(JSON.parse(String(calls[0].init.body))).toEqual({ from: "checks@mail.example", to: ["bola@example.com"], subject: "Hi", text: "Body" });
@@ -18,9 +19,18 @@ describe("ResendMailer", () => {
   it("caps each address per day and refuses non-addresses", async () => {
     const fetchImpl = (async () => new Response("{}")) as unknown as typeof fetch;
     const m = new ResendMailer("k", "f@x.io", fetchImpl, () => 0);
-    for (let i = 0; i < EMAIL_PER_ADDRESS_PER_DAY; i++) expect(await m.send("a@b.co", "s", "t")).toBe(true);
-    expect(await m.send("A@b.co", "s", "t")).toBe(false);
-    expect(await m.send("someone.testnet", "s", "t")).toBe(false);
+    for (let i = 0; i < EMAIL_PER_ADDRESS_PER_DAY; i++) expect(await m.send("a@b.co", "s", "t")).toBe("sent");
+    expect(await m.send("A@b.co", "s", "t")).toBe("capped");
+    expect(await m.send("someone.testnet", "s", "t")).toBe("invalid");
+  });
+
+  it("demo-timing wills draw from a smaller budget, so real wills keep room under the daily total", async () => {
+    const fetchImpl = (async () => new Response("{}")) as unknown as typeof fetch;
+    const m = new ResendMailer("k", "f@x.io", fetchImpl, () => 0);
+    for (let i = 0; i < EMAIL_DEMO_PER_DAY; i++) expect(await m.send(`d${i}@x.io`, "s", "t", { demo: true })).toBe("sent");
+    expect(await m.send("one-more@x.io", "s", "t", { demo: true })).toBe("capped");
+    for (let i = EMAIL_DEMO_PER_DAY; i < EMAIL_GLOBAL_PER_DAY; i++) expect(await m.send(`r${i}@x.io`, "s", "t")).toBe("sent");
+    expect(await m.send("over@x.io", "s", "t")).toBe("capped");
   });
 
   it("a provider error names neither the address nor the content", async () => {
@@ -44,7 +54,7 @@ function will(state: WillState): WillView {
     stages: [{ pct: 100, wait_after: 30 }],
     accelerated_stages: [{ pct: 100, wait_after: 30 }],
     round_stages: [],
-    timings: { quiet_after: 100, nudge_period: 40, welfare_period: 60, vote_period: 300, challenge_period: 120, secrets_buffer: 60 },
+    timings: { quiet_after: 86_400, nudge_period: 40, welfare_period: 60, vote_period: 300, challenge_period: 120, secrets_buffer: 60 }, // real timings unless a test says otherwise
     policy_hash: "0".repeat(64),
     foreign_chains: [],
     lawyer: "lawyer.testnet",
@@ -64,7 +74,9 @@ function will(state: WillState): WillView {
 
 function setup(state: WillState) {
   const sent: [string, string][] = [];
-  const mailer: Mailer = { send: async (to, subject) => (sent.push([to, subject]), true) };
+  const bodies: string[] = [];
+  let result: SendResult = "sent";
+  const mailer: Mailer = { send: async (to, subject, text) => (result === "sent" && (sent.push([to, subject]), bodies.push(text)), result) };
   const store = new Store(null);
   store.update(
     (s) =>
@@ -83,10 +95,51 @@ function setup(state: WillState) {
     recordLiveness: async () => true,
   };
   const driver = new Driver({ contract: contract as never, adapters: [], store, mailer, now: () => new Date(nowS * 1000), log: () => {} });
-  return { driver, store, sent, w, setNow: (s: number) => (nowS = s) };
+  return { driver, store, sent, bodies, w, setNow: (s: number) => (nowS = s), setResult: (r: SendResult) => (result = r) };
 }
 
+describe("agent CORS", () => {
+  it("allows the app's domains and localhost, nothing else", () => {
+    for (const o of ["https://inheirit.xyz", "https://www.inheirit.xyz", "https://inheirit.vercel.app", "http://localhost:3100"]) expect(allowedOrigin(o)).toBe(true);
+    for (const o of ["https://evil.example", "https://inheirit.xyz.evil.io", undefined]) expect(allowedOrigin(o)).toBe(false);
+  });
+});
+
 describe("email delivery", () => {
+  it("every email says how to answer (replies aren't read)", async () => {
+    const t = setup({ WelfareCheck: { since: T0 + 150 } });
+    await t.driver.tick();
+    expect(t.bodies.length).toBeGreaterThan(0);
+    for (const b of t.bodies) expect(b.endsWith(EMAIL_FOOTER)).toBe(true);
+  });
+
+  it("on demo timings, one email per address per run; the app says so instead", async () => {
+    const t = setup({ GuardianVote: { since: T0 + 150 } });
+    t.w.timings = { ...t.w.timings, quiet_after: 120 }; // a speedrun
+    await t.driver.tick();
+    expect(t.sent.filter(([to]) => to === "g1@example.com")).toHaveLength(1);
+    // First challenge alarm of this run: it goes out.
+    t.w.state = { Challenge: { since: T0 + 300 } };
+    t.setNow(T0 + 305);
+    await t.driver.tick();
+    expect(t.sent.filter(([to]) => to === "alice@example.com")).toHaveLength(1);
+    // A second challenge in the same run: no second email to the owner.
+    t.w.state = "Active";
+    await t.driver.tick();
+    t.w.state = { Challenge: { since: T0 + 700 } };
+    t.setNow(T0 + 705);
+    await t.driver.tick();
+    expect(t.sent.filter(([to]) => to === "alice@example.com")).toHaveLength(1);
+    expect(t.store.get().notifications.some((n) => n.channels.includes("email (one per run on demo timings; shown here instead)"))).toBe(true);
+  });
+
+  it("when the daily limit is reached, the message stays in the app with a note", async () => {
+    const t = setup({ WelfareCheck: { since: T0 + 150 } });
+    t.setResult("capped");
+    await t.driver.tick();
+    expect(t.store.get().notifications.find((n) => n.event === "WelfareCheck")?.channels).toContain("email (daily limit reached; shown here instead)");
+  });
+
   it("emails the owner's check in Quiet, once per silence", async () => {
     const t = setup({ Quiet: { since: T0 + 100 } });
     t.setNow(T0 + 125);

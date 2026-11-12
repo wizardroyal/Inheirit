@@ -125,9 +125,19 @@ function watchingFlags(cfg: OwnerSignalConfig | undefined) {
     : null;
 }
 
+export const WEB_ORIGINS = ["https://inheirit.xyz", "https://www.inheirit.xyz", "https://inheirit.vercel.app"];
+/** The app's own origins, plus any localhost port (local runs, the README's "run it yourself"). */
+export function allowedOrigin(origin: string | undefined): boolean {
+  if (!origin) return false;
+  if (WEB_ORIGINS.includes(origin)) return true;
+  return /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+}
+
 export function api(deps: ApiDeps): Hono {
   const app = new Hono();
-  app.use(cors());
+  // The web app's origins only (plus localhost for running it yourself). Every write is NEP-413 signed
+  // anyway; this just keeps other sites' pages from reading the agent's answers in a visitor's browser.
+  app.use(cors({ origin: (o) => (allowedOrigin(o) ? o : null) }));
   const { contract, store } = deps;
   const limiters = deps.limiters ?? {
     draft: new RateLimiter(AI_DRAFT_LIMIT),
