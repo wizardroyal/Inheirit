@@ -93,7 +93,7 @@ export async function createWill(owner: string, o: CreateWillOptions, progress: 
   progress("Checking that everyone in the will has a NEAR account…");
   const named = [...o.policy.heirs.map((h) => h.near_account), ...o.policy.guardians, ...(o.policy.lawyer ? [o.policy.lawyer] : []), ...o.contacts];
   const missing = (await Promise.all([...new Set(named)].map(async (a) => ((await accountExists(a)) ? null : a)))).filter(Boolean);
-  if (missing.length) throw new Error(`These accounts don't exist on NEAR testnet: ${missing.join(", ")}. Check the spelling, or use ⚡ to create a test person.`);
+  if (missing.length) throw new Error(`These accounts don't exist on NEAR testnet: ${missing.join(", ")}. Check the spelling, or tap ↻ to create a test person.`);
   const bps = nearShareBps(o.policy);
   const deposit = Number(o.depositNear) > 0 ? nearToYocto(o.depositNear) : 0n;
   progress(deposit ? `Creating the will on-chain and depositing ${o.depositNear} NEAR into the vault…` : "Creating the will on-chain…");

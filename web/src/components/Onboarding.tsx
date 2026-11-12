@@ -2,7 +2,7 @@
 // Progressive onboarding (CLAUDE.md §8): a minimum will in 3 steps (signals, people, vault) with a
 // live allocation preview, then a will-strength checklist. Percentages, not amounts; sign-up asks
 // only for a display name (jurisdiction optional), both kept in the off-chain policy.
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { checkPolicy, summarizePolicy, type Policy } from "@agent/policy/policy";
 import { STANDARD_PCT } from "@agent/policy/schedule";
 import { agent } from "@/lib/agent";
@@ -10,6 +10,7 @@ import { DEMO_SCHEDULE, REAL_SCHEDULE } from "@/lib/config";
 import { acceptAsGuardians, createWill } from "@/lib/demo";
 import { keys } from "@/lib/keys";
 import { createPerson } from "@/lib/onboard";
+import { newTestReceive, testReceiveFor } from "@/lib/test-wallets";
 import { useOverview } from "@/lib/hooks";
 import { humanize, nameOf, useAccountLabel, useNames } from "@/lib/names";
 import { signRequest } from "@/lib/near";
@@ -45,18 +46,41 @@ function Chip({ label, onRemove }: { label: string; onRemove: () => void }) {
   );
 }
 
-/** ⚡ Creates a funded test person (random name, key in this browser) for this role. */
+/** The "generate" mark: a circular arrow. */
+export function RefreshIcon({ className = "" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`inline-block align-[-3px] ${className}`} aria-hidden>
+      <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+      <path d="M21 3v6h-6" />
+    </svg>
+  );
+}
+
+/** A square button the height of an input, showing the refresh mark. */
+function RefreshButton({ label, busy, onClick }: { label: string; busy?: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      title={label}
+      aria-label={label}
+      disabled={busy}
+      className="grid h-[38px] w-[38px] shrink-0 place-items-center rounded-lg border border-field bg-card text-accent hover:bg-accent-soft disabled:opacity-50"
+      onClick={onClick}
+    >
+      <RefreshIcon className={busy ? "animate-spin" : ""} />
+    </button>
+  );
+}
+
+/** Creates a funded test person (random name, key in this browser) for this role. */
 function GenerateButton({ owner, what, onMade }: { owner: string; what: string; onMade: (p: { accountId: string; name: string }) => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   return (
-    <span className="inline-flex flex-col">
-      <button
-        type="button"
-        title={`Generate a test ${what}`}
-        aria-label={`Generate a test ${what}`}
-        disabled={busy}
-        className="rounded-lg border border-line bg-card px-2.5 py-1.5 text-base leading-none hover:bg-accent-soft disabled:opacity-50"
+    <span className="flex shrink-0 flex-col items-end">
+      <RefreshButton
+        label={`Generate a test ${what}`}
+        busy={busy}
         onClick={async () => {
           setBusy(true);
           setError(null);
@@ -68,15 +92,13 @@ function GenerateButton({ owner, what, onMade }: { owner: string; what: string; 
             setBusy(false);
           }
         }}
-      >
-        {busy ? "…" : "⚡"}
-      </button>
+      />
       {error && <span className="max-w-48 text-xs text-danger">{error}</span>}
     </span>
   );
 }
 
-/** A comma-separated list of NEAR accounts shown as name chips, with a box to add one and ⚡ to generate one. */
+/** A comma-separated list of NEAR accounts shown as name chips, with a box to add one and a refresh button to generate one. */
 function PeopleField({
   owner,
   what,
@@ -109,7 +131,7 @@ function PeopleField({
         </div>
       )}
       {(!single || people.length === 0) && (
-        <span className="flex gap-2">
+        <span className="flex items-start gap-2">
           <input
             className={`${inputCls} min-w-0 flex-1`}
             value={draft}
@@ -121,7 +143,7 @@ function PeopleField({
               }
             }}
             onBlur={() => add(draft)}
-            aria-label={`Add a ${what} by NEAR account`} placeholder={`Their NEAR account, or ⚡ for a test ${what}`}
+            aria-label={`Add a ${what} by NEAR account`} placeholder="NEAR account, or tap ↻"
           />
           <GenerateButton owner={owner} what={what} onMade={(p) => add(p.accountId)} />
         </span>
@@ -155,6 +177,15 @@ export function MyWillSetup({
   const [stable, setStable] = useState(false);
   const [log, setLog] = useState<string[]>([]);
   const [failed, setFailed] = useState(false);
+  // The demo faucet pool's addresses: the first generated heir receives there, so test coins come back.
+  // A ref, so a click that lands before or after the answer always reads the latest value.
+  const pool = useRef<{ eth: string; btc: string } | null>(null);
+  useEffect(() => {
+    agent
+      .faucetInfo()
+      .then((f) => (pool.current = f.enabled ? { eth: f.eth, btc: f.btc } : null))
+      .catch(() => (pool.current = null));
+  }, []);
 
   const label = useAccountLabel();
   const names = useNames();
@@ -230,21 +261,35 @@ export function MyWillSetup({
       </Card>
 
       <Card title="2 · The people">
-        <p className="mb-3 text-sm text-muted">Heirs receive in stages. Guardians must accept your invitation, and until enough have, nothing can ever start.</p>
+        <p className="text-sm text-muted">Heirs receive in stages. Guardians must accept your invitation, and until enough have, nothing can ever start.</p>
+        <p className="mb-3 mt-1 text-sm text-muted">
+          Just trying it? Tap <RefreshIcon className="text-accent" /> to generate a test heir, guardian, lawyer or friend: a funded testnet account,
+          and for heirs, test Sepolia and Bitcoin addresses too.
+        </p>
         <div className="space-y-3">
           {heirs.map((h, i) => (
             <div key={i} className="grid gap-2 rounded-lg border border-line p-3 sm:grid-cols-[1fr_1.4fr_5rem_auto]">
               <input className={inputCls} value={h.name} onChange={(e) => setHeir(i, { name: e.target.value })} aria-label="Heir's name" placeholder="Heir's name" />
-              <span className="flex gap-2">
+              <span className="flex items-start gap-2">
                 {h.account && keys.secret(h.account) ? (
-                  <Chip label={`${label(h.account)} · test account`} onRemove={() => setHeir(i, { account: "" })} />
+                  <span className="self-center">
+                    <Chip label={`${label(h.account)} · test account`} onRemove={() => setHeir(i, { account: "" })} />
+                  </span>
                 ) : (
                   <input className={`${inputCls} min-w-0 flex-1`} value={h.account} onChange={(e) => setHeir(i, { account: e.target.value.trim() })} aria-label="Heir's NEAR account" placeholder="Their NEAR account" />
                 )}
                 <GenerateButton
                   owner={owner}
                   what="heir"
-                  onMade={(p) => setHeir(i, { account: p.accountId, name: heirs[i].name || p.name })}
+                  onMade={(p) =>
+                    setHeirs((hs) =>
+                      hs.map((x, j) => {
+                        if (j !== i) return x;
+                        const recv = testReceiveFor(hs.filter((_, k) => k !== i).map((o) => o.eth), pool.current);
+                        return { ...x, account: p.accountId, name: x.name || p.name, eth: x.eth || recv.eth, btc: x.btc || recv.btc };
+                      }),
+                    )
+                  }
                 />
               </span>
               <span className="relative">
@@ -258,14 +303,32 @@ export function MyWillSetup({
               ) : (
                 <span />
               )}
-              {assets.ETH && (
-                <input className={`${inputCls} sm:col-span-2`} value={h.eth} onChange={(e) => setHeir(i, { eth: e.target.value })} aria-label="Heir's Ethereum address" placeholder="Receives ETH at 0x…" />
-              )}
-              {assets.BTC && (
-                <input className={`${inputCls} sm:col-span-2`} value={h.btc} onChange={(e) => setHeir(i, { btc: e.target.value })} aria-label="Heir's Bitcoin address" placeholder="Receives BTC at tb1…" />
+              {(assets.ETH || assets.BTC) && (
+                <span className="flex flex-col gap-2 sm:col-span-4 sm:flex-row sm:items-start">
+                  {assets.ETH && (
+                    <input className={`${inputCls} min-w-0 flex-1`} value={h.eth} onChange={(e) => setHeir(i, { eth: e.target.value.trim() })} aria-label="Heir's Sepolia address" placeholder="Receives Sepolia ETH at 0x…" />
+                  )}
+                  {assets.BTC && (
+                    <input className={`${inputCls} min-w-0 flex-1`} value={h.btc} onChange={(e) => setHeir(i, { btc: e.target.value.trim() })} aria-label="Heir's Bitcoin testnet address" placeholder="Receives BTC at tb1…" />
+                  )}
+                  <RefreshButton
+                    label="Generate test addresses for this heir"
+                    onClick={() => {
+                      const recv = newTestReceive();
+                      setHeir(i, { eth: recv.eth, btc: recv.btc });
+                    }}
+                  />
+                </span>
               )}
             </div>
           ))}
+          {(assets.ETH || assets.BTC) && (
+            <p className="text-xs text-muted">
+              In a live will, <b>Pay heirs in dollars</b> means each heir needs just one address: NEAR Intents turns every slice, from every
+              chain, into USDC and sends it there. On testnet the vaults still pay each chain&apos;s test address first, which is why generated
+              heirs get test addresses here.
+            </p>
+          )}
           <div className="flex items-center gap-3 text-sm">
             <ActionButton tone="quiet" onClick={async () => setHeirs((hs) => [...hs, { name: "", account: "", pct: "0", eth: "", btc: "" }])}>
               Add an heir
@@ -349,7 +412,8 @@ export function MyWillSetup({
           policy && (
             <ul className="list-disc space-y-1 pl-5 text-sm">
               {summarizePolicy(policy).map((l) => (
-                <li key={l}>{humanize(l, names)}</li>
+                // "Anouk (anouk.…testnet)" humanizes to "Anouk (Anouk)": say the name once.
+                <li key={l}>{humanize(l, names).replace(/([^\s(]+) \(\1\)/g, "$1")}</li>
               ))}
             </ul>
           )
