@@ -4,7 +4,7 @@ Drafts for the human. Claude never posts (CLAUDE.md §0, hard rule 4).
 
 ## Video (about 90 seconds)
 
-Record at 1280 px wide on `https://inheirit.vercel.app`, with a phone in shot for the Telegram moment. Before recording: link Telegram on the will (Will strength → Link Telegram), and run scenario b once so you know the timing.
+Record at 1280 px wide on `https://inheirit.xyz`, with a phone in shot for the Telegram moment. Before recording: link Telegram on the will (Will strength → Link Telegram), and run scenario b once so you know the timing.
 
 | Time | On screen | Voice-over |
 |---|---|---|
@@ -30,7 +30,7 @@ Title: **A will that doesn't make you prove you're alive**
 >
 > Built at NEAR HACKATHON with Chain Signatures, Shade Agents, NEAR AI Cloud and NEAR Intents.
 >
-> Try it (testnet, no sign-up): https://inheirit.vercel.app
+> Try it (testnet, no sign-up): https://inheirit.xyz
 > Code: <repo URL once public>
 >
 > [video]

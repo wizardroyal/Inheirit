@@ -148,7 +148,13 @@
       "compose_hash": "29d27d7c5bf1987033e4aa46a315a69066d278de3e601cbd3756f5486cbd4389",
       "image": "unwizarding/inheirit-agent@sha256:34fb8cd360c6fa967c4f24d60a3881c9b86c2ac32771234b8ce84fe00bb59d29",
       "at": "2026-11-12T11:23:54.894Z",
-      "note": "v2o: extra NEAR accounts (mainnet .near read-only) and Sepolia addresses as signs of life; real email via Resend when RESEND_API_KEY/NOTIFY_FROM_EMAIL are set (not yet: allowed_envs unchanged); registered as 2b624d42, same sealed-notes key ae74cf06"
+      "note": "v2o: extra NEAR accounts (mainnet .near read-only) and Sepolia addresses as signs of life; real email via Resend when RESEND_API_KEY/NOTIFY_FROM_EMAIL are set (not yet: allowed_envs unchanged); registered as 2b624d42, same sealed-notes key ae74cf06; retired 2026-11-12 (v2p)"
+    },
+    {
+      "compose_hash": "3eaafc2449ad67daa0115787b1182b85b232d1e3f21707447ccc3d404b2179fe",
+      "image": "unwizarding/inheirit-agent@sha256:07ede9ffdb6c3208d44ca78897482a9a596df31e8fdb8540ca07bdb262602b16",
+      "at": "2026-11-12T12:43:27.934Z",
+      "note": "v2p: real email via Resend (mail.inheirit.xyz; footer, one per address per run on demo timings, demo budget 60/day of 95, in-app note when capped); CORS limited to inheirit.xyz, www, vercel.app, localhost; links to inheirit.xyz. Approved by the human after a --plan review. Registered as 420dfa88, same sealed-notes key ae74cf06"
     }
   ]
 }

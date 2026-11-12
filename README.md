@@ -6,7 +6,7 @@ Built at **NEAR HACKATHON** (November 2026).
 
 Inheirit notices the signs of life you already give off, privately, and only reaches out when you've gone quiet for longer than usual. It **never acts on silence alone**: people have to confirm you're gone, and you get a loud challenge period to say otherwise. Only then does it hand your assets on across **NEAR, Ethereum and Bitcoin**, in small, reversible slices. Sealed instructions for everything else reach the right heir **last**.
 
-**Try it:** https://inheirit.vercel.app · Live mainnet quotes: https://inheirit.vercel.app/mainnet · Agent (TEE): https://d5b714731becca502b6bd054a5cf6ffa5ce71f61-3000.dstack-pha-prod9.phala.network · Contract: [`inheirit.testnet`](https://testnet.nearblocks.io/address/inheirit.testnet)
+**Try it:** https://inheirit.xyz · Live mainnet quotes: https://inheirit.xyz/mainnet · Agent (TEE): https://d5b714731becca502b6bd054a5cf6ffa5ce71f61-3000.dstack-pha-prod9.phala.network · Contract: [`inheirit.testnet`](https://testnet.nearblocks.io/address/inheirit.testnet)
 
 <p align="center">
   <img src="docs/screenshots/snapback.gif" alt="The owner goes quiet and the ladder climbs to the guardian vote; one heartbeat snaps it back to All good and nothing moves" width="640">
@@ -31,8 +31,8 @@ Inheirit notices the signs of life you already give off, privately, and only rea
 | The core moment: silence climbs the ladder, one sign of life snaps it back | [Try it in 3 minutes](#try-it-in-3-minutes-no-wallet-no-money) on the live app |
 | Real cross-chain execution: NEAR, Ethereum (Sepolia) and Bitcoin (testnet4) released in stages, with explorer links | [Then the full run](#then-the-full-run-about-15-minutes) |
 | An attested TEE agent and private AI, verifiable on-chain | `npx tsx scripts/verify.ts`: one read-only command, PASS/FAIL per check (explained in [`docs/VERIFY.md`](docs/VERIFY.md)); the trust badges under *Signs of life*; [`deploy/tee-agent.json`](deploy/tee-agent.json) lists every deployed compose hash |
-| NEAR Intents on mainnet | two real payouts (public Base → Solana, confidential Base → Arbitrum) with explorer links on [`/mainnet`](https://inheirit.vercel.app/mainnet); live quotes on the heir page |
-| Tests and security work | 247 agent tests, 173 contract unit tests plus sandbox flows, run on every push ([CI](.github/workflows/ci.yml)); five adversarial review rounds logged finding by finding in [`CLAUDE.md`](CLAUDE.md) (Decision log) and summarised in [`docs/AUDITS.md`](docs/AUDITS.md) |
+| NEAR Intents on mainnet | two real payouts (public Base → Solana, confidential Base → Arbitrum) with explorer links on [`/mainnet`](https://inheirit.xyz/mainnet); live quotes on the heir page |
+| Tests and security work | 252 agent tests, 173 contract unit tests plus sandbox flows, run on every push ([CI](.github/workflows/ci.yml)); five adversarial review rounds logged finding by finding in [`CLAUDE.md`](CLAUDE.md) (Decision log) and summarised in [`docs/AUDITS.md`](docs/AUDITS.md) |
 | What's real and what's simulated | [Real vs simulated](#real-vs-simulated) |
 
 ### Real vs simulated
@@ -42,7 +42,8 @@ Inheirit notices the signs of life you already give off, privately, and only rea
 | The will contract, guardians, challenge period and staged release on NEAR testnet | Social and work signals (Google, X, Instagram, TikTok, Facebook, WhatsApp, LinkedIn): listed as *coming soon* with their weights; the control panel can send a SIMULATED one to show how weak signals are handled |
 | NEAR, Sepolia ETH and testnet4 BTC payouts, signed by Chain Signatures (MPC) | DM check messages |
 | The agent in an Intel TDX enclave on Phala, attested on-chain | The onward NEAR Intents swap on testnet (NEAR Intents has no testnet; priced with live quotes) |
-| Signs of life: transactions from your NEAR accounts (testnet, and mainnet `.near` read-only) and Sepolia addresses, the signed heartbeat, Telegram replies, GitHub | Email checks are shown in the app, not sent |
+| Signs of life: transactions from your NEAR accounts (testnet, and mainnet `.near` read-only) and Sepolia addresses, the signed heartbeat, Telegram replies, GitHub | |
+| Email checks and alerts, sent from `mail.inheirit.xyz` to addresses you enter (*Email alerts*): your check-ins, welfare questions, guardian vote requests, the challenge alarm. Only the time is kept, never the content | |
 | Sealed notes encrypted in the browser, re-sealed inside the enclave | |
 | Plain-English drafting and the heir guide on an attested NEAR AI Cloud model | |
 | Live NEAR Intents quotes from mainnet, public and confidential | |
@@ -79,7 +80,7 @@ Billions in crypto are lost when holders die or become incapacitated. Earlier at
 
 Everything runs on testnet. One path, start to finish:
 
-1. Open **https://inheirit.vercel.app/owner** and click **Try with a demo account**. You get a fresh, funded testnet account whose key stays in your browser, shown under a random username such as *HatYoungRace*. A NEAR testnet wallet or Google sign-in works too.
+1. Open **https://inheirit.xyz/owner** and click **Try with a demo account**. You get a fresh, funded testnet account whose key stays in your browser, shown under a random username such as *HatYoungRace*. A NEAR testnet wallet or Google sign-in works too.
 2. Open the **Generate sample will** tab and click **Generate my will** (under a minute). It creates test people with new names each time (an heir, three guardians, a friend and a lawyer), writes the will (everything to the heir, 10% → 20% → 30% → 40%), has the guardians accept (the will is now **armed**), funds the vaults (Sepolia and BTC from a small demo pool while it lasts) and seals a note for the heir.
    → The dashboard opens at **All good**: the *Signs of life* panel shows the ladder, a countdown, the agent's plain-English verdict and "What the agent saw: timestamps only".
 3. **Set your will in motion** is already on scenario **a · The owner comes back**, with demo timings (quiet after 2 minutes instead of 30 days). Do nothing for about 2 minutes.
@@ -94,11 +95,11 @@ Pick another scenario on the same card. The card shows a checklist with a button
 - **c · A lawyer speeds it up.** Once the guardian vote has started, click **File the death certificate** (the evidence is SIMULATED), then **Both guardians confirm**. → The challenge period still runs in full; the release then follows the faster 10% → 30% → 60% schedule.
 - **d · The heir chooses late.** Don't set the heir's payout. → After the release starts, *Payouts to heirs* shows slices waiting for the heir to choose. Open the heir's view, choose e.g. **USDC on Base** with an address, and **Save my choice** → the waiting slices pay out together (SIMULATED NEAR Intents on testnet, priced live).
 
-**View as** (on the same card) opens the guardian, heir, friend and lawyer pages as those accounts; each links back to the owner. On the heir's page, once an address is entered, **Get live quotes** shows real NEAR Intents quotes from mainnet, public and confidential side by side (dry runs: no money moves; the confidential column needs our partner key on the deployment). The same quote is on **https://inheirit.vercel.app/mainnet**. Afterwards: **Back to real timings**, or, once Completed, **Start over with the same people**.
+**View as** (on the same card) opens the guardian, heir, friend and lawyer pages as those accounts; each links back to the owner. On the heir's page, once an address is entered, **Get live quotes** shows real NEAR Intents quotes from mainnet, public and confidential side by side (dry runs: no money moves; the confidential column needs our partner key on the deployment). The same quote is on **https://inheirit.xyz/mainnet**. Afterwards: **Back to real timings**, or, once Completed, **Start over with the same people**.
 
-**At any step, try to break the rule "signals stop it, people start it":** on the [control panel](https://inheirit.vercel.app/demo), a lone **X post** (SIMULATED) is ignored on purpose, and the verdict says why (*"ignored on its own because posts can be scheduled or run by someone else"*). Two weak sources within 24 hours, or any strong one, do count. A will whose guardians haven't accepted never leaves All good, however long the silence.
+**At any step, try to break the rule "signals stop it, people start it":** on the [control panel](https://inheirit.xyz/demo), a lone **X post** (SIMULATED) is ignored on purpose, and the verdict says why (*"ignored on its own because posts can be scheduled or run by someone else"*). Two weak sources within 24 hours, or any strong one, do count. A will whose guardians haven't accepted never leaves All good, however long the silence.
 
-**Advanced:** the [control panel](https://inheirit.vercel.app/demo) (`/demo`) is a lower-level control room for the same flow: **Make a test cast**, **Create the demo will**, then the guardian and signal buttons. The same steps run headlessly in `scripts/demo-cancel.ts` (cancel) and `scripts/demo-execute.ts` (release).
+**Advanced:** the [control panel](https://inheirit.xyz/demo) (`/demo`) is a lower-level control room for the same flow: **Make a test cast**, **Create the demo will**, then the guardian and signal buttons. The same steps run headlessly in `scripts/demo-cancel.ts` (cancel) and `scripts/demo-execute.ts` (release).
 
 **Your own will** (`/owner`): the **My will** tab (signals, people, vault; the ↻ button next to heirs, guardians, the lawyer and friends creates a funded test person with a random name, and gives a test heir Sepolia and Bitcoin testnet addresses too; a live "who gets what" preview; "if you go quiet, the earliest anything moves is about…") or **Will in plain English** (a private NEAR AI model drafts it, our code checks it and asks only for what's missing, such as NEAR accounts or guardians, with ↻ to generate test people; you approve a summary that code, not the model, wrote). The **Will strength** checklist shows what arms the will and what makes it stronger, including **Link Telegram**: if you go quiet, the bot checks in, and any reply cancels. Guardians accept at `/guardian/<owner>`; `/heartbeat` is an installable app.
 
@@ -152,7 +153,7 @@ On testnet the onward swap to each heir runs on a SIMULATED 1Click client, becau
   - public, to USDC on Solana: [MPC signature](https://nearblocks.io/txns/FWPUnhyCSJrCHqzJBahCazgeLmURHGVPSsHdWtxdXcYH) · [sent on Base](https://basescan.org/tx/0xb70144f0f8ec0e99ab98c168a1925d2b69476d57aa1c2d59a1f306fe1a099c18) · [received on Solana](https://solscan.io/tx/65BJcb63tQkQnQ57Nsopv1v6cZKppy2GmnLmqiYJ2bCAsg9XYL1VuKyPyokGdzRyrw4kaDisvYvzhb8sbuRzpSaU);
   - confidential (Confidential Intents, `basic`), to USDC on Arbitrum: [MPC signature](https://nearblocks.io/txns/4RW7R4CsXYpYWaumCfT7DDCGs89Ph7faiJ797ypn8dDB) · [sent on Base](https://basescan.org/tx/0x2716595c73b267af1c03a87d737e24fdea4960274a99972af31209ca6b8f8790) · [received on Arbitrum](https://arbiscan.io/tx/0x448b42caa4165351684f87dede862c10d493aa36c5a01e50670e8e9e1d73e3d6).
 
-  They are sends from the demo vault, not slices of a testnet will (Intents has no testnet), and both recipient addresses are the builder's own wallets. Both are listed on [`/mainnet`](https://inheirit.vercel.app/mainnet);
+  They are sends from the demo vault, not slices of a testnet will (Intents has no testnet), and both recipient addresses are the builder's own wallets. Both are listed on [`/mainnet`](https://inheirit.xyz/mainnet);
 - the step-by-step, including a read-only `preflight` check, is [`docs/MAINNET.md`](docs/MAINNET.md).
 
 ## NEAR technology used, and where
@@ -208,7 +209,7 @@ See [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md). In short:
 - **Experimental stack.** The Shade Agent Framework is unaudited and testnet-only. The will runs on NEAR testnet, Sepolia and BTC testnet4.
 - **Vault model.** Assets must be moved into vaults the will controls: the NEAR vault in the contract, and Sepolia/BTC addresses derived by Chain Signatures. The owner can withdraw while the will is at All good.
 - **Signals not connected yet:** Google Calendar, Gmail, X, Instagram, TikTok, Facebook, WhatsApp, LinkedIn are listed as *coming soon* (the control panel can send a SIMULATED one, labelled so). Real: transactions from your NEAR accounts (testnet, and mainnet `.near` read-only) and Sepolia addresses, the signed heartbeat, Telegram replies, GitHub.
-- **Email** checks are shown in the app; no email is sent yet.
+- **Email limits.** On the free sending tier (about 100 a day), demo-timing wills get one email per address per run from a smaller daily budget, so real-timing wills keep room; when a limit is reached, the message stays in the app with a note. Replies to these emails aren't read: the email says to open the heartbeat app or reply on Telegram.
 - **Heirs are hidden in the UI only.** The app and agent don't reveal heirs before the release, but heir accounts and NEAR shares are in contract state, which anyone can read. Commit-reveal is on the roadmap.
 - **Payload-blind gate.** The contract decides *when* and *which vault* can be signed, not *what* the transaction says. That rests on the attested agent code and a per-stage signature cap.
 - **Centralized KMS.** With Phala's KMS, whoever controls the Phala account could push new agent code that derives the same sealed-notes key. Every deployed compose hash is published (`deploy/tee-agent.json`) and must be approved on the contract to register. An on-chain KMS with a timelocked allowlist is on the roadmap.
@@ -234,7 +235,7 @@ See [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md). In short:
 - Fire-drill mode, and stale-will review.
 - A lawyer companion letter.
 - Gasless heir claims.
-- Real-world contacts: guardians, friends and lawyers reached by phone number or email instead of NEAR accounts, and bank or Cash App payouts for heirs without crypto.
+- Real-world contacts: guardians, friends and lawyers reached by phone number instead of a link, and bank or Cash App payouts for heirs without crypto.
 - **Private inheritance with Confidential Intents:** payouts that observers can't trace from the will's release to the heir's receipt. A confidential payout has already gone through on mainnet (above); heirs see confidential quotes next to public ones.
 - **Intents-native vault:** the will holds every asset as a NEAR Intents balance, distributes by internal transfer, and heirs withdraw to any chain. One vault for every asset, and instant cross-chain payout. A dry 1Click quote from an Intents balance to USDC on Base already succeeds.
 - Self-funding upkeep: the agent pays its own inference and hosting via Intents, and tops up gas for vaults and heirs.
@@ -256,7 +257,7 @@ The agent and its tests:
 
 ```bash
 npm ci                                  # repo root
-npm test                                # agent tests (247)
+npm test                                # agent tests (252)
 cp .env.example .env                    # AGENT_CONTRACT_ID, SPONSOR_*, NEARAI_API_KEY, DEMO_MODE=true (TELEGRAM_* optional)
 npm run dev                             # agent on :3000
 ```

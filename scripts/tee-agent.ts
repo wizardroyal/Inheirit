@@ -6,6 +6,7 @@
 //   npx tsx scripts/tee-agent.ts approve     approve the running CVM's measurements + PPIDs on the contract
 //   npx tsx scripts/tee-agent.ts upgrade     ship docker-compose.yaml + .env to the SAME CVM in place
 //                                            (approves the new compose hash first, so the agent can register at boot)
+//   npx tsx scripts/tee-agent.ts upgrade --plan   show the new compose hash and env keys; approve and commit nothing
 //   npx tsx scripts/tee-agent.ts env         push .env (ENV_KEYS) to the CVM; changing the key list changes the
 //                                            compose hash, which is approved before the restart
 //   npx tsx scripts/tee-agent.ts retire <compose_hash>   remove an old version's approved measurements
@@ -233,6 +234,13 @@ async function upgrade() {
   const appCompose = buildAppComposeForDeploy(compose, ENV_KEYS, { publicLogs: true, publicSysinfo: true });
   const prov = await client.provisionCvmComposeFileUpdate({ id: record.vm_uuid, app_compose: appCompose });
   console.log(`provisioned compose hash ${prov.compose_hash} (image ${image})`);
+  if (process.argv.includes("--plan")) {
+    // Review step: nothing is approved on the contract, nothing committed, no reboot.
+    const { envs } = await encryptedDotenv(client, record);
+    console.log(`PLAN ONLY. Would push env keys: ${envs.map((e) => e.key).join(", ")}`);
+    console.log(`Nothing approved or committed. Re-run without --plan to approve ${prov.compose_hash} and reboot.`);
+    return;
+  }
 
   const current = await currentMeasurements(apiKey, record.vm_uuid);
   await approveMeasurements(await owner(), { ...current, app_compose_hash_payload: prov.compose_hash });
