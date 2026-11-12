@@ -136,7 +136,13 @@
       "compose_hash": "815ba58a94fd4e6f79b2d861512b2c2bce6182b53ea60517dd402ec94a80766e",
       "image": "unwizarding/inheirit-agent@sha256:15292c11727f81b04225f38eb35c5bf0202744eca895574fc795e6f4162ba4fb",
       "at": "2026-11-11T14:54:50.715Z",
-      "note": "v2m: audit round 5 (a lap is spent only when the advance succeeds; 48 laps a day; the early record only for armed wills, plus 300 Active records per will per day); registered as b30f06bc, same sealed-notes key ae74cf06; live, only approved hash"
+      "note": "v2m: audit round 5 (a lap is spent only when the advance succeeds; 48 laps a day; the early record only for armed wills, plus 300 Active records per will per day); registered as b30f06bc, same sealed-notes key ae74cf06; live, only approved hash; retired 2026-11-12 (v2n)"
+    },
+    {
+      "compose_hash": "44f805884dc811974d1be41b495bd0ea2da94e98cae6f0ae095491b78d1526d7",
+      "image": "unwizarding/inheirit-agent@sha256:c89e09ae8ed428910fdda3eddd1df721474def8165a03fe6ff197d21a15d657d",
+      "at": "2026-11-12T10:58:05.877Z",
+      "note": "v2n: verdict puts the silence next to the owner's usual rhythm (baseline from NEAR/Sepolia history, daily cache); registered as b0a975ce, same sealed-notes key ae74cf06"
     }
   ]
 }
