@@ -167,6 +167,11 @@
       "image": "unwizarding/inheirit-agent@sha256:07ede9ffdb6c3208d44ca78897482a9a596df31e8fdb8540ca07bdb262602b16",
       "at": "2026-11-12T13:05:27.219Z",
       "note": "v2p, compose maps RESEND_API_KEY and NOTIFY_FROM_EMAIL into the container (the actual fix). Reviewed with upgrade --plan, approved by the human in chat, approved on the contract before the reboot. Registered as 8e617d40, same sealed-notes key ae74cf06. [VERIFIED] a Quiet email check reached the human's inbox (channel 'email')."
+    },
+    {
+      "compose_hash": "ecfc4af9f4a7edfa98e8be192c7436005fbc21d7408644b868163353e10f3e0f",
+      "image": "unwizarding/inheirit-agent@sha256:0c903c9f179d63fd6e62bdf481153309506c2dbe87f294e450080f7204ebc562",
+      "at": "2026-11-12T20:59:02.667Z"
     }
   ]
 }
