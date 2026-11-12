@@ -25,6 +25,8 @@ pub const MAX_GUARDIANS: usize = 10;
 pub const MAX_CONTACTS: usize = 10;
 pub const MAX_STAGES: usize = 10;
 pub const MAX_NOTES: usize = 10;
+/// Longest owner pause (round 5).
+pub const MAX_PAUSE_DAYS: u32 = 90;
 /// Shortest allowed timing or stage wait. The demo uses 60 s and up (accelerated tests 20 s); shorter only lets a will
 /// cycle the ladder fast enough to burn the agent's gas (audit round 3).
 pub const MIN_TIMING_S: u64 = 20;
@@ -95,6 +97,11 @@ pub enum WillState {
     Completed {
         at: u64,
     },
+    /// The owner paused the will (round 5): no escalation until `until`, then `advance` resumes it.
+    /// Added last so stored wills keep their borsh layout (code-only upgrade).
+    Paused {
+        until: u64,
+    },
 }
 
 impl WillState {
@@ -108,7 +115,7 @@ impl WillState {
             | WillState::Executing { since, .. }
             | WillState::SecretsBuffer { since }
             | WillState::SecretsReleased { since } => Some(*since),
-            WillState::Active | WillState::Completed { .. } => None,
+            WillState::Active | WillState::Completed { .. } | WillState::Paused { .. } => None,
         }
     }
 
@@ -123,6 +130,7 @@ impl WillState {
             WillState::SecretsBuffer { .. } => "SecretsBuffer",
             WillState::SecretsReleased { .. } => "SecretsReleased",
             WillState::Completed { .. } => "Completed",
+            WillState::Paused { .. } => "Paused",
         }
     }
 }
@@ -703,6 +711,10 @@ impl Will {
             "Will already completed"
         );
         self.last_alive_at = self.last_alive_at.max(alive_at);
+        // A paused will stays paused: only the owner (or the end of the pause) resumes it.
+        if matches!(self.state, WillState::Paused { .. }) {
+            return;
+        }
         let halted_stage = match self.state {
             WillState::Executing { stage, .. } => Some(stage),
             WillState::SecretsBuffer { .. } | WillState::SecretsReleased { .. } => {
@@ -874,6 +886,11 @@ impl Contract {
         let t = will.timings.clone();
         let elapsed = |since: u64| now.saturating_sub(since);
         match will.state.clone() {
+            WillState::Paused { until } if now >= until => {
+                // The quiet clock restarts at the end of the pause, not at its start.
+                will.last_alive_at = will.last_alive_at.max(until);
+                will.set_state(WillState::Active, "pause_ended");
+            }
             WillState::Active
                 if elapsed(will.last_alive_at) >= t.quiet_after
                     && will.armed_missing().is_empty() =>

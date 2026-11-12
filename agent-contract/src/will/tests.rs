@@ -1875,3 +1875,119 @@ fn a_will_created_after_close_continues_round_and_note_numbering() {
     assert_eq!(t.will().execution_round, round);
     assert_eq!(t.will().next_note_id, next_note);
 }
+
+// ---------------------------------------------------------------- pause (round 5, 2026-11-12)
+
+const DAY: u64 = 86_400;
+
+#[test]
+fn pause_stops_escalation_and_resumes_itself() {
+    let mut t = T::with_will();
+    t.as_(OWNER).pause_will(10);
+    assert_eq!(t.state(), WillState::Paused { until: t.now + 10 * DAY });
+    t.wait(9 * DAY);
+    assert!(!t.advance(), "nothing escalates while paused");
+    t.wait(DAY);
+    assert!(t.advance(), "advance resumes it once the pause ends");
+    assert_eq!(t.state(), WillState::Active);
+    // The quiet clock restarts at the end of the pause.
+    assert_eq!(t.will().last_alive_at, T0 + 10 * DAY);
+    assert!(!t.advance());
+    t.to_quiet();
+}
+
+#[test]
+fn owner_can_resume_early() {
+    let mut t = T::with_will();
+    t.as_(OWNER).pause_will(90);
+    t.wait(DAY);
+    t.as_(OWNER).resume_will();
+    assert_eq!(t.state(), WillState::Active);
+    assert_eq!(t.will().last_alive_at, t.now);
+}
+
+#[test]
+#[should_panic(expected = "A pause lasts 1 to 90 days")]
+fn pause_longer_than_90_days_rejected() {
+    let mut t = T::with_will();
+    t.as_(OWNER).pause_will(91);
+}
+
+#[test]
+#[should_panic(expected = "A pause lasts 1 to 90 days")]
+fn pause_of_zero_days_rejected() {
+    let mut t = T::with_will();
+    t.as_(OWNER).pause_will(0);
+}
+
+#[test]
+#[should_panic(expected = "A will can be paused only at All good")]
+fn pause_refused_while_escalating() {
+    let mut t = T::with_will();
+    t.to_quiet();
+    t.as_(OWNER).pause_will(10);
+}
+
+#[test]
+#[should_panic(expected = "A will can be paused only at All good")]
+fn pause_refused_mid_execution() {
+    let mut t = T::with_will();
+    t.to_executing();
+    t.as_(OWNER).pause_will(10);
+}
+
+#[test]
+#[should_panic(expected = "The will isn't paused")]
+fn resume_refused_when_not_paused() {
+    let mut t = T::with_will();
+    t.as_(OWNER).resume_will();
+}
+
+#[test]
+#[should_panic(expected = "No will")]
+fn only_the_owner_pauses_their_will() {
+    let mut t = T::with_will();
+    t.as_(STRANGER).pause_will(10);
+}
+
+#[test]
+fn withdraw_while_paused() {
+    let mut t = T::with_will();
+    t.as_(OWNER).pause_will(10);
+    t.as_(OWNER).request_withdrawal(Chain::Near, H1.into(), U128(ONE_NEAR));
+    assert_eq!(t.will().near_balance.0, 9 * ONE_NEAR);
+    let id = t.as_(OWNER).request_withdrawal(Chain::Eth, "0xabc".into(), U128(5)).unwrap();
+    assert_eq!(t.will().pending_withdrawals[0].id, id);
+}
+
+#[test]
+fn sign_of_life_while_paused_keeps_it_paused() {
+    let mut t = T::with_will();
+    t.as_(OWNER).pause_will(10);
+    t.wait(DAY);
+    t.as_(OWNER).i_am_alive();
+    assert!(matches!(t.state(), WillState::Paused { .. }));
+    t.wait(60);
+    let at = t.now;
+    assert!(t.as_(AGENT).record_liveness(acc(OWNER), at));
+    assert!(matches!(t.state(), WillState::Paused { .. }));
+}
+
+#[test]
+fn close_while_paused() {
+    let mut t = T::with_will();
+    t.as_(OWNER).pause_will(10);
+    t.as_(OWNER).close_will();
+    assert!(t.c.get_will(acc(OWNER)).is_none());
+}
+
+#[test]
+fn invite_found_by_code_alone() {
+    let mut t = with_invite("guardian", "s3cret-code", 3600);
+    let (owner, inv) = t.c.find_invite(code_hash("s3cret-code")).unwrap();
+    assert_eq!(owner, acc(OWNER));
+    assert_eq!(inv.role, "guardian");
+    t.as_(NEWBIE).claim_invite(acc(OWNER), "s3cret-code".into());
+    assert!(t.c.find_invite(code_hash("s3cret-code")).is_none(), "claimed invites leave the index");
+    assert!(t.c.find_invite(code_hash("other")).is_none());
+}

@@ -227,8 +227,8 @@ impl Contract {
         let owner = env::predecessor_account_id();
         let mut will = self.will(&owner);
         require!(
-            will.state == WillState::Active,
-            "Withdrawals only while Active"
+            matches!(will.state, WillState::Active | WillState::Paused { .. }),
+            "Withdrawals only while Active or Paused"
         );
         require!(amount.0 > 0, "Amount must be > 0");
         require_ref(&to, "to");
@@ -309,6 +309,32 @@ impl Contract {
         self.save(will);
     }
 
+    /// Pauses the will for `days` (1 to 90), only from Active: nothing escalates while paused, and
+    /// `advance` resumes it once the pause ends. Withdrawals still work.
+    pub fn pause_will(&mut self, days: u32) {
+        let owner = env::predecessor_account_id();
+        let mut will = self.will(&owner);
+        require!(will.state == WillState::Active, "A will can be paused only at All good");
+        require!((1..=MAX_PAUSE_DAYS).contains(&days), "A pause lasts 1 to 90 days");
+        let now = now_s();
+        let until = now + days as u64 * 86_400;
+        will.last_alive_at = now;
+        emit("will_paused", serde_json::json!({ "owner": owner, "until": until }));
+        will.set_state(WillState::Paused { until }, "owner_paused");
+        self.save(will);
+    }
+
+    /// Ends a pause early. Owner only.
+    pub fn resume_will(&mut self) {
+        let owner = env::predecessor_account_id();
+        let mut will = self.will(&owner);
+        require!(matches!(will.state, WillState::Paused { .. }), "The will isn't paused");
+        will.last_alive_at = now_s();
+        will.set_state(WillState::Active, "owner_resumed");
+        emit("will_resumed", serde_json::json!({ "owner": owner }));
+        self.save(will);
+    }
+
     /// Closes the caller's will for good: only at All good, never with a withdrawal still being sent.
     /// The NEAR vault and the will's storage deposit go back to the owner; sealed notes are dropped.
     /// The contract can't see Sepolia or Bitcoin balances, so the app checks those vaults are empty
@@ -316,7 +342,10 @@ impl Contract {
     pub fn close_will(&mut self) {
         let owner = env::predecessor_account_id();
         let will = self.will(&owner);
-        require!(will.state == WillState::Active, "A will can be closed only at All good");
+        require!(
+            matches!(will.state, WillState::Active | WillState::Paused { .. }),
+            "A will can be closed only at All good or while paused"
+        );
         require!(will.pending_withdrawals.is_empty(), "A withdrawal is still being sent; wait for it first");
         let vault = will.near_balance.0;
         let initial = env::storage_usage();

@@ -24,6 +24,11 @@ fn invite_key(owner: &AccountId, code_hash: &str) -> Vec<u8> {
     format!("inv:{owner}:{code_hash}").into_bytes()
 }
 
+/// Code-hash index (round 5): short links `/i/<code>` carry no owner, so the app finds it here.
+fn index_key(code_hash: &str) -> Vec<u8> {
+    format!("invh:{code_hash}").into_bytes()
+}
+
 fn read_invite(owner: &AccountId, code_hash: &str) -> Option<Invite> {
     env::storage_read(&invite_key(owner, code_hash)).map(|b| borsh::from_slice(&b).expect("invite record"))
 }
@@ -44,6 +49,10 @@ impl Contract {
         let record = Invite { role: role.clone(), expires_at: now_s() + ttl_s };
         let existed = env::storage_write(&invite_key(&owner, &code_hash), &borsh::to_vec(&record).unwrap());
         require!(!existed, "That invite already exists");
+        require!(
+            !env::storage_write(&index_key(&code_hash), owner.as_bytes()),
+            "That invite code is already in use"
+        );
         will.last_alive_at = now_s();
         emit("invite_created", serde_json::json!({ "owner": owner, "role": role, "expires_at": record.expires_at }));
         self.save(will);
@@ -56,6 +65,7 @@ impl Contract {
         let owner = env::predecessor_account_id();
         let initial = env::storage_usage();
         require!(env::storage_remove(&invite_key(&owner, &code_hash)), "Invite not found or already used");
+        env::storage_remove(&index_key(&code_hash));
         self.settle_storage(&owner, initial, NearToken::from_yoctonear(0));
     }
 
@@ -70,6 +80,7 @@ impl Contract {
         require!(will.state == WillState::Active, "Invites can be claimed only while Active");
         let initial = env::storage_usage();
         env::storage_remove(&invite_key(&owner, &code_hash));
+        env::storage_remove(&index_key(&code_hash));
         let heirs: Vec<&AccountId> = will.heirs.iter().map(|h| &h.account_id).collect();
         match invite.role.as_str() {
             "guardian" => {
@@ -96,6 +107,13 @@ impl Contract {
         self.wills.flush();
         // Removing the invite frees more than the new entry takes; the freed bytes go back to the owner who paid.
         self.settle_storage(&owner, initial, NearToken::from_yoctonear(0));
+    }
+
+    /// The will an open invite belongs to, by sha256(code) alone (for `/i/<code>` links).
+    pub fn find_invite(&self, code_hash: String) -> Option<(AccountId, Invite)> {
+        let raw = env::storage_read(&index_key(&code_hash))?;
+        let owner: AccountId = String::from_utf8(raw).ok()?.parse().ok()?;
+        read_invite(&owner, &code_hash).map(|i| (owner, i))
     }
 
     /// Whether an invite is open (for the join page), by sha256(code).

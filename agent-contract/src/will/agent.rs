@@ -41,7 +41,7 @@ impl Contract {
             "liveness_recorded",
             serde_json::json!({ "owner": owner, "at": at, "source": "agent" }),
         );
-        if will.state == WillState::Active {
+        if matches!(will.state, WillState::Active | WillState::Paused { .. }) {
             will.last_alive_at = at;
         } else {
             will.reset_to_active("signal_alive", at);
@@ -121,8 +121,8 @@ impl Contract {
             }
             SignPurpose::Withdrawal { id } => {
                 require!(
-                    will.state == WillState::Active,
-                    "Withdrawal signatures only while Active"
+                    matches!(will.state, WillState::Active | WillState::Paused { .. }),
+                    "Withdrawal signatures only while Active or Paused"
                 );
                 let w = will
                     .pending_withdrawals
