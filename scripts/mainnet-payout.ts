@@ -102,6 +102,23 @@ function saveLedger(l: Ledger) {
   fs.writeFileSync(LEDGER, JSON.stringify(l, null, 2));
 }
 
+// 1Click sometimes returns a tx hash with an empty explorerUrl; build the link from the hash then.
+const EXPLORERS: Record<string, string> = {
+  sol: "https://solscan.io/tx/",
+  arb: "https://arbiscan.io/tx/",
+  base: "https://basescan.org/tx/",
+  eth: "https://etherscan.io/tx/",
+  op: "https://optimistic.etherscan.io/tx/",
+  pol: "https://polygonscan.com/tx/",
+  near: "https://nearblocks.io/txns/",
+  btc: "https://mempool.space/tx/",
+};
+function explorerTx(chain: string, h?: { hash: string; explorerUrl?: string }): string | null {
+  if (!h) return null;
+  if (h.explorerUrl) return h.explorerUrl;
+  return EXPLORERS[chain] ? EXPLORERS[chain] + h.hash : null;
+}
+
 async function confirm(lines: string[]): Promise<boolean> {
   console.log(`\n${"=".repeat(72)}\nMAINNET TRANSACTION. Real funds. Check every line:\n`);
   for (const l of lines) console.log(`  ${l}`);
@@ -315,7 +332,7 @@ async function main() {
       at: new Date().toISOString(),
       link: arg("link") ?? null,
       from: { chain: "base", symbol: "USDC", amount: usd, tx: `https://basescan.org/tx/${txHash}` },
-      to: { chain: to.blockchain, symbol: to.symbol, amount: st.swapDetails?.amountOutFormatted ?? q.quote.amountOutFormatted, recipient: need("recipient"), tx: st.swapDetails?.destinationChainTxHashes?.[0]?.explorerUrl ?? null },
+      to: { chain: to.blockchain, symbol: to.symbol, amount: st.swapDetails?.amountOutFormatted ?? q.quote.amountOutFormatted, recipient: need("recipient"), tx: explorerTx(to.blockchain, st.swapDetails?.destinationChainTxHashes?.[0]) },
       confidentiality: arg("confidential") ?? "public",
       vault: v.kind,
       status: st.status,
