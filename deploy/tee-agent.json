@@ -142,7 +142,13 @@
       "compose_hash": "44f805884dc811974d1be41b495bd0ea2da94e98cae6f0ae095491b78d1526d7",
       "image": "unwizarding/inheirit-agent@sha256:c89e09ae8ed428910fdda3eddd1df721474def8165a03fe6ff197d21a15d657d",
       "at": "2026-11-12T10:58:05.877Z",
-      "note": "v2n: verdict puts the silence next to the owner's usual rhythm (baseline from NEAR/Sepolia history, daily cache); registered as b0a975ce, same sealed-notes key ae74cf06"
+      "note": "v2n: verdict puts the silence next to the owner's usual rhythm (baseline from NEAR/Sepolia history, daily cache); registered as b0a975ce, same sealed-notes key ae74cf06; retired 2026-11-12 (v2o)"
+    },
+    {
+      "compose_hash": "29d27d7c5bf1987033e4aa46a315a69066d278de3e601cbd3756f5486cbd4389",
+      "image": "unwizarding/inheirit-agent@sha256:34fb8cd360c6fa967c4f24d60a3881c9b86c2ac32771234b8ce84fe00bb59d29",
+      "at": "2026-11-12T11:23:54.894Z",
+      "note": "v2o: extra NEAR accounts (mainnet .near read-only) and Sepolia addresses as signs of life; real email via Resend when RESEND_API_KEY/NOTIFY_FROM_EMAIL are set (not yet: allowed_envs unchanged); registered as 2b624d42, same sealed-notes key ae74cf06"
     }
   ]
 }
