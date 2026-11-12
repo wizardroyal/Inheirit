@@ -4,6 +4,7 @@
 // code the agent uses (checkPolicy); nothing is invented without the owner seeing it.
 import { useEffect, useRef, useState } from "react";
 import { checkPolicy, type Policy } from "@agent/policy/policy";
+import { STANDARD_PCT } from "@agent/policy/schedule";
 import { agent } from "@/lib/agent";
 import { createPerson } from "@/lib/onboard";
 import { newTestReceive, testReceiveFor } from "@/lib/test-wallets";
@@ -13,20 +14,35 @@ import { ActionButton, inputCls } from "./ui";
 /** Looks like a NEAR account rather than a bare name: named (has a dot) or implicit (64 hex). */
 export const isAccount = (s: unknown) => typeof s === "string" && (/^[a-z0-9_-]+(\.[a-z0-9_-]+)+$/.test(s) || /^[0-9a-f]{64}$/.test(s));
 
-type Heir = { id: string; name: string; near_account?: string; receive?: { eth?: string; btc?: string } };
-type Raw = Omit<Policy, "heirs" | "guardians"> & { heirs: Heir[]; guardians?: string[] };
+type Heir = { id: string; name: string; near_account?: string; receive?: { eth?: string; btc?: string }; [k: string]: unknown };
+type Raw = Partial<Omit<Policy, "heirs" | "guardians">> & { heirs: Heir[]; guardians?: string[] };
 
 const title = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
-/** True if the draft is a will with gaps this form can fill (rather than a malformed answer). */
+/** True if the draft names at least one heir: everything else missing can be asked for here. */
 export function hasGaps(draft: unknown): draft is Raw {
   const d = draft as Raw | null;
-  return !!d && Array.isArray(d.heirs) && Array.isArray(d.allocations);
+  return !!d && Array.isArray(d.heirs) && d.heirs.length > 0 && d.heirs.every((h) => h && typeof h.name === "string");
+}
+
+/** A share the model kept on the heir itself (some drafts do), else none. */
+function ownShare(h: Heir): number | null {
+  for (const k of ["share", "pct", "percent", "percentage"]) if (typeof h[k] === "number") return h[k] as number;
+  return null;
 }
 
 export function DraftGaps({ owner, draft, onReady }: { owner: string; draft: Raw; onReady: (p: Policy | null, errors: string[]) => void }) {
-  const assets = new Set(draft.allocations.map((a) => a.asset));
-  const [heirs, setHeirs] = useState<Heir[]>(() => draft.heirs.map((h) => ({ ...h, near_account: h.near_account ?? "", receive: { ...h.receive } })));
+  // Shares the model didn't record are asked for (pre-filled from the draft, else an equal split).
+  const sharesGiven = Array.isArray(draft.allocations) && draft.allocations.some((a) => a?.asset === "NEAR" && a.shares);
+  const [pct, setPct] = useState<string[]>(() => {
+    const n = draft.heirs.length;
+    return draft.heirs.map((h, i) => String(ownShare(h) ?? Math.floor(100 / n) + (i === n - 1 ? 100 - Math.floor(100 / n) * n : 0)));
+  });
+  const allocations: Policy["allocations"] = sharesGiven
+    ? draft.allocations!
+    : [{ asset: "NEAR", shares: Object.fromEntries(draft.heirs.map((h, i) => [h.id, Number(pct[i]) || 0])) }];
+  const assets = new Set(allocations.map((a) => a.asset));
+  const [heirs, setHeirs] = useState<Heir[]>(() => draft.heirs.map((h, i) => ({ id: h.id ?? `h${i + 1}`, name: h.name, near_account: h.near_account ?? "", receive: { ...h.receive } })));
   // Guardians the model wrote as bare names keep the name as a label; at least two slots.
   const [guardians, setGuardians] = useState<{ label: string; account: string }[]>(() => {
     const g = (draft.guardians ?? []).map((x) => (isAccount(x) ? { label: x, account: x } : { label: title(x), account: "" }));
@@ -52,14 +68,17 @@ export function DraftGaps({ owner, draft, onReady }: { owner: string; draft: Raw
     const accounts = guardians.map((g) => g.account);
     const r = checkPolicy({
       ...draft,
+      version: 1,
       owner,
+      allocations,
+      stages_pct: Array.isArray(draft.stages_pct) && draft.stages_pct.length ? draft.stages_pct : STANDARD_PCT,
       heirs: heirs.map((h) => ({ ...h, near_account: h.near_account!, receive: { ...(needEth ? { eth: h.receive!.eth } : {}), ...(needBtc ? { btc: h.receive!.btc } : {}) } })),
       guardians: accounts,
       guardian_threshold: Math.min(Math.max(draft.guardian_threshold || 2, 1), accounts.length),
     });
     onReady(r.ok ? (r.policy as Policy) : null, r.ok ? [] : r.errors);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [heirs, guardians, missing]);
+  }, [heirs, guardians, missing, pct.join()]);
 
   const setHeir = (i: number, patch: Partial<Heir>) => setHeirs((hs) => hs.map((h, j) => (j === i ? { ...h, ...patch, receive: { ...h.receive, ...patch.receive } } : h)));
   const addresses = (i: number, hs: Heir[]) => testReceiveFor(hs.filter((_, k) => k !== i).map((o) => o.receive?.eth ?? ""), pool.current);
@@ -94,19 +113,37 @@ export function DraftGaps({ owner, draft, onReady }: { owner: string; draft: Raw
     }
   }
 
-  if (!missing) return null;
+  if (!missing && sharesGiven) return null;
+  const total = pct.reduce((a, b) => a + (Number(b) || 0), 0);
   return (
     <div className="mt-4 space-y-3 rounded-lg border border-line p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="font-serif text-lg">A few details are missing</h3>
-        <ActionButton tone="quiet" disabled={busy} onClick={fillAll}>
-          {busy ? "Generating…" : "Fill all with test people"}
-        </ActionButton>
+        <h3 className="font-serif text-lg">{missing ? "A few details are missing" : "Check the shares"}</h3>
+        {missing > 0 && (
+          <ActionButton tone="quiet" disabled={busy} onClick={fillAll}>
+            {busy ? "Generating…" : "Fill all with test people"}
+          </ActionButton>
+        )}
       </div>
+      {!sharesGiven && <p className={`text-xs ${total === 100 ? "text-muted" : "text-danger"}`}>Shares of your NEAR: {total}% of 100%</p>}
       {error && <p className="text-xs text-danger">{error}</p>}
       {heirs.map((h, i) => (
         <div key={h.id} className="space-y-2">
-          <p className="text-sm font-medium">{h.name}</p>
+          <span className="flex items-center justify-between gap-2">
+            <p className="text-sm font-medium">{h.name}</p>
+            {!sharesGiven && (
+              <span className="relative w-24">
+                <input
+                  className={`${inputCls} w-full pr-7`}
+                  inputMode="decimal"
+                  aria-label={`${h.name}'s share in percent`}
+                  value={pct[i]}
+                  onChange={(e) => setPct((ps) => ps.map((x, j) => (j === i ? e.target.value : x)))}
+                />
+                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted">%</span>
+              </span>
+            )}
+          </span>
           {!isAccount(draft.heirs[i]?.near_account) && (
             <span className="flex items-start gap-2">
               <input className={`${inputCls} min-w-0 flex-1`} aria-label={`${h.name}'s NEAR account`} placeholder="NEAR account, or tap ↻" value={h.near_account ?? ""} onChange={(e) => setHeir(i, { near_account: e.target.value.trim() })} />

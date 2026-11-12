@@ -330,12 +330,7 @@ function WriteWill({ owner, onCreating, onCreated }: { owner: string; onCreating
         )}
         {draft && !draft.ok && !gaps && (
           <div className="mt-4 space-y-2">
-            <ErrorNote>The draft doesn&apos;t add up. Reword it and try again.</ErrorNote>
-            <ul className="list-disc pl-5 text-sm">
-              {draft.errors.map((e) => (
-                <li key={e}>{e}</li>
-              ))}
-            </ul>
+            <ErrorNote>Say who inherits, e.g. “Half to Sam, half to Samantha. My guardians are Hamed and James.”</ErrorNote>
           </div>
         )}
         {policy && (
