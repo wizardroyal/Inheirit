@@ -7,7 +7,7 @@ import { checkPolicy, summarizePolicy, type Policy } from "@agent/policy/policy"
 import { STANDARD_PCT } from "@agent/policy/schedule";
 import { agent } from "@/lib/agent";
 import { DEMO_SCHEDULE } from "@/lib/config";
-import { acceptAsGuardians, createWill } from "@/lib/demo";
+import { acceptAsGuardians, addSealedNote, createWill } from "@/lib/demo";
 import { keys } from "@/lib/keys";
 import { createPerson } from "@/lib/onboard";
 import { newTestReceive, testReceiveFor } from "@/lib/test-wallets";
@@ -17,6 +17,7 @@ import { signRequest } from "@/lib/near";
 import { acceptedGuardians, isArmed, type Will } from "@/lib/will";
 import { TelegramLink } from "./TelegramLink";
 import { QuietPeriod, realSchedule } from "./QuietPeriod";
+import { type DraftNote, FinalSecrets, readyNotes } from "./FinalSecrets";
 import { ActionButton, Card, Field, inputCls, Pill, SimulatedTag } from "./ui";
 
 const ACCOUNT = /^[a-z0-9._-]{2,64}$/;
@@ -177,6 +178,9 @@ export function MyWillSetup({
   const [contacts, setContacts] = useState("");
   const [assets, setAssets] = useState({ ETH: false, BTC: false });
   const [deposit, setDeposit] = useState("0.5");
+  // Notes only: no money in any vault, just sealed notes released last (the zero-custody way in).
+  const [notesOnly, setNotesOnly] = useState(false);
+  const [notes, setNotes] = useState<DraftNote[]>([]);
   const [demoClock, setDemoClock] = useState(true);
   const [quietDays, setQuietDays] = useState<number | null>(null);
   const [stable, setStable] = useState(false);
@@ -227,7 +231,8 @@ export function MyWillSetup({
       ...(name.trim() ? [] : ["Add your display name."]),
       ...(guardianList.length < 2 ? ["Choose at least two guardians."] : []),
       ...badAccounts.map((a) => `“${a}” isn't a valid NEAR account name.`),
-      ...(Number.isFinite(deposit_) && deposit_ > 0 && deposit_ <= 1000 ? [] : ["Put between 0 and 1,000 NEAR in the vault."]),
+      ...(notesOnly || (Number.isFinite(deposit_) && deposit_ > 0 && deposit_ <= 1000) ? [] : ["Put between 0 and 1,000 NEAR in the vault."]),
+      ...(notesOnly && !readyNotes(notes).length ? ["A notes-only will needs at least one note (heir, title and text)."] : []),
       // The checker's own guardian-count messages repeat the line above.
       ...(check.ok ? [] : check.errors.filter((e) => !(guardianList.length < 2 && /guardian/i.test(e) && !/heir|own guardian|twice/.test(e)))),
     ]),
@@ -359,6 +364,25 @@ export function MyWillSetup({
       </Card>
 
       <Card title="3 · The vault">
+        <label className="mb-3 flex items-start gap-2 text-sm">
+          <input
+            type="checkbox"
+            className="mt-1"
+            checked={notesOnly}
+            onChange={(e) => {
+              setNotesOnly(e.target.checked);
+              if (e.target.checked) {
+                setAssets({ ETH: false, BTC: false });
+                setStable(false);
+                if (!notes.length) setNotes([{ heir: heirs.find((h) => h.account)?.account ?? "", label: "", text: "" }]);
+              }
+            }}
+          />
+          <span>
+            <b>Notes only, no vaults</b>: nothing held for you; only sealed notes, released last.
+          </span>
+        </label>
+        {!notesOnly && (<>
         <div className="flex flex-wrap gap-4 text-sm">
           <label className="flex items-center gap-2">
             <input type="checkbox" checked disabled /> NEAR (held by the contract)
@@ -399,6 +423,7 @@ export function MyWillSetup({
           </ul>
           <p className="mt-1 text-xs text-muted">10% → 20% → 30% → 40%, longest wait after the first. Fund ETH and BTC vaults afterwards.</p>
         </div>
+        </>)}
         <label className="mt-3 flex items-center gap-2 text-sm">
           <input type="checkbox" checked={demoClock} onChange={(e) => setDemoClock(e.target.checked)} />
           Demo clock (minutes instead of months)
@@ -409,6 +434,10 @@ export function MyWillSetup({
           </div>
         )}
         <div className="mt-2">{summary(STANDARD_PCT, demoClock, quietDays)}</div>
+      </Card>
+
+      <Card title={notesOnly ? "4 · Final secrets" : "4 · Final secrets (optional)"}>
+        <FinalSecrets heirs={heirs.filter((h) => h.account).map((h) => ({ account: h.account.trim(), name: h.name }))} notes={notes} onChange={setNotes} />
       </Card>
 
       <Card title="Check and approve">
@@ -443,10 +472,14 @@ export function MyWillSetup({
                     contacts: list(contacts),
                     schedule: demoClock ? DEMO_SCHEDULE : realSchedule(quietDays),
                     foreignChains: [...(assets.ETH ? ["Eth" as const] : []), ...(assets.BTC ? ["Btc" as const] : [])],
-                    depositNear: deposit,
+                    depositNear: notesOnly ? "0" : deposit,
                   },
                   progress,
                 );
+                for (const n of readyNotes(notes)) {
+                  progress(`Sealing “${n.label}” in this browser…`);
+                  await addSealedNote(owner, n.heir, n.label.trim(), n.text);
+                }
                 // Test guardians generated here hold their keys in this browser: they accept at once.
                 const local = list(guardians).filter((g) => keys.secret(g));
                 if (local.length) await acceptAsGuardians(owner, local, progress);

@@ -8,6 +8,7 @@ import { Ladder } from "@/components/Ladder";
 import { ActionButton, Card, CopyLink, Details, ErrorNote, Field, inputCls, NoWill, Pill, short } from "@/components/ui";
 import { MyWillSetup, PeopleField, StrengthChecklist } from "@/components/Onboarding";
 import { QuietPeriod, realSchedule } from "@/components/QuietPeriod";
+import { type DraftNote, FinalSecrets, readyNotes } from "@/components/FinalSecrets";
 import { DraftGaps, hasGaps } from "@/components/DraftGaps";
 import { FundAnywhere, PayoutsPanel } from "@/components/Payouts";
 import { SignIn } from "@/components/SignIn";
@@ -307,6 +308,8 @@ function WriteWill({ owner, onCreating, onCreated }: { owner: string; onCreating
   const [draftingSince, setDraftingSince] = useState<number | null>(null);
   const now = useNow();
   const [demoClock, setDemoClock] = useState(true);
+  const [notes, setNotes] = useState<DraftNote[]>([]);
+  const [notesOnly, setNotesOnly] = useState(false);
   const [quietDays, setQuietDays] = useState<number | null>(null);
   const [contacts, setContacts] = useState("");
   const [deposit, setDeposit] = useState("0.5");
@@ -396,7 +399,16 @@ function WriteWill({ owner, onCreating, onCreated }: { owner: string; onCreating
             </label>
             {!demoClock && <QuietPeriod owner={owner} value={quietDays} onChange={setQuietDays} />}
             <SetupSummary stagesPct={policy.stages_pct} demoClock={demoClock} quietDays={quietDays} />
+            <label className="flex items-start gap-2 text-sm">
+              <input type="checkbox" className="mt-1" checked={notesOnly} onChange={(e) => setNotesOnly(e.target.checked)} />
+              <span>
+                <b>Notes only, no vaults</b>: nothing held for you; only sealed notes, released last.
+              </span>
+            </label>
+            <h3 className="font-serif text-lg">Final secrets {notesOnly ? "" : "(optional)"}</h3>
+            <FinalSecrets heirs={policy.heirs.map((h) => ({ account: h.near_account, name: h.name }))} notes={notes} onChange={setNotes} />
             <ActionButton
+              disabled={notesOnly && !readyNotes(notes).length}
               onClick={async () => {
                 setLog([]);
                 setFailed(false);
@@ -408,11 +420,15 @@ function WriteWill({ owner, onCreating, onCreated }: { owner: string; onCreating
                     policy,
                     contacts: contacts.split(",").map((c) => c.trim()).filter(Boolean),
                     schedule: demoClock ? DEMO_SCHEDULE : realSchedule(quietDays),
-                    foreignChains: [...(assets.has("ETH") ? ["Eth" as const] : []), ...(assets.has("BTC") ? ["Btc" as const] : [])],
-                    depositNear: deposit,
+                    foreignChains: notesOnly ? [] : [...(assets.has("ETH") ? ["Eth" as const] : []), ...(assets.has("BTC") ? ["Btc" as const] : [])],
+                    depositNear: notesOnly ? "0" : deposit,
                   },
                   (m) => setLog((l) => [...l, m]),
                 );
+                  for (const n of readyNotes(notes)) {
+                    setLog((l) => [...l, `Sealing “${n.label}” in this browser…`]);
+                    await addSealedNote(owner, n.heir, n.label.trim(), n.text);
+                  }
                   // Test guardians generated here hold their keys in this browser: they accept at once.
                   const local = policy.guardians.filter((g) => keys.secret(g));
                   if (local.length) await acceptAsGuardians(owner, local, (m) => setLog((l) => [...l, m]));

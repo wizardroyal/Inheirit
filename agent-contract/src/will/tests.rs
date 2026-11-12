@@ -1666,3 +1666,46 @@ fn halt_records_keep_only_the_latest() {
     assert_eq!(w.halted.len(), MAX_HALT_RECORDS);
     assert_eq!(w.halted.last().unwrap().round, w.execution_round);
 }
+
+// ---------------------------------------------------------------- notes-only wills (2026-11-12)
+
+/// A will with no money in any vault (no NEAR deposit, no foreign chains) still runs the whole ladder
+/// and releases its sealed notes last: the zero-custody way in.
+#[test]
+fn notes_only_will_runs_to_completed_and_releases_its_note() {
+    let mut t = T::new();
+    let mut cfg = config();
+    cfg.foreign_chains = vec![];
+    t.pay(OWNER, STORAGE_DEPOSIT).create_will(cfg);
+    for g in [G1, G2, G3] {
+        t.as_(g).accept_guardian(acc(OWNER));
+    }
+    t.pay(OWNER, STORAGE_DEPOSIT)
+        .add_sealed_note(acc(H1), "Where the Ledger is".into(), vec![7u8; 100].into());
+    t.as_(H1).register_heir_key(acc(OWNER), HEIR_KEY.into());
+    assert_eq!(t.will().near_balance.0, 0);
+
+    t.to_executing();
+    for _ in 0..2 {
+        t.wait(60);
+        assert!(t.advance());
+    }
+    t.wait(60);
+    assert!(t.advance(), "no foreign chain to wait for");
+    assert!(matches!(t.state(), WillState::SecretsBuffer { .. }));
+    t.wait(60);
+    assert!(t.advance());
+    assert!(matches!(t.state(), WillState::SecretsReleased { .. }));
+
+    t.as_(AGENT)
+        .store_released_note(acc(OWNER), 0, acc(H1), vec![9u8; 148].into());
+    assert!(t.advance());
+    assert!(matches!(t.state(), WillState::Completed { .. }));
+    let w = t.will();
+    assert_eq!(w.released_notes.len(), 1);
+    assert_eq!(w.near_balance.0, 0);
+    assert!(
+        w.executions.iter().all(|e| e.amount == "0") || w.executions.is_empty(),
+        "nothing was paid out"
+    );
+}

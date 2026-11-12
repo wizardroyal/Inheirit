@@ -12,7 +12,7 @@ import { useAccountLabel } from "@/lib/names";
 import { keys } from "@/lib/keys";
 import { agent } from "@/lib/agent";
 import { call, ROLE_TGAS, signRequest, view } from "@/lib/near";
-import { keypairFromSeedHex, newSeedHex, openReleased, pubkeyHex } from "@/lib/sealed";
+import { keypairFromSeedHex, newSeedHex, openReleased, pubkeyHex, sealToBase64 } from "@/lib/sealed";
 import { executionStarted, schedule, stateName, type Will, stateLabel } from "@/lib/will";
 
 type Released = Will["released_notes"][number];
@@ -147,9 +147,34 @@ function KeyStep({ owner, heir, refresh }: { owner: string; heir: Will["heirs"][
             Download a backup
           </button>
         )}
+        {registered && seed && <TestKey registered={registered} seed={seed} />}
         <RestoreKey owner={owner} heir={heir.account_id} />
       </div>
     </Step>
+  );
+}
+
+/**
+ * Proves the key works before anything is released, without touching a note: a random test message is
+ * sealed to the key registered on-chain (what the agent will seal to) and opened with the key held here.
+ */
+function TestKey({ registered, seed }: { registered: string; seed: string }) {
+  const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null);
+  return (
+    <span className="inline-flex flex-col gap-1">
+      <button
+        type="button"
+        className="rounded-lg border border-line px-4 py-2 text-sm hover:bg-accent-soft"
+        onClick={async () => {
+          const probe = `test-${crypto.getRandomValues(new Uint32Array(2)).join("")}`;
+          const opened = await openReleased(await sealToBase64(probe, registered), await keypairFromSeedHex(seed)).catch(() => null);
+          setResult(opened === probe ? { ok: true, text: "Works: notes sealed to you will open here." } : { ok: false, text: "This browser's key can't open notes sealed to your registered key." });
+        }}
+      >
+        Test my key
+      </button>
+      {result && <span className={`text-xs ${result.ok ? "text-accent" : "text-danger"}`}>{result.text}</span>}
+    </span>
   );
 }
 
