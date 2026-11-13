@@ -247,7 +247,7 @@ export function MyWillSetup({
   const [notes, setNotes] = useState<DraftNote[]>([]);
   // Setup always uses real timings; a speedrun is started later from My will.
   const demoClock = false;
-  const [quietDays, setQuietDays] = useState<number | null>(30);
+  const [quietDays, setQuietDays] = useState<number | null>(60);
   const [stable, setStable] = useState(false);
   const [log, setLog] = useState<string[]>([]);
   const [failed, setFailed] = useState(false);

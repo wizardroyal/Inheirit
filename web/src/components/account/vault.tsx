@@ -1,17 +1,15 @@
 "use client";
 // The vault (one per account): its name, holdings with a total in dollars, and Deposit / Withdraw pop-ups.
-// Deposit: pick a token and a chain; the vault's own chains show the vault address (NEAR is deposited from
-// the owner's account), anything else goes through NEAR Intents (SIMULATED on testnet). Withdrawals also
-// work while the will is paused.
+// Deposit: pick a chain; its test token and an address to copy follow. Withdrawals also work while the will
+// is paused.
 import { useRef, useState } from "react";
 import { toUnits } from "@/components/account/parts";
-import { chainLabel, IntentsSimTag } from "@/components/Payouts";
 import { useAccount } from "@/lib/account";
-import { agent, type FundQuote, type IntentsToken } from "@/lib/agent";
+import { agent } from "@/lib/agent";
 import { fundFromFaucet } from "@/lib/demo";
 import { usePoll } from "@/lib/hooks";
 import { useAccountLabel } from "@/lib/names";
-import { call, formatNear, nearToYocto } from "@/lib/near";
+import { balanceOf, call, formatNear, nearToYocto } from "@/lib/near";
 import { useProfile } from "@/lib/profile";
 import { stateName, type Will } from "@/lib/will";
 import { Icon } from "../icons";
@@ -56,13 +54,13 @@ function useHoldings(will: Will) {
     const address = v?.address ?? (fresh && "vault" in fresh ? fresh.vault : undefined);
     rows.push({ chain: c, label: c === "Eth" ? "Ethereum" : "Bitcoin", amount, unit: c === "Eth" ? "ETH" : "BTC", usd: (amount ?? 0) * (c === "Eth" ? price("ETH", "eth") : price("BTC", "btc")), address });
   }
-  return { rows, tokens: tokens?.enabled ? tokens.tokens : [], total: rows.reduce((s, r) => s + r.usd, 0) };
+  return { rows, total: rows.reduce((s, r) => s + r.usd, 0) };
 }
 
 export function VaultSection({ will }: { will: Will }) {
   const { viewing, refresh } = useAccount();
   const label = useAccountLabel();
-  const { rows, tokens, total } = useHoldings(will);
+  const { rows, total } = useHoldings(will);
   const [modal, setModal] = useState<"deposit" | "withdraw" | null>(null);
   const s = stateName(will.state);
   const open = (s === "Active" || s === "Paused") && !viewing;
@@ -102,121 +100,102 @@ export function VaultSection({ will }: { will: Will }) {
         ) : (
           <p className="mt-3 text-sm text-muted">Deposits and withdrawals only at All good or while paused.</p>
         )}
+        <p className="mt-4 text-sm text-muted">
+          Nobody holds this vault&apos;s keys, not you and not us: NEAR&apos;s signing network signs for it only to pay your heirs or your own withdrawals. Your recovery key controls your account, which can withdraw everything at any time.
+        </p>
       </Card>
-      {modal === "deposit" && <DepositModal will={will} rows={rows} tokens={tokens} onClose={() => setModal(null)} />}
+      {modal === "deposit" && <DepositModal will={will} rows={rows} onClose={() => setModal(null)} />}
       {modal === "withdraw" && <WithdrawModal will={will} rows={rows} onClose={() => setModal(null)} />}
     </div>
   );
 }
 
-type Route = { key: string; chain: string; kind: "near" | "vault"; vault?: "Eth" | "Btc" } | { key: string; chain: string; kind: "intents"; assetId: string };
-
-/** Token → chains it can come from: the vault's own chains first, then NEAR Intents routes into the NEAR vault. */
-function routes(will: Will, tokens: IntentsToken[]): Map<string, Route[]> {
-  const m = new Map<string, Route[]>();
-  const add = (sym: string, r: Route) => m.set(sym, [...(m.get(sym) ?? []), r]);
-  add("NEAR", { key: "near", chain: "NEAR", kind: "near" });
-  if (will.foreign_chains.includes("Eth")) add("ETH", { key: "eth-vault", chain: "Ethereum", kind: "vault", vault: "Eth" });
-  if (will.foreign_chains.includes("Btc")) add("BTC", { key: "btc-vault", chain: "Bitcoin", kind: "vault", vault: "Btc" });
-  for (const t of tokens) {
-    if (t.symbol === "wNEAR" || (t.symbol === "ETH" && t.blockchain === "eth") || (t.symbol === "BTC" && t.blockchain === "btc")) continue;
-    add(t.symbol, { key: t.assetId, chain: chainLabel(t.blockchain), kind: "intents", assetId: t.assetId });
-  }
-  return m;
+/** One address to copy, with a copy button. */
+function AddressBox({ address, note }: { address: string; note: string }) {
+  const [copied, setCopied] = useState<boolean | null>(null);
+  return (
+    <div className="space-y-2">
+      <p className="text-sm text-muted">{note}</p>
+      <p className="break-all rounded-lg border border-line bg-bg p-3 font-mono text-sm">{address}</p>
+      <button
+        type="button"
+        className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-line hover:bg-accent-soft"
+        onClick={() => navigator.clipboard.writeText(address).then(() => setCopied(true), () => setCopied(false))}
+      >
+        <Icon name="copy" className="h-4 w-4" /> {copied ? "Copied" : copied === false ? "Select the address above to copy it" : "Copy address"}
+      </button>
+    </div>
+  );
 }
 
-function DepositModal({ will, rows, tokens, onClose }: { will: Will; rows: ReturnType<typeof useHoldings>["rows"]; tokens: IntentsToken[]; onClose: () => void }) {
+/**
+ * Deposit: pick a chain; its test token and an address to copy follow. Ethereum and Bitcoin go straight
+ * to the vault's own address. NEAR is held by the will contract, which can't tell whose a plain transfer
+ * is, so NEAR goes to your account first and "Move into the vault" deposits it.
+ */
+function DepositModal({ will, rows, onClose }: { will: Will; rows: ReturnType<typeof useHoldings>["rows"]; onClose: () => void }) {
   const { refresh } = useAccount();
-  const all = routes(will, tokens);
-  const [symbol, setSymbol] = useState("NEAR");
-  const [routeKey, setRouteKey] = useState(all.get("NEAR")![0].key);
+  const [chain, setChain] = useState<Chain>("Near");
   const [amount, setAmount] = useState("");
-  const [quote, setQuote] = useState<FundQuote | null>(null);
   const [err, setErr] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
   const [log, setLog] = useState<string[]>([]);
-  const list = all.get(symbol) ?? [];
-  const route = list.find((r) => r.key === routeKey) ?? list[0];
-  const vaultRow = route?.kind === "vault" ? rows.find((r) => r.chain === route.vault) : undefined;
-  const reset = () => (setQuote(null), setErr(null), setCopied(false));
+  const { data: own } = usePoll(() => balanceOf(will.owner).then((b) => formatNear(b.toString())).catch(() => null), 10_000, [will.owner]);
+  const row = rows.find((r) => r.chain === chain);
+  const TOKEN: Record<Chain, string> = { Near: "NEAR (testnet)", Eth: "ETH (Sepolia testnet)", Btc: "BTC (testnet)" };
   return (
     <Modal title="Deposit" onClose={onClose}>
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Token">
-          <select className={inputCls} value={symbol} onChange={(e) => (setSymbol(e.target.value), setRouteKey(all.get(e.target.value)![0].key), reset())}>
-            {[...all.keys()].map((k) => (
-              <option key={k}>{k}</option>
-            ))}
-          </select>
-        </Field>
         <Field label="Chain">
-          <select className={inputCls} value={route?.key} onChange={(e) => (setRouteKey(e.target.value), reset())}>
-            {list.map((r) => (
-              <option key={r.key} value={r.key}>
-                {r.chain}
+          <select className={inputCls} value={chain} onChange={(e) => (setChain(e.target.value as Chain), setErr(null))}>
+            <option value="Near">NEAR</option>
+            {will.foreign_chains.map((c) => (
+              <option key={c} value={c}>
+                {c === "Eth" ? "Ethereum" : "Bitcoin"}
               </option>
             ))}
           </select>
         </Field>
+        <Field label="Token">
+          <select className={inputCls} value={chain} disabled aria-readonly>
+            <option value={chain}>{TOKEN[chain]}</option>
+          </select>
+        </Field>
       </div>
-      <div className="mt-5 space-y-3">
-        {route?.kind === "near" && (
+      <div className="mt-5 space-y-4">
+        {chain === "Near" ? (
           <>
-            <Field label="Amount (NEAR)">
-              <input className={inputCls} inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.1" />
+            <AddressBox address={will.owner} note={`Send testnet NEAR to your account${own != null ? ` (holds ${own} NEAR)` : ""}, then move it into the vault.`} />
+            <Field label="Move into the vault (NEAR)">
+              <span className="flex gap-2">
+                <input className={`${inputCls} min-w-0 flex-1`} inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.1" />
+                <ActionButton
+                  disabled={!(Number(amount) > 0)}
+                  onClick={async () => {
+                    setErr(null);
+                    try {
+                      await call(will.owner, "deposit_near", {}, nearToYocto(amount));
+                      refresh();
+                      onClose();
+                    } catch (e) {
+                      setErr(e instanceof Error ? e.message : String(e));
+                    }
+                  }}
+                >
+                  Move
+                </ActionButton>
+              </span>
             </Field>
-            <ActionButton disabled={!(Number(amount) > 0)} onClick={async () => (await call(will.owner, "deposit_near", {}, nearToYocto(amount)), refresh(), onClose())}>
-              Deposit from my account
-            </ActionButton>
           </>
-        )}
-        {route?.kind === "vault" && !vaultRow?.address && <p className="text-muted">Loading the address… (the agent may be restarting; try again in a minute)</p>}
-        {route?.kind === "vault" && vaultRow?.address && (
+        ) : row?.address ? (
           <>
-            <p className="text-sm text-muted">Your deposit address ({route.vault === "Eth" ? "Ethereum, test network" : "Bitcoin, test network"})</p>
-            <p className="break-all rounded-lg border border-line bg-bg p-3 font-mono text-sm">{vaultRow.address}</p>
-            <button type="button" className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-line hover:bg-accent-soft" onClick={() => navigator.clipboard.writeText(vaultRow.address!).then(() => setCopied(true), () => setErr("Couldn't copy; select the address instead."))}>
-              <Icon name="copy" className="h-4 w-4" /> {copied ? "Copied" : "Copy address"}
-            </button>
+            <AddressBox address={row.address} note={`Send only ${TOKEN[chain]} to this vault address.`} />
             <button type="button" className="min-h-11 text-sm text-accent underline" onClick={() => fundFromFaucet(will.owner, (m) => setLog((l) => [...l, m])).catch((e) => setLog((l) => [...l, e instanceof Error ? e.message : String(e)]))}>
-              Or fill empty vaults with free test coins
+              Or get free test coins for empty vaults
             </button>
             {log.length > 0 && <p className="text-sm text-muted">{log[log.length - 1]}</p>}
           </>
-        )}
-        {route?.kind === "intents" && (
-          <>
-            <Field label={`Amount (${symbol})`}>
-              <input className={inputCls} inputMode="decimal" value={amount} onChange={(e) => (setAmount(e.target.value), setQuote(null))} placeholder="25" />
-            </Field>
-            {!quote ? (
-              <ActionButton
-                disabled={!(Number(amount) > 0)}
-                onClick={async () => {
-                  setErr(null);
-                  try {
-                    setQuote(await agent.fundQuote(will.owner, "Near", route.assetId, amount));
-                  } catch (e) {
-                    setErr(e instanceof Error ? e.message : String(e));
-                  }
-                }}
-              >
-                Get deposit address
-              </ActionButton>
-            ) : (
-              <>
-                <p className="text-sm text-muted">
-                  Your deposit address · arrives as ≈ {quote.quote.amountOutFormatted} NEAR in about {quote.quote.timeEstimate} s
-                </p>
-                <p className="break-all rounded-lg border border-line bg-bg p-3 font-mono text-sm">{quote.quote.depositAddress}</p>
-                {quote.simulated && (
-                  <p className="flex flex-wrap items-center gap-2 text-sm text-muted">
-                    <IntentsSimTag /> NEAR Intents has no testnet: don&apos;t send anything here.
-                  </p>
-                )}
-              </>
-            )}
-          </>
+        ) : (
+          <p className="text-muted">Loading the address… (the agent may be restarting; try again in a minute)</p>
         )}
         {err && <ErrorNote>{err}</ErrorNote>}
       </div>

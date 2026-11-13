@@ -156,7 +156,11 @@ export function ApproveDevice({ owner }: { owner: string }) {
   if (!keys.secret(owner)) return null;
   return (
     <Card title="Add another device">
-      <p className="text-muted">On the new device, choose “Use an account from another device” and paste its code here.</p>
+      <ol className="list-decimal space-y-1 pl-5 text-muted">
+        <li>On the new device, open inheirit.xyz and choose <b className="text-ink">Use an account from another device</b> on the sign-in screen.</li>
+        <li>It shows a pairing code. Paste it below and approve.</li>
+      </ol>
+      <p className="mt-2 text-sm text-muted">The code is made on the new device, so its key never leaves it. Or sign in there with your recovery key.</p>
       <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end">
         <Field label="Device code">
           <input className={inputCls} value={code} onChange={(e) => (setCode(e.target.value), setMsg(null))} placeholder="inheirit-pair:v1:…" />

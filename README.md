@@ -83,7 +83,7 @@ Everything runs on testnet. One path, start to finish:
    → **Set up your account**: a username (made up for you, editable), *Save your recovery key*, your people (a name is enough) and your vault (a name and its chains), with **Back** and **Next**. Every step can be skipped; all of it lives in **Profile** later.
 2. On **Home**, the will form: the people you added show as **+ Name** buttons (someone saved by name only gets a funded test account when picked), or tap ↻ next to the heir and twice next to the guardians. Add a final secret if you like, then **Start my will** (**Save as draft** keeps it off-chain instead). The will starts on real timings.
    → **Home** shows the will at **All good**, when it last saw you, **I'm here**, the **Will strength** bar and one next step. **My will** reads like a will.
-3. On **My will**, click **Try a speedrun** (any will can, on testnet), then **Start the speedrun**. The card is on scenario **a · The owner comes back** (quiet after 2 minutes instead of 30 days). Do nothing for about 2 minutes.
+3. On **My will**, click **Try a speedrun** (any will can, on testnet), then **Start the speedrun**. The card is on scenario **a · The owner comes back** (quiet after 2 minutes instead of 60 days). Do nothing for about 2 minutes.
    → The ladder climbs to **Quiet** and then **Welfare check**; the checks are listed under **Activity** (heartbeat app, email if you added one, Telegram if linked, a SIMULATED DM).
 4. Click **I'm here (send a heartbeat)**.
    → Within seconds the ladder **snaps back to All good**, and the verdict says nothing moved. That's the whole idea: signals can stop it; only people can start it.
@@ -131,7 +131,7 @@ On **Try a speedrun**, pick another scenario. The card shows a checklist with a 
 
 **The ladder:**
 1. **All good** (armed only once enough guardians accept).
-2. **Quiet:** after silence longer than your usual. At setup the app reads your own NEAR (and Sepolia) history, finds your typical gap between transactions, and suggests 3× it (at least 30 days); you choose the number. The verdict then says "quiet 9 days (usually active every 3 days)". Checks go out to the heartbeat app, email, Telegram, then DMs.
+2. **Quiet:** after silence longer than your usual. At setup the app reads your own NEAR (and Sepolia) history, finds your typical gap between transactions, and suggests 3× it (at least 30 days; 60 days when there is too little history); you choose the number. The verdict then says "quiet 9 days (usually active every 3 days)". Checks go out to the heartbeat app, email, Telegram, then DMs.
 3. **Welfare check** (14 days): guardians, friends and the lawyer are asked whether they've heard from you.
 4. **Guardian vote** (30 days): one "they're alive" stops it.
 5. **Challenge period** (60 days): you're alerted everywhere.

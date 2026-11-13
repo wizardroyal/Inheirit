@@ -13,7 +13,7 @@ export const SUGGEST_FACTOR = 3;
 export const MIN_QUIET_S = 30 * DAY;
 export const MAX_QUIET_S = 180 * DAY;
 /** With too little history, the default real-timing quiet period. */
-export const DEFAULT_QUIET_S = 30 * DAY;
+export const DEFAULT_QUIET_S = 60 * DAY;
 
 export interface Baseline {
   /** Median gap between sessions, in seconds; null when there isn't enough history. */

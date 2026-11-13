@@ -31,7 +31,7 @@ export const DEMO_SCHEDULE: SchedulePreset = {
  */
 export const REAL_SCHEDULE: SchedulePreset = {
   timings: {
-    quiet_after: 30 * DAY,
+    quiet_after: 60 * DAY,
     nudge_period: 7 * DAY,
     welfare_period: 14 * DAY,
     vote_period: 30 * DAY,

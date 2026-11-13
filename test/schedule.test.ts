@@ -19,10 +19,10 @@ describe("release schedules", () => {
     // quiet 120 + nudge 60 + welfare 60 + challenge 120 = 360; + waits 180+60+60 = 660; + 60 + buffer 60 = 780
     expect(summarize(DEMO_SCHEDULE.timings, stages)).toEqual({ earliestMove: 360, fullDistribution: 660, secrets: 780 });
   });
-  it("real defaults: first slice after ~4 months of silence, full distribution in ~16 months, secrets ~21", () => {
+  it("real defaults: first slice after ~5 months of silence, full distribution in ~17 months, secrets ~23", () => {
     const s = summarize(REAL_SCHEDULE.timings, stagesFor(STANDARD_PCT, REAL_SCHEDULE));
     // quiet 30 + checks 7 + welfare 14 + challenge 60 = 111 d; + 180 + 90 + 90 = 471 d; + 90 + secrets 90 = 651 d
-    expect([s.earliestMove, s.fullDistribution, s.secrets].map((x) => x / 86_400)).toEqual([111, 471, 651]);
+    expect([s.earliestMove, s.fullDistribution, s.secrets].map((x) => x / 86_400)).toEqual([141, 501, 681]);
   });
 });
 
