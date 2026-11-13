@@ -4,7 +4,6 @@
 
 const ACCOUNT = /^(?=.{2,64}$)([a-z\d]+[-_])*[a-z\d]+(\.([a-z\d]+[-_])*[a-z\d]+)*$/;
 const SECRET = /^ed25519:[1-9A-HJ-NP-Za-km-z]{80,90}$/;
-const PUBLIC = /^ed25519:[1-9A-HJ-NP-Za-km-z]{43,44}$/;
 
 export interface Backup {
   account: string;
@@ -42,15 +41,4 @@ export function parseBackup(input: string): Backup {
   if (!ACCOUNT.test(account)) throw new Error("The backup names an account that isn't valid.");
   if (!SECRET.test(key)) throw new Error("The key in this backup is damaged or incomplete.");
   return { account, key };
-}
-
-/** Add another device: the new device shows this code; a device already signed in approves it. */
-export function pairingCode(account: string, publicKey: string): string {
-  return `inheirit-pair:v1:${account}:${publicKey}`;
-}
-
-export function parsePairing(input: string): { account: string; publicKey: string } {
-  const m = /^inheirit-pair:v1:([^:]+):(ed25519:\S+)$/.exec(input.trim());
-  if (!m || !ACCOUNT.test(m[1]) || !PUBLIC.test(m[2])) throw new Error("That isn't a device code from Inheirit. Copy it again from the new device.");
-  return { account: m[1], publicKey: m[2] };
 }

@@ -1,15 +1,8 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { Carousel } from "@/components/Carousel";
 import { HeroLoop } from "@/components/HeroLoop";
 import { Icon } from "@/components/icons";
-import { REPO_URL } from "@/lib/config";
-
-// The first slice of a real test will (released 2026-11-05 on the hosted stack), one link per chain.
-const PROOF: [string, string][] = [
-  ["NEAR", "https://testnet.nearblocks.io/address/alice.inheirit-gzdcfh.testnet"],
-  ["Ethereum", "https://sepolia.etherscan.io/tx/0x0df06408e6ae91219b8c7fb45a3fefa8c8f2eff54d3e9f6b0e65fe8a16ef76ff"],
-  ["Bitcoin", "https://mempool.space/testnet4/tx/50876126ed1784ed78ad41e5dbbe544031e0b0fd0ded2f36efc7f7f6fdfc4dae"],
-];
 
 const PROBLEMS = [
   ["Check-in fatigue", "Dead-man's switches make you prove you're alive. People forget.", "No check-ins. It reads activity you already produce."],
@@ -29,12 +22,15 @@ const PRINCIPLES = [
 const em = (s: string) => <em className="italic">{s}</em>;
 
 /** A small dark product card with its caption underneath, for the scrolling row. */
-function Shot({ title, text, children }: { title: string; text: string; children: ReactNode }) {
+function Shot({ step, title, text, children }: { step: string; title: string; text: string; children: ReactNode }) {
   return (
-    <figure className="w-72 shrink-0 snap-start space-y-3 lg:w-auto">
+    <figure className="w-72 shrink-0 snap-start space-y-3">
       <div className="film-card tech h-56 rounded-2xl p-4 text-sm">{children}</div>
       <figcaption>
-        <span className="block font-medium">{title}</span>
+        <span className="block font-medium">
+          <span className="text-muted">{step} · </span>
+          {title}
+        </span>
         <span className="text-sm text-muted">{text}</span>
       </figcaption>
     </figure>
@@ -60,79 +56,80 @@ export default function Home() {
         </div>
       </section>
 
-      {/* A dark band with the line that matters and the proof, like laurels. */}
-      <section className="film -mx-4 space-y-6 px-6 py-14 text-center sm:mx-0 sm:rounded-3xl">
-        <h2 className="font-serif text-3xl sm:text-4xl">You shouldn&apos;t have to {em("check in")} to stay alive.</h2>
-        <p className="film-muted mx-auto max-w-xl">Signs of life can stop it; only people can start it. Assets go out in slices that any sign of life can halt, and secrets go last.</p>
-        <div className="flex flex-wrap justify-center gap-3">
-          {PROOF.map(([label, href]) => (
-            <a key={label} href={href} target="_blank" rel="noreferrer" className="tech inline-flex min-h-11 items-center gap-2 rounded-full border border-[#3a362f] px-4 py-2 text-sm hover:bg-[#24211d]">
-              ❧ First 10% on {label} ↗
-            </a>
-          ))}
-        </div>
-        <p className="film-muted text-sm">A real test will on testnet: its first slice, paid on three chains.</p>
-      </section>
-
-      {/* The product in small pieces. */}
+      {/* How a will executes, step by step, with sample people. */}
       <section className="space-y-6">
-        <h2 className="text-center font-serif text-4xl">See your {em("whole")} will.</h2>
-        <div className="-mx-4 flex snap-x gap-4 overflow-x-auto px-4 pb-2 lg:mx-0 lg:grid lg:grid-cols-4 lg:overflow-visible lg:px-0">
-          <Shot title="Signs of life" text="Activity you already produce, weighted by how hard it is to fake.">
+        <h2 className="text-center font-serif text-4xl">How your will {em("executes")}</h2>
+        <Carousel label="How your will executes">
+          <Shot step="1" title="Signals" text="Activity you already produce, read as times only. No check-ins.">
             {[
-              ["Heartbeat", "strong", "● 2 min"],
-              ["NEAR", "strong", "● 1 day"],
-              ["Telegram", "medium", "● 3 d"],
-              ["GitHub", "weak", "○"],
-            ].map(([a, b, c]) => (
-              <div key={a} className={row}>
-                <span>{a}</span>
-                <span className="text-[#a39b8e]">{b}</span>
-                <span className="text-[#9fd3b8]">{c}</span>
-              </div>
-            ))}
-          </Shot>
-          <Shot title="Guardian vote" text="Only guardians who accepted count. One “they're alive” stops it.">
-            <p className="text-[#a39b8e]">Guardian vote · 2 of 3 must confirm</p>
-            {[
-              ["Lazarus", "✓ confirmed"],
-              ["Mary", "✓ confirmed"],
-              ["Geti", "invited"],
+              ["Heartbeat app", "strong"],
+              ["On-chain transactions", "strong"],
+              ["Email", "medium"],
+              ["Calendar", "medium"],
+              ["Socials", "weak"],
             ].map(([a, b]) => (
               <div key={a} className={row}>
                 <span>{a}</span>
-                <span className={b.startsWith("✓") ? "text-[#9fd3b8]" : "text-[#e7c27a]"}>{b}</span>
+                <span className="text-[#a39b8e]">{b}</span>
               </div>
             ))}
           </Shot>
-          <Shot title="Released in stages" text="10% first, then the longest wait: a slice leaving is the loudest alarm.">
+          <Shot step="2" title="Friends" text="A friendly inquiry to your chosen friends about your welfare. Any positive sign is enough.">
+            <p className="text-[#a39b8e]">Have you heard from Sam recently?</p>
             {[
-              [10, "sent", "w-[10%]"],
-              [20, "in 6 months", "w-[20%]"],
+              ["Amara", "asked"],
+              ["Tom", "asked"],
+              ["Priya", "asked"],
+            ].map(([a, b]) => (
+              <div key={a} className={row}>
+                <span>{a}</span>
+                <span className="text-[#a39b8e]">{b}</span>
+              </div>
+            ))}
+          </Shot>
+          <Shot step="3" title="Guardians" text="After a long silence, guardians are alerted and vote. A single “they're alive” is enough to pause the will.">
+            <p className="text-[#a39b8e]">2 of 3 must confirm</p>
+            {[
+              ["Daniel", "accepted"],
+              ["Grace", "accepted"],
+              ["Kofi", "invited"],
+            ].map(([a, b]) => (
+              <div key={a} className={row}>
+                <span>{a}</span>
+                <span className={b === "accepted" ? "text-[#9fd3b8]" : "text-[#e7c27a]"}>{b}</span>
+              </div>
+            ))}
+          </Shot>
+          <Shot step="4" title="Staged release" text="Slices, not a lump sum, with the longest wait after the first. Any sign of life stops the rest.">
+            {[
+              [10, "after the challenge period", "w-[10%]"],
+              [20, "6 months later", "w-[20%]"],
               [30, "3 months later", "w-[30%]"],
               [40, "3 months later", "w-[40%]"],
             ].map(([p, when, w]) => (
-              <div key={p} className="py-1.5">
-                <div className="flex justify-between">
+              <div key={p} className="py-1">
+                <div className="flex justify-between gap-2">
                   <span>{p}%</span>
                   <span className="text-[#a39b8e]">{when}</span>
                 </div>
                 <div className="mt-1 h-1.5 rounded bg-[#2f2c27]">
-                  <div className={`h-1.5 rounded ${p === 10 ? "bg-[#9fd3b8]" : "bg-[#4a463f]"} ${w}`} />
+                  <div className={`h-1.5 rounded bg-[#9fd3b8] ${w}`} />
                 </div>
               </div>
             ))}
           </Shot>
-          <Shot title="Heirs get what they use" text="Each heir picks the asset and chain they receive; NEAR Intents pays each slice in it.">
-            <p className="text-[#a39b8e]">Ada chose</p>
-            <p className="mt-1 font-serif text-2xl">USDC on Base</p>
-            <div className={`${row} mt-4`}>
-              <span>$10 of NEAR</span>
-              <span className="text-[#9fd3b8]">≈ 10.01 USDC</span>
-            </div>
-            <p className="mt-2 text-[#a39b8e]">example; heirs see live mainnet quotes</p>
+          <Shot step="5" title="Sealed notes" text="Final secrets for your heirs, released last: directions to wallets, physical assets and more.">
+            {[
+              ["for Ada", "Where the hardware wallet is"],
+              ["for Ben", "The house deed: blue folder in the study"],
+            ].map(([who, t]) => (
+              <div key={t} className="border-b border-[#2f2c27] py-2 last:border-0">
+                <span className="block text-[#a39b8e]">🔒 {who}</span>
+                <span>{t}</span>
+              </div>
+            ))}
           </Shot>
-        </div>
+        </Carousel>
       </section>
 
       {/* The check-in, as it arrives. */}
@@ -223,20 +220,6 @@ export default function Home() {
         <p className="text-sm opacity-80">Next: gifts that release at milestones.</p>
       </section>
 
-      <p className="text-sm text-muted">
-        Built on NEAR: Chain Signatures, Shade Agents (TEE), NEAR AI Cloud and NEAR Intents ·{" "}
-        <a href={REPO_URL} target="_blank" rel="noreferrer" className="text-accent underline">
-          Code on GitHub
-        </a>{" "}
-        ·{" "}
-        <a href={`${REPO_URL}/blob/main/docs/VERIFY.md`} target="_blank" rel="noreferrer" className="text-accent underline">
-          Verify it yourself
-        </a>{" "}
-        ·{" "}
-        <Link href="/mainnet" className="text-accent underline">
-          Mainnet
-        </Link>
-      </p>
     </div>
   );
 }

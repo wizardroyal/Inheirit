@@ -190,7 +190,6 @@ export function WriteWill({ owner, onCreating, onCreated }: { owner: string; onC
   const now = useNow();
   const demoClock = false; // a speedrun is started later from My will
   const [notes, setNotes] = useState<DraftNote[]>([]);
-  const [notesOnly, setNotesOnly] = useState(false);
   const [quietDays, setQuietDays] = useState<number | null>(null);
   const [contacts, setContacts] = useState("");
   const [deposit, setDeposit] = useState("0.5");
@@ -276,16 +275,9 @@ export function WriteWill({ owner, onCreating, onCreated }: { owner: string; onC
             </div>
             <QuietPeriod owner={owner} value={quietDays} onChange={setQuietDays} />
             <SetupSummary stagesPct={policy.stages_pct} demoClock={demoClock} quietDays={quietDays} />
-            <label className="flex items-start gap-2 text-sm">
-              <input type="checkbox" className="mt-1" checked={notesOnly} onChange={(e) => setNotesOnly(e.target.checked)} />
-              <span>
-                <b>Notes only, no vaults</b>: nothing held for you; only sealed notes, released last.
-              </span>
-            </label>
-            <h3 className="font-serif text-lg">Final secrets {notesOnly ? "" : "(optional)"}</h3>
+            <h3 className="font-serif text-lg">Final secrets (optional)</h3>
             <FinalSecrets heirs={policy.heirs.map((h) => ({ account: h.near_account, name: h.name }))} notes={notes} onChange={setNotes} />
             <ActionButton
-              disabled={notesOnly && !readyNotes(notes).length}
               onClick={async () => {
                 setLog([]);
                 setFailed(false);
@@ -297,8 +289,8 @@ export function WriteWill({ owner, onCreating, onCreated }: { owner: string; onC
                     policy,
                     contacts: contacts.split(",").map((c) => c.trim()).filter(Boolean),
                     schedule: demoClock ? DEMO_SCHEDULE : realSchedule(quietDays),
-                    foreignChains: notesOnly ? [] : [...(assets.has("ETH") ? ["Eth" as const] : []), ...(assets.has("BTC") ? ["Btc" as const] : [])],
-                    depositNear: notesOnly ? "0" : deposit,
+                    foreignChains: [...(assets.has("ETH") ? ["Eth" as const] : []), ...(assets.has("BTC") ? ["Btc" as const] : [])],
+                    depositNear: deposit,
                   },
                   (m) => setLog((l) => [...l, m]),
                 );

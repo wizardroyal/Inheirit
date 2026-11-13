@@ -4,7 +4,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Suspense, useEffect, useState, type ReactNode } from "react";
-import { NewDevice, RestoreAccess } from "@/components/account/access";
+import { RestoreAccess } from "@/components/account/access";
 import { SignIn } from "@/components/SignIn";
 import { Avatar } from "@/components/ui";
 import { AccountProvider, isDemoAccount, MENU_EVENT, useAccount } from "@/lib/account";
@@ -71,7 +71,6 @@ function Shell({ children }: { children: ReactNode }) {
           </section>
         )}
         <RestoreAccess onRestored={setOwner} />
-        <NewDevice onApproved={setOwner} />
       </div>
     );
   }

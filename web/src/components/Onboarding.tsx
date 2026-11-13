@@ -14,7 +14,7 @@ import { newTestReceive, testReceiveFor } from "@/lib/test-wallets";
 import { humanize, nameOf, readable, useAccountLabel, useNames } from "@/lib/names";
 import { QuietPeriod, realSchedule } from "./QuietPeriod";
 import { type DraftNote, FinalSecrets, readyNotes } from "./FinalSecrets";
-import { ActionButton, Avatar, Card, Field, inputCls, Pill, SimulatedTag, Stepper } from "./ui";
+import { ActionButton, Avatar, Card, Field, inputCls, SimulatedTag, Stepper } from "./ui";
 import { localProfile, newId, saveProfile, useProfile, type Person, type Role } from "@/lib/profile";
 
 const ACCOUNT = /^[a-z0-9._-]{2,64}$/;
@@ -243,7 +243,8 @@ export function MyWillSetup({
   const [assets, setAssets] = useState({ ETH: false, BTC: false });
   const [deposit, setDeposit] = useState("0.5");
   // Notes only: no money in any vault, just sealed notes released last (the zero-custody way in).
-  const [notesOnly, setNotesOnly] = useState(false);
+  // Notes-only wills were dropped from setup (2026-11-13); old drafts load as normal wills.
+  const notesOnly = false;
   const [notes, setNotes] = useState<DraftNote[]>([]);
   // Setup always uses real timings; a speedrun is started later from My will.
   const demoClock = false;
@@ -280,7 +281,6 @@ export function MyWillSetup({
     setContacts(d.contacts);
     setAssets(d.assets);
     setDeposit(d.deposit);
-    setNotesOnly(d.notesOnly);
     setQuietDays(d.quietDays);
     setStable(d.stable);
   }, [profile.draft]);
@@ -331,7 +331,6 @@ export function MyWillSetup({
   ];
   const policy = check.ok && !errors.length ? (check.policy as Policy) : null;
   const pctTotal = heirs.reduce((s, h) => s + (Number(h.pct) || 0), 0);
-  const nearDeposit = Number(deposit) || 0;
 
   const setHeir = (i: number, patch: Partial<HeirRow>) => setHeirs((hs) => hs.map((h, j) => (j === i ? { ...h, ...patch } : h)));
 
@@ -341,9 +340,9 @@ export function MyWillSetup({
         steps={[
           ["Who gets what", heirs.some((h) => h.account.trim() && h.name.trim())],
           ["Who confirms", list(guardians).length >= 2],
-          ["Signs of life", true],
-          ["Fund the vault", notesOnly || Number(deposit) > 0],
-          ["Final secrets", readyNotes(notes).length > 0 || !notesOnly],
+          ["Vault", Number(deposit) > 0],
+          ["Release", true],
+          ["Final secrets", readyNotes(notes).length > 0],
           ["Save your recovery key", false],
           ["Review", !!policy],
         ]}
@@ -359,22 +358,7 @@ export function MyWillSetup({
         </div>
       </Card>
 
-      <Card title="1 · Signs of life" aside={<Pill tone="accent">your NEAR account always counts</Pill>}>
-        <p className="text-sm text-muted">
-          No check-ins. Every transaction you sign already counts.
-        </p>
-        <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          <p className="text-sm text-muted">Connect your other wallets later in Signs of life (you sign a message; no access to funds).</p>
-          <div className="text-sm">
-            <p className="font-medium">Heartbeat app</p>
-            <p className="text-muted">
-              Add <a className="text-accent underline" href="/heartbeat" target="_blank" rel="noreferrer">the heartbeat app</a> to your phone&apos;s home screen. Opening it is a strong sign of life.
-            </p>
-          </div>
-        </div>
-      </Card>
-
-      <Card title="2 · The people">
+      <Card title="1 · The people">
         <p className="text-sm text-muted">Nothing can start until enough guardians accept.</p>
         <p className="mb-3 mt-1 text-sm text-muted">
           Tap <RefreshIcon className="text-accent" /> to generate a test heir or guardian.
@@ -479,83 +463,54 @@ export function MyWillSetup({
           <Field label="How many must confirm" group>
             <Stepper label="guardians who must confirm" value={Number(threshold) || 1} min={1} max={Math.max(1, guardianList.length)} onChange={(n) => setThreshold(String(n))} />
           </Field>
+        </div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <Field label="Lawyer (optional)" group hint="Can speed up the release, never skip the challenge period.">
             <PeopleField owner={owner} what="lawyer" value={lawyer} onChange={setLawyer} label={label} single />
           </Field>
+        </div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <Field label="Friends for a welfare check (optional)" group hint="Can only stop it, never start it.">
             <PeopleField owner={owner} what="friend" value={contacts} onChange={setContacts} label={label} />
           </Field>
         </div>
       </Card>
 
-      <Card title="3 · The vault">
-        <label className="mb-3 flex items-start gap-2 text-sm">
-          <input
-            type="checkbox"
-            className="mt-1"
-            checked={notesOnly}
-            onChange={(e) => {
-              setNotesOnly(e.target.checked);
-              if (e.target.checked) {
-                setAssets({ ETH: false, BTC: false });
-                setStable(false);
-                if (!notes.length) setNotes([{ heir: heirs.find((h) => h.account)?.account ?? "", label: "", text: "" }]);
-              }
-            }}
-          />
-          <span>
-            <b>Notes only, no vaults</b>: nothing held for you; only sealed notes, released last.
-          </span>
-        </label>
-        {!notesOnly && (<>
+      <Card title="2 · The vault">
         <div className="flex flex-wrap gap-4 text-sm">
           <label className="flex items-center gap-2">
-            <input type="checkbox" checked disabled /> NEAR (held by the contract)
+            <input type="checkbox" checked disabled /> NEAR
           </label>
           <label className="flex items-center gap-2">
-            <input type="checkbox" checked={assets.ETH} onChange={(e) => setAssets({ ...assets, ETH: e.target.checked })} /> Ethereum vault
+            <input type="checkbox" checked={assets.ETH} onChange={(e) => setAssets({ ...assets, ETH: e.target.checked })} /> Ethereum
           </label>
           <label className="flex items-center gap-2">
-            <input type="checkbox" checked={assets.BTC} onChange={(e) => setAssets({ ...assets, BTC: e.target.checked })} /> Bitcoin vault
+            <input type="checkbox" checked={assets.BTC} onChange={(e) => setAssets({ ...assets, BTC: e.target.checked })} /> Bitcoin
           </label>
         </div>
-        <label className="mt-3 flex items-start gap-2 text-sm">
-          <input type="checkbox" className="mt-1" checked={stable} onChange={(e) => setStable(e.target.checked)} />
-          <span>
-            <b>Pay heirs in dollars</b>: each slice becomes USDC on the heir&apos;s chain via NEAR Intents.{" "}
-            <SimulatedTag /> on testnet.
-          </span>
-        </label>
         <div className="mt-3 max-w-xs">
           <Field label="NEAR to put in the vault now">
             <input className={inputCls} value={deposit} onChange={(e) => setDeposit(e.target.value)} />
           </Field>
         </div>
-        <div className="mt-3 rounded-lg bg-accent-soft p-3 text-sm">
-          <p className="font-medium">Who gets what</p>
-          <ul className="mt-1 space-y-0.5">
-            {heirs.map((h, i) => {
-              const pct = Math.max(0, Math.min(100, Number(h.pct) || 0));
-              const parts = [`${+(Math.max(0, nearDeposit) * pct / 100).toFixed(4)} NEAR`];
-              if (assets.ETH) parts.push(`${pct}% of the ETH vault`);
-              if (assets.BTC) parts.push(`${pct}% of the BTC vault`);
-              return (
-                <li key={i} className="break-words">
-                  {parts.join(" + ")} → <b>{h.name || `heir ${i + 1}`}</b>
-                </li>
-              );
-            })}
-          </ul>
-          <p className="mt-1 text-xs text-muted">10% → 20% → 30% → 40%, longest wait after the first. Fund ETH and BTC vaults afterwards.</p>
-        </div>
-        </>)}
-        <div className="mt-3">
+        {(assets.ETH || assets.BTC) && <p className="mt-2 text-sm text-muted">Fund Ethereum and Bitcoin from the Vault page once the will is started.</p>}
+      </Card>
+
+      <Card title="3 · The release">
+        <label className="flex items-start gap-2 text-sm">
+          <input type="checkbox" className="mt-1" checked={stable} onChange={(e) => setStable(e.target.checked)} />
+          <span>
+            <b>Pay heirs in dollars</b>: each slice is paid as USDC, using NEAR Intents on mainnet. <SimulatedTag /> on testnet.
+          </span>
+        </label>
+        <div className="mt-4">
           <QuietPeriod owner={owner} evm={evm} value={quietDays} onChange={setQuietDays} />
         </div>
         <div className="mt-2">{summary(STANDARD_PCT, demoClock, quietDays)}</div>
       </Card>
 
-      <Card title={notesOnly ? "4 · Final secrets" : "4 · Final secrets (optional)"}>
+      <Card title="4 · Final secrets (optional)">
+        {!heirs.some((h) => h.account.trim()) && <p className="text-sm text-muted">Add an heir first; each secret is for one heir.</p>}
         <FinalSecrets heirs={heirs.filter((h) => h.account).map((h) => ({ account: h.account.trim(), name: h.name }))} notes={notes} onChange={setNotes} />
       </Card>
 

@@ -2,7 +2,7 @@
 // Profile: the username, linked accounts, the recovery key, then your people by role (heirs, guardians,
 // lawyer, friends), each with + to add and ⚙ to edit. Contact details stay with the agent, never on-chain.
 import { useState } from "react";
-import { ApproveDevice, BackupAccess } from "@/components/account/access";
+import { BackupAccess } from "@/components/account/access";
 import { PeopleBlock } from "@/components/account/profile";
 import { useSignalStatus } from "@/components/account/strength";
 import { Icon, type IconName } from "@/components/icons";
@@ -25,7 +25,6 @@ export default function ProfilePage() {
       <PeopleBlock owner={owner} will={will} role="guardian" title="Guardians" />
       <PeopleBlock owner={owner} will={will} role="lawyer" title="Lawyer" />
       <PeopleBlock owner={owner} will={will} role="friend" title="Friends" />
-      <ApproveDevice owner={owner} />
       <div>
         <ActionButton tone="quiet" onClick={async () => setOwner("")}>
           Sign out of this browser
