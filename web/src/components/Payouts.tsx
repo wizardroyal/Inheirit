@@ -13,7 +13,7 @@ import { ago } from "@/lib/will";
 import { ActionButton, ExtLink, Field, inputCls, Pill, short } from "./ui";
 
 const CHAIN_LABELS: Record<string, string> = { near: "NEAR", eth: "Ethereum", base: "Base", arb: "Arbitrum", op: "Optimism", pol: "Polygon", sol: "Solana", btc: "Bitcoin" };
-const chainLabel = (c: string) => CHAIN_LABELS[c] ?? c;
+export const chainLabel = (c: string) => CHAIN_LABELS[c] ?? c;
 
 export function IntentsSimTag() {
   return (

@@ -4,7 +4,7 @@ import { WillGate } from "@/components/account/home";
 import { AgentBadge, AiBadge } from "@/components/Attestation";
 import { Ladder } from "@/components/Ladder";
 import { Card, Details } from "@/components/ui";
-import { NotificationLog } from "@/components/WillParts";
+import { NotificationLog, Releases } from "@/components/WillParts";
 import { CONTRACT_ID } from "@/lib/config";
 
 export default function ActivityPage() {
@@ -21,6 +21,11 @@ export default function ActivityPage() {
               <Ladder will={will} />
             </Card>
           </div>
+          {will.execution_round > 0 && (
+            <Card title="Released">
+              <Releases will={will} />
+            </Card>
+          )}
           <Details summary="Technical details">
             <div className="tech space-y-3 text-xs">
               <AgentBadge />

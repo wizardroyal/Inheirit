@@ -1,6 +1,7 @@
 "use client";
 // Invite links (contract: will/invites.rs): the owner stores sha256(code) for a role; the link carries the
 // code in its #fragment, so it never reaches a server log. Whoever opens it signs in and claims the role.
+import { useEffect, useState } from "react";
 import { sha256 } from "@noble/hashes/sha2";
 import { bytesToHex } from "@noble/hashes/utils";
 import { nameAccounts, nameOf } from "./names";
@@ -8,7 +9,7 @@ import { SITE_URL } from "./config";
 import { call, nearToYocto, ROLE_TGAS, view } from "./near";
 
 const PENDING = "inheirit:pending-invites";
-type Pending = { owner: string; hash: string; role: InviteRole; name: string };
+type Pending = { owner: string; hash: string; role: InviteRole; name: string; link?: string; expires?: number };
 function pending(): Pending[] {
   try {
     return JSON.parse(localStorage.getItem(PENDING) ?? "[]") as Pending[];
@@ -55,8 +56,10 @@ export async function createInvite(owner: string, role: InviteRole, name: string
     .replace(/\+/g, "-")
     .replace(/\//g, "_");
   await call(owner, "create_invite", { role, code_hash: codeHash(code), ttl_s: INVITE_TTL_S }, nearToYocto("0.01"));
-  savePending([...pending(), { owner, hash: codeHash(code), role, name: name.trim() }]);
-  return `${SITE_URL}/i/${code}`;
+  const link = `${SITE_URL}/i/${code}`;
+  savePending([...pending(), { owner, hash: codeHash(code), role, name: name.trim(), link, expires: Date.now() + INVITE_TTL_S * 1000 }]);
+  window.dispatchEvent(new Event(PENDING_EVENT));
+  return link;
 }
 
 /** Which will an open invite belongs to, from the code alone (contract index `find_invite`). */
@@ -71,4 +74,35 @@ export async function inviteOpen(owner: string, code: string, hash = codeHash(co
 
 export async function claimInvite(account: string, owner: string, code: string): Promise<void> {
   await call(account, "claim_invite", { owner, code }, 0n, ROLE_TGAS);
+}
+
+const PENDING_EVENT = "inheirit:invites";
+
+export type OpenInvite = { hash: string; role: InviteRole; name: string; link?: string };
+
+/** Invites made in this browser that nobody has used yet (checked on-chain), with their links. */
+export function useOpenInvites(owner: string): [OpenInvite[], () => void] {
+  const [list, setList] = useState<OpenInvite[]>([]);
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    let live = true;
+    const mine = pending().filter((p) => p.owner === owner && (!p.expires || p.expires > Date.now()));
+    Promise.all(mine.map((p) => inviteOpen(owner, "", p.hash).then((o) => (o ? p : null)).catch(() => p))).then((r) => {
+      if (live) setList(r.filter((x): x is Pending => !!x).map(({ hash, role, name, link }) => ({ hash, role, name, link })));
+    });
+    const on = () => setTick((t) => t + 1);
+    window.addEventListener(PENDING_EVENT, on);
+    return () => {
+      live = false;
+      window.removeEventListener(PENDING_EVENT, on);
+    };
+  }, [owner, tick]);
+  return [list, () => setTick((t) => t + 1)];
+}
+
+/** Withdraws an unused invite (its storage goes back to the owner). */
+export async function cancelInvite(owner: string, hash: string): Promise<void> {
+  await call(owner, "cancel_invite", { code_hash: hash });
+  savePending(pending().filter((p) => !(p.owner === owner && p.hash === hash)));
+  window.dispatchEvent(new Event(PENDING_EVENT));
 }

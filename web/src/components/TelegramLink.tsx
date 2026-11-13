@@ -2,6 +2,7 @@
 // Link a Telegram chat to a NEAR account (agent §7.7), the same everywhere: one button opens Telegram,
 // then we wait for Start and confirm. The request is signed with the account's key in this browser.
 import { useState } from "react";
+import { nameOf } from "@/lib/names";
 import { agent } from "@/lib/agent";
 import { usePoll } from "@/lib/hooks";
 import { signRequest } from "@/lib/near";
@@ -28,7 +29,7 @@ export function TelegramLink({ account, purpose }: { account: string; purpose?: 
             // Open the window on the click itself (browsers block pop-ups opened later), then point it at Telegram.
             const w = window.open("about:blank", "_blank");
             try {
-              const url = (await agent.telegramLink(await signRequest(account, "telegram_link"))).url;
+              const url = (await agent.telegramLink(await signRequest(account, "telegram_link", nameOf(account) ? { name: nameOf(account) } : {}))).url;
               setLink(url);
               if (w) w.location.href = url;
             } catch (e) {

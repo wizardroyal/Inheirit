@@ -134,7 +134,7 @@ export class GithubAdapter implements SignalAdapter {
 export class HeartbeatAdapter implements SignalAdapter {
   source = "phone_heartbeat" as const;
   simulated = false;
-  trustWeight = 0.9;
+  trustWeight = 0.95;
   constructor(private readonly store: Store) {}
 
   async lastActivity(owner: OwnerSignalConfig): Promise<Date | null> {

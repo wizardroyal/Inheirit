@@ -29,7 +29,7 @@ async function send<T>(path: string, body?: unknown): Promise<T> {
 }
 
 export interface AgentProfile {
-  people: { id: string; name: string; role: "heir" | "guardian" | "friend" | "lawyer"; account?: string; email?: string; telegram?: string; eth?: string; btc?: string }[];
+  people: { id: string; name: string; role: "heir" | "guardian" | "friend" | "lawyer"; account?: string; email?: string; telegram?: string; eth?: string; btc?: string; contact?: string }[];
   vaultName?: string;
   draft?: unknown;
   setupDone?: boolean;
@@ -159,6 +159,7 @@ export const agent = {
   faucet: (signed: SignedRequest) => req<{ ok: boolean; sends: { chain: string; to: string; amount: string; txHash: string }[]; errors: string[] }>("/demo/faucet", { signed }),
   telegramStatus: (account: string) => req<{ enabled: boolean; bot?: string; linked: boolean }>(`/api/telegram/${encodeURIComponent(account)}`),
   /** One-time t.me link that binds a Telegram chat to the signing account. */
+  telegramUnlink: (signed: SignedRequest) => req<{ ok: true }>("/api/telegram/unlink", { signed }),
   telegramLink: (signed: SignedRequest) => req<{ ok: true; url: string; expires_at: string }>("/api/telegram/link", { signed }),
   intentsTokens: () => req<{ enabled: boolean; simulated?: boolean; tokens: IntentsToken[] }>("/api/intents/tokens"),
   payouts: (owner: string, heir?: string) => req<Payouts>(`/api/payouts/${encodeURIComponent(owner)}${heir ? `?heir=${encodeURIComponent(heir)}` : ""}`),

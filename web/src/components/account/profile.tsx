@@ -1,66 +1,73 @@
 "use client";
-// Profile (round 5): the owner's people, each a row with ⚙ to edit inline. Contact details are saved with
-// the agent (owner-signed) and never put on-chain. Someone used in the will can't be deleted here.
+// Profile people, one block per role: each row shows what matters for that role (an heir's wallet, a
+// guardian's status with the invite to copy), and ⚙ edits it inline. Contact is free text the agent reads
+// (an email in it is where messages go). Saved with the agent, owner-signed, never on-chain. Someone used in
+// the will can't be deleted here.
 import { useState } from "react";
-import { createPerson } from "@/lib/onboard";
-import { missingFromProfile, newId, ROLE_LABEL, roleOnWill, useProfile, type Person, type Role } from "@/lib/profile";
+import { SITE_URL } from "@/lib/config";
+import { useOpenInvites } from "@/lib/invites";
 import { nameAccounts } from "@/lib/names";
+import { missingFromProfile, newId, roleOnWill, useProfile, type Person, type Role } from "@/lib/profile";
+import { newTestReceive } from "@/lib/test-wallets";
 import type { Will } from "@/lib/will";
-import { ActionButton, Avatar, Card, ConfirmButton, ErrorNote, Field, GearButton, inputCls, Pill } from "../ui";
+import { Icon } from "../icons";
+import { ActionButton, Avatar, Card, ConfirmButton, ErrorNote, Field, GearButton, inputCls, Pill, short } from "../ui";
 
-const ROLES: Role[] = ["heir", "guardian", "friend", "lawyer"];
+const ADD_LABEL: Record<Role, string> = { heir: "Add heir", guardian: "Add guardian", lawyer: "Add lawyer", friend: "Add friend" };
 
-/** Status on the will: accepted / invited for guardians, "on your will" for the rest, else "not on your will". */
-function status(will: Will | null, p: Person): { text: string; tone: "accent" | "warn" | "neutral" } {
-  const role = roleOnWill(will, p.account);
-  if (!role) return { text: will ? "not on your will" : "saved", tone: "neutral" };
-  if (role === "guardian") {
-    const g = will!.guardians.find((x) => x.account_id === p.account)!;
-    return g.accepted ? { text: "accepted", tone: "accent" } : { text: "invited", tone: "warn" };
-  }
-  return { text: "on your will", tone: "accent" };
+function CopyInvite({ text }: { text: string }) {
+  const [done, setDone] = useState(false);
+  return (
+    <button type="button" className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-line px-3 py-1 text-sm hover:bg-accent-soft" onClick={() => navigator.clipboard.writeText(text).then(() => setDone(true))}>
+      <Icon name="copy" className="h-4 w-4" />
+      {done ? "Copied" : "Copy invite"}
+    </button>
+  );
 }
 
-export function PeopleList({ owner, will }: { owner: string; will: Will | null }) {
+export function PeopleBlock({ owner, will, role, title }: { owner: string; will: Will | null; role: Role; title: string }) {
   const [profile, save] = useProfile(owner);
-  // Everyone on the will shows here, even if they were added before profiles existed.
-  const people = [...profile.people, ...missingFromProfile(will, profile)];
+  const [invites] = useOpenInvites(owner);
+  const all = [...profile.people, ...missingFromProfile(will, profile)];
+  const people = all.filter((p) => p.role === role);
   const [open, setOpen] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const write = (next: Person[]) => save({ people: next });
+  const status = (p: Person) => {
+    if (role !== "guardian") return null;
+    const g = will?.guardians.find((x) => x.account_id === p.account);
+    if (g) return g.accepted ? <Pill tone="accent">accepted</Pill> : (<><Pill tone="warn">invited</Pill><CopyInvite text={`${SITE_URL}/guardian/${owner}`} /></>);
+    const inv = invites.find((i) => i.role === "guardian" && i.name === p.name);
+    if (inv) return (<><Pill tone="warn">invited</Pill>{inv.link && <CopyInvite text={inv.link} />}</>);
+    return <span className="text-sm text-muted">not on your will</span>;
+  };
+  const detail = (p: Person) =>
+    [role === "heir" && p.eth ? `ETH ${short(p.eth, 6)}` : "", role === "heir" && p.btc ? `BTC ${short(p.btc, 6)}` : "", p.contact ?? p.email ?? p.telegram ?? ""].filter(Boolean).join(" · ");
   return (
-    <Card title="Your people">
-      {people.length === 0 && <p className="text-muted">Nobody yet. Add your heirs, guardians, friends and a lawyer; a name is enough.</p>}
+    <Card title={title}>
+      {people.length === 0 && !adding && <p className="text-muted">Nobody yet.</p>}
       <ul className="divide-y divide-line">
         {people.map((p) => (
           <li key={p.id} className="py-3">
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <Avatar name={p.name} />
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-lg">{p.name}</span>
-                <span className="text-sm text-muted">{ROLE_LABEL[p.role]}</span>
+                {detail(p) && <span className="block truncate text-sm text-muted">{detail(p)}</span>}
               </span>
-              <Pill tone={status(will, p).tone}>{status(will, p).text}</Pill>
+              {status(p)}
               <GearButton open={open === p.id} label={`Edit ${p.name}`} onClick={() => setOpen(open === p.id ? null : p.id)} />
             </div>
             {open === p.id && (
               <PersonForm
                 person={p}
-                lockedRole={roleOnWill(will, p.account)}
                 onSave={async (np) => {
-                  const rest = people.filter((x) => x.id !== p.id);
-                  await write([...rest, np]);
+                  await write([...all.filter((x) => x.id !== p.id), np]);
                   if (np.account) nameAccounts({ [np.account]: np.name });
                   setOpen(null);
                 }}
-                onDelete={
-                  roleOnWill(will, p.account)
-                    ? null
-                    : async () => {
-                        await write(people.filter((x) => x.id !== p.id));
-                        setOpen(null);
-                      }
-                }
+                onCancel={() => setOpen(null)}
+                onDelete={roleOnWill(will, p.account) ? null : async () => (await write(all.filter((x) => x.id !== p.id)), setOpen(null))}
               />
             )}
           </li>
@@ -68,115 +75,75 @@ export function PeopleList({ owner, will }: { owner: string; will: Will | null }
       </ul>
       {adding ? (
         <PersonForm
-          owner={owner}
-          person={{ id: newId(), name: "", role: "heir" }}
-          lockedRole={null}
-          onSave={async (np) => {
-            await write([...people, np]);
-            if (np.account) nameAccounts({ [np.account]: np.name });
-            setAdding(false);
-          }}
+          person={{ id: newId(), name: "", role }}
+          onSave={async (np) => (await write([...all, np]), setAdding(false))}
           onCancel={() => setAdding(false)}
           onDelete={null}
         />
       ) : (
-        <button type="button" className="mt-3 min-h-11 rounded-lg border border-line px-4 py-2 hover:bg-accent-soft" onClick={() => setAdding(true)}>
-          + Add a person
-        </button>
+        !(role === "lawyer" && people.length > 0) && (
+          <button type="button" className="mt-2 inline-flex min-h-11 items-center gap-2 rounded-lg border border-dashed border-line px-4 py-2 hover:bg-accent-soft" onClick={() => setAdding(true)}>
+            <Icon name="plus" className="h-4 w-4" /> {ADD_LABEL[role]}
+          </button>
+        )
       )}
     </Card>
   );
 }
 
-/** Inline edit: name, role, email, Telegram, wallets. Only the name is required. */
-export function PersonForm({
-  person,
-  lockedRole,
-  onSave,
-  onDelete,
-  onCancel,
-  owner,
-}: {
-  person: Person;
-  /** Their role on the will, if any: it's changed on My will, not here. */
-  lockedRole: Role | null;
-  onSave: (p: Person) => Promise<void>;
-  onDelete: (() => Promise<void>) | null;
-  onCancel?: () => void;
-  /** Given when adding: offers "make a test person" for the NEAR account. */
-  owner?: string;
-}) {
-  const [p, setP] = useState<Person>(person);
+/** Inline edit: name, wallets (heirs, with ↻ for a test wallet) and contact. Only the name is required. */
+export function PersonForm({ person, onSave, onDelete, onCancel }: { person: Person; onSave: (p: Person) => Promise<void>; onDelete: (() => Promise<void>) | null; onCancel: () => void }) {
+  const [p, setP] = useState<Person>({ ...person, contact: person.contact ?? [person.email, person.telegram].filter(Boolean).join(", ") });
   const [err, setErr] = useState<string | null>(null);
-  const set = (k: keyof Person) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setP({ ...p, [k]: e.target.value });
-  const check = (): string | null => {
-    if (!p.name.trim()) return "Give them a name.";
-    if (p.email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(p.email)) return "That email doesn't look right.";
-    if (p.eth && !/^0x[0-9a-fA-F]{40}$/.test(p.eth)) return "An Ethereum address starts with 0x and has 40 more characters.";
-    if (p.account && !/^[a-z0-9._-]{2,64}$/.test(p.account)) return "A NEAR account looks like ada.testnet.";
-    return null;
-  };
+  const heir = p.role === "heir";
+  const wallet = (k: "eth" | "btc", label: string) => (
+    <Field label={label}>
+      <span className="flex gap-2">
+        <input className={`${inputCls} min-w-0 flex-1`} value={p[k] ?? ""} onChange={(e) => setP({ ...p, [k]: e.target.value.trim() })} />
+        <button
+          type="button"
+          title="Make a test wallet"
+          aria-label={`Make a test ${label.toLowerCase()}`}
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-line hover:bg-accent-soft"
+          onClick={() => setP({ ...p, [k]: newTestReceive()[k] })}
+        >
+          <Icon name="refresh" className="h-4 w-4" />
+        </button>
+      </span>
+    </Field>
+  );
   return (
     <div className="mt-3 space-y-3 rounded-xl border border-line bg-bg p-4">
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="Name">
-          <input className={inputCls} maxLength={64} value={p.name} onChange={set("name")} autoFocus={!person.name} />
-        </Field>
-        <Field label="Role" hint={lockedRole ? "Change their role on My will." : undefined}>
-          <select className={inputCls} value={p.role} disabled={!!lockedRole} onChange={set("role")}>
-            {ROLES.map((r) => (
-              <option key={r} value={r}>
-                {ROLE_LABEL[r]}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label="Email (optional)">
-          <input className={inputCls} type="email" value={p.email ?? ""} onChange={set("email")} />
-        </Field>
-        <Field label="Telegram (optional)">
-          <input className={inputCls} placeholder="@handle" value={p.telegram ?? ""} onChange={set("telegram")} />
-        </Field>
-        {!lockedRole && (
-        <Field label="NEAR account (optional)" hint="They can also join by an invite link.">
-          <span className="flex gap-2">
-            <input className={`${inputCls} min-w-0 flex-1`} value={p.account ?? ""} onChange={set("account")} />
-            {owner && !p.account && (
-              <ActionButton tone="quiet" onClick={async () => setP({ ...p, account: (await createPerson(owner, p.name.trim() || undefined)).accountId })}>
-                Test person
-              </ActionButton>
-            )}
-          </span>
-        </Field>
-        )}
-        <Field label="Ethereum wallet (optional)">
-          <input className={inputCls} placeholder="0x…" value={p.eth ?? ""} onChange={set("eth")} />
-        </Field>
-        <Field label="Bitcoin wallet (optional)">
-          <input className={inputCls} placeholder="tb1…" value={p.btc ?? ""} onChange={set("btc")} />
-        </Field>
-      </div>
+      <Field label="Name">
+        <input className={inputCls} maxLength={64} value={p.name} onChange={(e) => setP({ ...p, name: e.target.value })} autoFocus={!person.name} />
+      </Field>
+      {heir && (
+        <div className="grid gap-3 sm:grid-cols-2">
+          {wallet("eth", "Ethereum wallet")}
+          {wallet("btc", "Bitcoin wallet")}
+        </div>
+      )}
+      <Field label="Contact">
+        <textarea className={`${inputCls} h-20 w-full`} maxLength={500} placeholder="Email, phone, Telegram: anything that helps reach them" value={p.contact ?? ""} onChange={(e) => setP({ ...p, contact: e.target.value })} />
+      </Field>
       {err && <ErrorNote>{err}</ErrorNote>}
       <div className="flex flex-wrap items-center gap-3">
         <ActionButton
           onClick={async () => {
-            const e = check();
-            setErr(e);
-            if (!e) await onSave({ ...p, name: p.name.trim() });
+            setErr(null);
+            if (!p.name.trim()) return setErr("Give them a name.");
+            if (p.eth && !/^0x[0-9a-fA-F]{40}$/.test(p.eth)) return setErr("An Ethereum wallet starts with 0x and has 40 more characters.");
+            if (p.btc && !/^(tb1|bc1|[mn2])[a-zA-HJ-NP-Z0-9]{25,62}$/.test(p.btc)) return setErr("That Bitcoin wallet doesn't look right.");
+            // The email the agent writes to comes from the contact text (lib/profile clean).
+            await onSave({ ...p, name: p.name.trim(), email: undefined, telegram: undefined });
           }}
         >
           Save
         </ActionButton>
-        {onCancel && (
-          <button type="button" className="min-h-11 px-3 text-muted underline" onClick={onCancel}>
-            Cancel
-          </button>
-        )}
-        {onDelete ? (
-          <ConfirmButton label="Delete" question={`Delete ${person.name}?`} onConfirm={onDelete} />
-        ) : (
-          lockedRole && <span className="text-sm text-muted">Used in your will. Remove them there first to delete.</span>
-        )}
+        <button type="button" className="min-h-11 px-3 text-muted underline" onClick={onCancel}>
+          Cancel
+        </button>
+        {onDelete ? <ConfirmButton label="Delete" question={`Delete ${person.name || "them"}?`} onConfirm={onDelete} /> : person.name && <span className="text-sm text-muted">Used in your will.</span>}
       </div>
     </div>
   );

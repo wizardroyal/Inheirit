@@ -1,6 +1,7 @@
 // HTTP API of the will agent. The web app (Day 4) and demo scripts use it.
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import { type Hex, verifyMessage } from "viem";
 import { z } from "zod";
 import type { AttestationResult } from "./ai/attestation";
 import type { GuideAnswer, GuideTurn } from "./ai/heir-guide";
@@ -40,7 +41,7 @@ export interface ApiDeps {
     send(chain: "Eth" | "Btc", to: string): Promise<FaucetSend>;
   };
   /** Telegram check bot; absent when TELEGRAM_BOT_TOKEN / TELEGRAM_BOT_USERNAME aren't set. */
-  telegram?: Pick<TelegramBot, "issueLink" | "isLinked" | "username">;
+  telegram?: Pick<TelegramBot, "issueLink" | "isLinked" | "username" | "unlink">;
   /** NEAR Intents 1Click client (SIMULATED on testnet, §J.7); absent = Intents routes off. Kept
    * separate from the payout engine's client, so unsigned fund quotes can't crowd out its deposits. */
   intents?: OneClickClient;
@@ -84,8 +85,27 @@ const OwnerFields = z.object({
     .refine((m) => Object.keys(m).length <= 16, "At most 16 addresses")
     .optional(),
   github: z.union([z.string().regex(/^[A-Za-z0-9-]{1,39}$/), z.literal("")]).optional(),
-  email: z.string().email().optional(),
+  /** An empty string clears it. */
+  email: z.union([z.string().email(), z.literal("")]).optional(),
+  /**
+   * Proof that the owner controls each wallet newly added to the lists above (2026-11-13): a NEAR wallet
+   * signs a NEP-413 "wallet_proof" naming the owner; an Ethereum wallet signs walletProofText(owner, at).
+   * Wallets already on the list stay without one.
+   */
+  wallet_proofs: z
+    .array(
+      z.union([
+        z.object({ kind: z.literal("near"), signed: z.unknown() }),
+        z.object({ kind: z.literal("evm"), address: z.string().regex(/^0x[0-9a-fA-F]{40}$/), issued_at: z.number(), signature: z.string().regex(/^0x[0-9a-fA-F]+$/) }),
+      ]),
+    )
+    .max(10)
+    .optional(),
 });
+
+/** The text an Ethereum wallet signs to let `owner`'s will read its activity times (nothing else). */
+export const walletProofText = (owner: string, issuedAt: number) =>
+  `Inheirit: let ${owner}'s will read this wallet's activity times. This grants no access to funds. ${issuedAt}`;
 
 const ProfilePersonSchema = z.object({
   id: z.string().min(1).max(40),
@@ -96,6 +116,7 @@ const ProfilePersonSchema = z.object({
   telegram: z.string().max(64).optional(),
   eth: z.string().regex(/^0x[0-9a-fA-F]{40}$/).optional(),
   btc: z.string().regex(/^(tb1|bc1|[mn2])[0-9a-zA-Z]{20,90}$/).optional(),
+  contact: z.string().max(500).optional(),
 });
 const ProfileFields = z.object({
   people: z.array(ProfilePersonSchema).max(30).optional(),
@@ -239,9 +260,36 @@ export function api(deps: ApiDeps): Hono {
   app.post("/api/owners", async (c) => {
     const r = await ownerRequest(await c.req.json(), "register_owner", OwnerFields, "Watching settings must be signed by the owner");
     if (r.error) return c.json(r.error.body, r.error.status);
-    const { evm_address, evm_addresses, near_accounts, people_emails, github, email, display_name } = r.data;
+    const { evm_address, evm_addresses, near_accounts, people_emails, github, email, display_name, wallet_proofs } = r.data;
     const will = await contract.getWill(r.owner);
     if (!will) return c.json({ error: `No will for ${r.owner}` }, 404);
+    // Every wallet new to the lists must come with its own signature: pasting someone else's busy wallet
+    // would keep a will "alive" on their activity.
+    {
+      const prev = store.get().owners[r.owner];
+      const proven = new Set<string>();
+      for (const p of wallet_proofs ?? []) {
+        if (p.kind === "evm") {
+          if (Math.abs(Date.now() - p.issued_at) > 10 * 60_000) return c.json({ error: "That wallet signature has expired; connect it again" }, 400);
+          const ok = await verifyMessage({ address: p.address as Hex, message: walletProofText(r.owner, p.issued_at), signature: p.signature as Hex }).catch(() => false);
+          if (!ok) return c.json({ error: "That Ethereum wallet signature doesn't match" }, 400);
+          proven.add(p.address.toLowerCase());
+        } else {
+          try {
+            const v = await deps.auth.verify(p.signed, "wallet_proof");
+            if ((v.data as { for?: string } | undefined)?.for !== r.owner) return c.json({ error: "That NEAR wallet signed for a different will" }, 400);
+            proven.add(v.owner);
+          } catch (e) {
+            return c.json({ error: `NEAR wallet signature: ${e instanceof Error ? e.message : String(e)}` }, 400);
+          }
+        }
+      }
+      const known = new Set([...(prev?.evmAddresses ?? []), ...(prev?.evmAddress ? [prev.evmAddress] : [])].map((a) => a.toLowerCase()));
+      for (const e of [...(evm_addresses ?? []), ...(evm_address ? [evm_address] : [])])
+        if (!known.has(e.toLowerCase()) && !proven.has(e.toLowerCase())) return c.json({ error: `Connect ${e.slice(0, 6)}…${e.slice(-4)} with its wallet and sign, so we know it's yours` }, 400);
+      const knownNear = new Set(prev?.nearAccounts ?? []);
+      for (const n of near_accounts ?? []) if (!knownNear.has(n) && !proven.has(n)) return c.json({ error: `Connect ${n} with its wallet and sign, so we know it's yours` }, 400);
+    }
     // The release itself must not count as a sign of life: the will's own ETH vault (its nonce rises
     // with every slice) and an heir's receive address are refused.
     const evms = [...(evm_address ? [evm_address] : []), ...(evm_addresses ?? [])]; // "" clears, nothing to check
@@ -278,7 +326,7 @@ export function api(deps: ApiDeps): Hono {
         peopleEmails: people_emails ?? prev?.peopleEmails,
         displayName: display_name ?? prev?.displayName,
         github: github === "" ? undefined : (github ?? prev?.github),
-        email: email ?? prev?.email,
+        email: email === "" ? undefined : (email ?? prev?.email),
         watchedSince,
       };
     });
@@ -475,9 +523,17 @@ export function api(deps: ApiDeps): Hono {
   // Always signed: a chat linked to someone else's account could keep their will "alive".
   app.post("/api/telegram/link", async (c) => {
     if (!deps.telegram) return c.json({ error: "Telegram is not configured on this agent" }, 503);
-    const r = await ownerRequest(await c.req.json(), "telegram_link", z.object({}).passthrough(), "Linking Telegram must be signed by the account");
+    const r = await ownerRequest(await c.req.json(), "telegram_link", z.object({ name: z.string().max(64).optional() }).passthrough(), "Linking Telegram must be signed by the account");
     if (r.error) return c.json(r.error.body, r.error.status);
-    return c.json({ ok: true, account: r.owner, ...deps.telegram.issueLink(r.owner) });
+    return c.json({ ok: true, account: r.owner, ...deps.telegram.issueLink(r.owner, r.data.name?.replace(/[^\p{L}\p{N} '.-]/gu, "").trim() || undefined) });
+  });
+
+  app.post("/api/telegram/unlink", async (c) => {
+    if (!deps.telegram) return c.json({ error: "Telegram is not configured on this agent" }, 503);
+    const r = await ownerRequest(await c.req.json(), "telegram_link", z.object({}).passthrough(), "Unlinking Telegram must be signed by the account");
+    if (r.error) return c.json(r.error.body, r.error.status);
+    deps.telegram.unlink(r.owner);
+    return c.json({ ok: true });
   });
 
   app.get("/api/telegram/:account", (c) => {

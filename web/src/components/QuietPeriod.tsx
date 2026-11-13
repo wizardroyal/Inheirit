@@ -37,7 +37,7 @@ export function QuietPeriod({ owner, evm, value, onChange }: { owner: string; ev
   return (
     <div className="flex flex-col gap-1 text-sm">
       <label className="font-medium" htmlFor="quiet-days">
-        Checks start after this many quiet days
+        Checks start after these many days of signal silence
       </label>
       <input
         id="quiet-days"
@@ -46,19 +46,11 @@ export function QuietPeriod({ owner, evm, value, onChange }: { owner: string; ev
         value={value ?? ""}
         onChange={(e) => onChange(e.target.value === "" ? null : Number(e.target.value))}
       />
-      <span className="text-muted">Choose a number. We suggest one from how often you&apos;re usually active.</span>
-      <span className="flex flex-wrap items-center gap-2 text-muted">
-        {!b
-          ? "Reading your transaction history…"
-          : b.medianGapS
-            ? `You usually transact ${everyPhrase(b.medianGapS)} (last 90 days). Suggestion: ${suggested} days.`
-            : `Not enough history to say what's usual for you. Suggestion: ${suggested} days.`}
-        {suggested !== null && value !== suggested && (
-          <button type="button" className="min-h-11 rounded-lg border border-line px-3 py-1 text-ink hover:bg-accent-soft" onClick={() => onChange(suggested)}>
-            Use {suggested} days
-          </button>
-        )}
-      </span>
+      {suggested !== null && value !== suggested && (
+        <button type="button" className="min-h-11 self-start rounded-lg border border-line px-3 py-1 text-ink hover:bg-accent-soft" onClick={() => onChange(suggested)}>
+          Use {suggested} days{b?.medianGapS ? ` (you're usually active ${everyPhrase(b.medianGapS)})` : ""}
+        </button>
+      )}
     </div>
   );
 }

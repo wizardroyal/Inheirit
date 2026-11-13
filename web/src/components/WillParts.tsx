@@ -13,7 +13,7 @@ import { ActionButton, ExtLink, Pill, short, SimulatedTag } from "./ui";
 export const SOURCES: { source: SignalSource; simulated: boolean; weight: number }[] = [
   { source: "near_onchain", simulated: false, weight: 0.9 },
   { source: "evm_onchain", simulated: false, weight: 0.9 },
-  { source: "phone_heartbeat", simulated: false, weight: 0.9 },
+  { source: "phone_heartbeat", simulated: false, weight: 0.95 },
   { source: "telegram", simulated: false, weight: 0.7 },
   { source: "github", simulated: false, weight: 0.5 },
   { source: "google_calendar", simulated: true, weight: 0.7 },

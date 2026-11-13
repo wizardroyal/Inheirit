@@ -2,22 +2,24 @@
 // My will (round 5): status and actions at the top, the will in plain words (always real timings; a
 // Speedrun badge instead of minutes), then sections that each open for editing with ⚙.
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { WillGate } from "@/components/account/home";
-import { InviteByLink } from "@/components/account/parts";
 import { CloseWill } from "@/components/account/will";
+import { Icon } from "@/components/icons";
 import { ActionButton, Avatar, Card, ErrorNote, Field, GearButton, inputCls, Pill, Stepper } from "@/components/ui";
 import { useAccount } from "@/lib/account";
 import { agent } from "@/lib/agent";
-import { REAL_SCHEDULE } from "@/lib/config";
+import { REAL_SCHEDULE, SITE_URL } from "@/lib/config";
 import { acceptAsGuardians, savedPolicy } from "@/lib/demo";
 import { peopleOf, saveWillPeople, type WillPeople } from "@/lib/edit-will";
 import { useOverview, usePoll } from "@/lib/hooks";
 import { keys } from "@/lib/keys";
 import { accountLabel, nameOf, useAccountLabel, useNames } from "@/lib/names";
 import { call, formatNear } from "@/lib/near";
+import { cancelInvite, createInvite, nameClaimedInvites, useOpenInvites, type InviteRole, type OpenInvite } from "@/lib/invites";
 import { createPerson } from "@/lib/onboard";
-import { useProfile, type Role } from "@/lib/profile";
+import { newTestReceive } from "@/lib/test-wallets";
+import { newId, useProfile, type Person } from "@/lib/profile";
 import { isSpeedrun } from "@/lib/speedrun";
 import { dateText, duration, pausedUntil, schedule, stateLabel, stateName, type Will } from "@/lib/will";
 
@@ -52,7 +54,9 @@ function StatusBar({ status, children }: { status: string; children?: React.Reac
   );
 }
 
-/** Pause (1-90 days, from All good), Resume, and a jump to Close. */
+const btn = "inline-flex min-h-11 items-center gap-2 rounded-lg border border-line px-4 py-2 hover:bg-accent-soft";
+
+/** Try a speedrun and Pause (1-90 days, from All good), or Resume. Close is at the bottom of the page. */
 function Actions({ will }: { will: Will }) {
   const { refresh } = useAccount();
   const [pausing, setPausing] = useState(false);
@@ -60,12 +64,17 @@ function Actions({ will }: { will: Will }) {
   const s = stateName(will.state);
   // Testnet: any will can be run on a clock of minutes to see how it would execute.
   const speedrun = (
-    <Link href="/account/speedrun" className="inline-flex min-h-11 items-center rounded-lg border border-line px-4 py-2 hover:bg-accent-soft">
+    <Link href="/account/speedrun" className={btn}>
+      <Icon name="ff" className="h-4 w-4" />
       {isSpeedrun(will) ? "Speedrun" : "Try a speedrun"}
     </Link>
   );
   if (s === "Paused")
-    return <ActionButton onClick={() => call(will.owner, "resume_will").then(refresh)}>Resume</ActionButton>;
+    return (
+      <button type="button" className={btn} onClick={() => call(will.owner, "resume_will").then(refresh)}>
+        <Icon name="play" className="h-4 w-4" /> Resume
+      </button>
+    );
   if (s !== "Active") return isSpeedrun(will) ? speedrun : null;
   return (
     <>
@@ -81,13 +90,10 @@ function Actions({ will }: { will: Will }) {
           </button>
         </span>
       ) : (
-        <button type="button" className="min-h-11 rounded-lg border border-line px-4 py-2 hover:bg-accent-soft" onClick={() => setPausing(true)}>
-          Pause
+        <button type="button" className={btn} onClick={() => setPausing(true)}>
+          <Icon name="pause" className="h-4 w-4" /> Pause
         </button>
       )}
-      <a href="#close" className="inline-flex min-h-11 items-center rounded-lg border border-line px-4 py-2 hover:bg-danger-soft hover:text-danger">
-        Close
-      </a>
     </>
   );
 }
@@ -176,19 +182,9 @@ function MyWill({ will }: { will: Will }) {
   );
 }
 
-/** A section card with ⚙ to edit in place. */
-function Section({ title, editable, children, editor }: { title: string; editable: boolean; children: React.ReactNode; editor: (close: () => void) => React.ReactNode }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <Card title={title} aside={editable ? <GearButton open={open} label={`Edit ${title.toLowerCase()}`} onClick={() => setOpen(!open)} /> : undefined}>
-      {open ? editor(() => setOpen(false)) : children}
-    </Card>
-  );
-}
-
 function PersonRow({ name, right }: { name: string; right?: React.ReactNode }) {
   return (
-    <li className="flex items-center gap-3 py-2">
+    <li className="flex flex-wrap items-center gap-3 py-2">
       <Avatar name={name} />
       <span className="min-w-0 flex-1 truncate text-lg">{name}</span>
       {right}
@@ -196,236 +192,39 @@ function PersonRow({ name, right }: { name: string; right?: React.ReactNode }) {
   );
 }
 
-/** Save with update_will; show the error under the button. */
-function useSave(will: Will, close: () => void) {
-  const { refresh } = useAccount();
-  return async (next: WillPeople) => {
-    await saveWillPeople(will, next);
-    refresh();
-    close();
-  };
-}
-
-/** Picks a person for a role: from Profile (with a NEAR account), by account, or a new test person. */
-function AddPerson({ owner, role, taken, onAdd }: { owner: string; role: Role; taken: string[]; onAdd: (account: string, name: string) => void }) {
-  const [profile] = useProfile(owner);
-  const [account, setAccount] = useState("");
-  const options = profile.people.filter((p) => p.role === role && p.account && !taken.includes(p.account));
+function CopyButton({ text, label = "Copy invite" }: { text: string; label?: string }) {
+  const [done, setDone] = useState(false);
   return (
-    <div className="space-y-2">
-      {options.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {options.map((p) => (
-            <button key={p.id} type="button" className="min-h-11 rounded-lg border border-dashed border-line px-3 py-2 hover:bg-accent-soft" onClick={() => onAdd(p.account!, p.name)}>
-              + {p.name}
-            </button>
-          ))}
-        </div>
-      )}
-      <div className="flex flex-wrap items-end gap-2">
-        <Field label="NEAR account">
-          <input className={inputCls} value={account} onChange={(e) => setAccount(e.target.value.trim())} placeholder="ada.testnet" />
-        </Field>
-        <ActionButton tone="quiet" disabled={!/^[a-z0-9._-]{2,64}$/.test(account) || taken.includes(account)} onClick={async () => (onAdd(account, nameOf(account) ?? account.split(".")[0]), setAccount(""))}>
-          Add
-        </ActionButton>
-        <ActionButton tone="quiet" onClick={async () => { const p = await createPerson(owner); onAdd(p.accountId, p.name); }}>
-          New test person
-        </ActionButton>
-      </div>
-    </div>
-  );
-}
-
-function HeirsSection({ will, editable }: { will: Will; editable: boolean }) {
-  return (
-    <Section
-      title="Heirs"
-      editable={editable}
-      editor={(close) => <HeirsEditor will={will} close={close} />}
+    <button
+      type="button"
+      className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-line px-3 py-1 text-sm hover:bg-accent-soft"
+      onClick={() => navigator.clipboard.writeText(text).then(() => setDone(true))}
     >
-      <ul className="divide-y divide-line">
-        {will.heirs.map((h) => (
-          <PersonRow key={h.account_id} name={h.name} right={<span className="text-lg text-muted">{h.near_share_bps / 100}%</span>} />
-        ))}
-      </ul>
-    </Section>
+      <Icon name="copy" className="h-4 w-4" />
+      {done ? "Copied" : label}
+    </button>
   );
 }
 
-function HeirsEditor({ will, close }: { will: Will; close: () => void }) {
-  const [p, setP] = useState(() => peopleOf(will));
-  const [profile] = useProfile(will.owner);
-  const save = useSave(will, close);
-  const total = p.heirs.reduce((s, h) => s + (Number(h.pct) || 0), 0);
+function AddButton({ label, onClick }: { label: string; onClick: () => void }) {
   return (
-    <div className="space-y-3">
-      <ul className="divide-y divide-line">
-        {p.heirs.map((h, i) => (
-          <li key={h.account_id} className="flex flex-wrap items-center gap-3 py-2">
-            <Avatar name={h.name} />
-            <span className="min-w-0 flex-1 truncate text-lg">{h.name}</span>
-            <span className="relative">
-              <input
-                className={`${inputCls} w-24 pr-7`}
-                inputMode="decimal"
-                aria-label={`${h.name}'s share in percent`}
-                value={h.pct}
-                onChange={(e) => setP({ ...p, heirs: p.heirs.map((x, j) => (j === i ? { ...x, pct: Number(e.target.value) || 0 } : x)) })}
-              />
-              <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted">%</span>
-            </span>
-            {p.heirs.length > 1 && (
-              <button type="button" className="min-h-11 px-3 text-muted underline" onClick={() => setP({ ...p, heirs: p.heirs.filter((_, j) => j !== i) })}>
-                Remove
-              </button>
-            )}
-          </li>
-        ))}
-      </ul>
-      <p className={total === 100 ? "text-muted" : "text-danger"}>Shares: {total}% of 100%</p>
-      <AddPerson
-        owner={will.owner}
-        role="heir"
-        taken={[...p.heirs.map((h) => h.account_id), ...p.guardians]}
-        onAdd={(account, name) => {
-          const pp = profile.people.find((x) => x.account === account);
-          setP({ ...p, heirs: [...p.heirs, { account_id: account, name, pct: 0, eth: pp?.eth, btc: pp?.btc }] });
-        }}
-      />
-      <EditorButtons onSave={() => save(p)} onCancel={close} disabled={total !== 100} />
-    </div>
+    <button type="button" className="mt-2 inline-flex min-h-11 items-center gap-2 rounded-lg border border-dashed border-line px-4 py-2 hover:bg-accent-soft" onClick={onClick}>
+      <Icon name="plus" className="h-4 w-4" /> {label}
+    </button>
   );
 }
 
-function GuardiansSection({ will, editable }: { will: Will; editable: boolean }) {
-  const label = useAccountLabel();
+function RemoveButton({ onClick }: { onClick: () => void }) {
   return (
-    <Section title="Guardians" editable={editable} editor={(close) => <GuardiansEditor will={will} close={close} />}>
-      <ul className="divide-y divide-line">
-        {will.guardians.map((g) => (
-          <PersonRow key={g.account_id} name={label(g.account_id)} right={<Pill tone={g.accepted ? "accent" : "warn"}>{g.accepted ? "accepted" : "invited"}</Pill>} />
-        ))}
-      </ul>
-      <p className="mt-2 text-muted">
-        {will.guardian_threshold} of {will.guardians.length} must confirm. Invited guardians accept on their page: <Link className="text-accent underline" href={`/guardian/${will.owner}`}>guardian page</Link>.
-      </p>
-    </Section>
-  );
-}
-
-function GuardiansEditor({ will, close }: { will: Will; close: () => void }) {
-  const [p, setP] = useState(() => peopleOf(will));
-  const label = useAccountLabel();
-  const { refresh } = useAccount();
-  const [err, setErr] = useState<string | null>(null);
-  return (
-    <div className="space-y-3">
-      <ul className="divide-y divide-line">
-        {p.guardians.map((g) => (
-          <PersonRow
-            key={g}
-            name={label(g)}
-            right={
-              <button type="button" className="min-h-11 px-3 text-muted underline" onClick={() => setP({ ...p, guardians: p.guardians.filter((x) => x !== g), threshold: Math.min(p.threshold, Math.max(1, p.guardians.length - 1)) })}>
-                Remove
-              </button>
-            }
-          />
-        ))}
-      </ul>
-      <Field label="How many must confirm" group>
-        <Stepper label="guardians who must confirm" value={p.threshold} min={1} max={Math.max(1, p.guardians.length)} onChange={(n) => setP({ ...p, threshold: n })} />
-      </Field>
-      <AddPerson owner={will.owner} role="guardian" taken={[...p.guardians, ...p.heirs.map((h) => h.account_id)]} onAdd={(a) => setP({ ...p, guardians: [...p.guardians, a] })} />
-      {err && <ErrorNote>{err}</ErrorNote>}
-      <EditorButtons
-        disabled={p.guardians.length < 1}
-        onCancel={close}
-        onSave={async () => {
-          setErr(null);
-          const added = p.guardians.filter((g) => !will.guardians.some((x) => x.account_id === g));
-          await saveWillPeople(will, p);
-          // Test people made here hold their keys in this browser: they accept at once.
-          const local = added.filter((g) => keys.secret(g));
-          if (local.length) await acceptAsGuardians(will.owner, local, () => {}).catch((e) => setErr(String(e)));
-          refresh();
-          close();
-        }}
-      />
-      <p className="text-sm text-muted">New guardians count once they accept.</p>
-    </div>
-  );
-}
-
-function LawyerFriendsSection({ will, editable }: { will: Will; editable: boolean }) {
-  const label = useAccountLabel();
-  return (
-    <Section title="Lawyer and friends" editable={editable} editor={(close) => <LawyerFriendsEditor will={will} close={close} />}>
-      <ul className="divide-y divide-line">
-        {will.lawyer && <PersonRow name={label(will.lawyer)} right={<span className="text-muted">Lawyer</span>} />}
-        {will.contacts.map((c) => (
-          <PersonRow key={c} name={label(c)} right={<span className="text-muted">Friend</span>} />
-        ))}
-      </ul>
-      {!will.lawyer && !will.contacts.length && <p className="text-muted">None yet. Friends can only stop things; a lawyer can speed up the release, never skip a step.</p>}
-    </Section>
-  );
-}
-
-function LawyerFriendsEditor({ will, close }: { will: Will; close: () => void }) {
-  const [p, setP] = useState(() => peopleOf(will));
-  const label = useAccountLabel();
-  const save = useSave(will, close);
-  const taken = [...p.contacts, ...(p.lawyer ? [p.lawyer] : []), ...p.heirs.map((h) => h.account_id)];
-  return (
-    <div className="space-y-4">
-      <div>
-        <p className="mb-2 font-medium">Lawyer</p>
-        {p.lawyer ? (
-          <ul>
-            <PersonRow
-              name={label(p.lawyer)}
-              right={
-                <button type="button" className="min-h-11 px-3 text-muted underline" onClick={() => setP({ ...p, lawyer: null })}>
-                  Remove
-                </button>
-              }
-            />
-          </ul>
-        ) : (
-          <AddPerson owner={will.owner} role="lawyer" taken={taken} onAdd={(a) => setP({ ...p, lawyer: a })} />
-        )}
-      </div>
-      <div>
-        <p className="mb-2 font-medium">Friends</p>
-        <ul className="divide-y divide-line">
-          {p.contacts.map((c) => (
-            <PersonRow
-              key={c}
-              name={label(c)}
-              right={
-                <button type="button" className="min-h-11 px-3 text-muted underline" onClick={() => setP({ ...p, contacts: p.contacts.filter((x) => x !== c) })}>
-                  Remove
-                </button>
-              }
-            />
-          ))}
-        </ul>
-        <AddPerson owner={will.owner} role="friend" taken={taken} onAdd={(a) => setP({ ...p, contacts: [...p.contacts, a] })} />
-      </div>
-      <EditorButtons onSave={() => save(p)} onCancel={close} />
-      <details className="text-sm">
-        <summary className="min-h-11 cursor-pointer py-2 text-muted">Someone without a NEAR account? Invite them by link</summary>
-        <InviteByLink owner={will.owner} hasLawyer={!!will.lawyer} will={will} />
-      </details>
-    </div>
+    <button type="button" className="min-h-11 px-3 text-muted underline" onClick={onClick}>
+      Remove
+    </button>
   );
 }
 
 function EditorButtons({ onSave, onCancel, disabled }: { onSave: () => Promise<unknown>; onCancel: () => void; disabled?: boolean }) {
   return (
-    <div className="flex flex-wrap items-center gap-3">
+    <div className="mt-3 flex flex-wrap items-center gap-3">
       <ActionButton disabled={disabled} onClick={onSave}>
         Save
       </ActionButton>
@@ -433,5 +232,389 @@ function EditorButtons({ onSave, onCancel, disabled }: { onSave: () => Promise<u
         Cancel
       </button>
     </div>
+  );
+}
+
+/** A wallet box with ↻ next to it that fills a fresh test address. */
+function WalletInput({ label, value, onChange, fill }: { label: string; value: string; onChange: (v: string) => void; fill: () => void }) {
+  return (
+    <Field label={label}>
+      <span className="flex gap-2">
+        <input className={`${inputCls} min-w-0 flex-1`} value={value} onChange={(e) => onChange(e.target.value.trim())} />
+        <button type="button" title="Make a test wallet" aria-label={`Make a test ${label.toLowerCase()}`} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-line hover:bg-accent-soft" onClick={fill}>
+          <Icon name="refresh" className="h-4 w-4" />
+        </button>
+      </span>
+    </Field>
+  );
+}
+
+type HeirRow = WillPeople["heirs"][number];
+
+/** Heirs: shares and Remove under ⚙; "Add heir" opens a small form (name and wallets, or someone from Profile). */
+function HeirsSection({ will, editable }: { will: Will; editable: boolean }) {
+  const { refresh } = useAccount();
+  const [editing, setEditing] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [p, setP] = useState<WillPeople>(() => peopleOf(will));
+  const [err, setErr] = useState<string | null>(null);
+  const total = p.heirs.reduce((s, h) => s + (Number(h.pct) || 0), 0);
+  const close = () => (setEditing(false), setAdding(false), setErr(null));
+  const open = () => (setP(peopleOf(will)), setEditing(true));
+  return (
+    <Card title="Heirs" aside={editable ? <GearButton open={editing} label="Edit heirs" onClick={() => (editing ? close() : open())} /> : undefined}>
+      <ul className="divide-y divide-line">
+        {(editing ? p.heirs : peopleOf(will).heirs).map((h, i) => (
+          <PersonRow
+            key={h.account_id}
+            name={h.name}
+            right={
+              editing ? (
+                <>
+                  <span className="relative">
+                    <input
+                      className={`${inputCls} w-24 pr-7`}
+                      inputMode="decimal"
+                      aria-label={`${h.name}'s share in percent`}
+                      value={h.pct}
+                      onChange={(e) => setP({ ...p, heirs: p.heirs.map((x, j) => (j === i ? { ...x, pct: Number(e.target.value) || 0 } : x)) })}
+                    />
+                    <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted">%</span>
+                  </span>
+                  {p.heirs.length > 1 && <RemoveButton onClick={() => setP({ ...p, heirs: p.heirs.filter((_, j) => j !== i) })} />}
+                </>
+              ) : (
+                <span className="text-lg text-muted">{h.pct}%</span>
+              )
+            }
+          />
+        ))}
+      </ul>
+      {editing && <p className={total === 100 ? "text-muted" : "text-danger"}>Shares: {total}% of 100%</p>}
+      {editable &&
+        (adding ? (
+          <AddHeir
+            will={will}
+            taken={[...(editing ? p : peopleOf(will)).heirs.map((h) => h.account_id), ...will.guardians.map((g) => g.account_id)]}
+            onCancel={() => setAdding(false)}
+            onAdd={(h) => {
+              const base = editing ? p : peopleOf(will);
+              setP({ ...base, heirs: [...base.heirs, h] });
+              setEditing(true);
+              setAdding(false);
+            }}
+          />
+        ) : (
+          <AddButton label="Add heir" onClick={() => setAdding(true)} />
+        ))}
+      {err && <ErrorNote>{err}</ErrorNote>}
+      {editing && (
+        <EditorButtons
+          disabled={total !== 100}
+          onCancel={close}
+          onSave={async () => {
+            setErr(null);
+            try {
+              await saveWillPeople(will, p);
+              refresh();
+              close();
+            } catch (e) {
+              setErr(e instanceof Error ? e.message : String(e));
+            }
+          }}
+        />
+      )}
+    </Card>
+  );
+}
+
+function AddHeir({ will, taken, onAdd, onCancel }: { will: Will; taken: string[]; onAdd: (h: HeirRow) => void; onCancel: () => void }) {
+  const [profile, saveProfile] = useProfile(will.owner);
+  const [from, setFrom] = useState<Person | null>(null);
+  const [name, setName] = useState("");
+  const [eth, setEth] = useState("");
+  const [btc, setBtc] = useState("");
+  const [pct, setPct] = useState("");
+  const [err, setErr] = useState<string | null>(null);
+  const options = profile.people.filter((x) => x.role === "heir" && !(x.account && taken.includes(x.account)));
+  const pick = (x: Person) => (setFrom(x), setName(x.name), setEth(x.eth ?? ""), setBtc(x.btc ?? ""));
+  const fill = (k: "eth" | "btc") => {
+    const r = newTestReceive();
+    if (k === "eth") setEth(r.eth);
+    else setBtc(r.btc);
+  };
+  return (
+    <div className="mt-3 space-y-3 rounded-xl border border-line bg-bg p-4">
+      {options.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {options.map((x) => (
+            <button
+              key={x.id}
+              type="button"
+              aria-pressed={from?.id === x.id}
+              className={`min-h-11 rounded-lg border border-dashed border-line px-3 py-2 hover:bg-accent-soft ${from?.id === x.id ? "bg-accent-soft" : ""}`}
+              onClick={() => pick(x)}
+            >
+              {x.name}
+            </button>
+          ))}
+        </div>
+      )}
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label="Name">
+          <input className={inputCls} maxLength={64} value={name} onChange={(e) => (setName(e.target.value), setFrom(null))} autoFocus />
+        </Field>
+        <Field label="Share">
+          <span className="relative">
+            <input className={`${inputCls} w-24 pr-7`} inputMode="decimal" value={pct} onChange={(e) => setPct(e.target.value)} placeholder="0" />
+            <span className="pointer-events-none absolute left-[4.6rem] top-1/2 -translate-y-1/2 text-sm text-muted">%</span>
+          </span>
+        </Field>
+        <WalletInput label="Ethereum wallet" value={eth} onChange={setEth} fill={() => fill("eth")} />
+        <WalletInput label="Bitcoin wallet" value={btc} onChange={setBtc} fill={() => fill("btc")} />
+      </div>
+      {err && <ErrorNote>{err}</ErrorNote>}
+      <div className="flex flex-wrap items-center gap-3">
+        <ActionButton
+          disabled={!name.trim()}
+          onClick={async () => {
+            setErr(null);
+            if (eth && !/^0x[0-9a-fA-F]{40}$/.test(eth)) return setErr("An Ethereum wallet starts with 0x and has 40 more characters.");
+            if (btc && !/^(tb1|bc1|[mn2])[a-zA-HJ-NP-Z0-9]{25,62}$/.test(btc)) return setErr("That Bitcoin wallet doesn't look right.");
+            // Testnet: someone without a NEAR account gets a funded test account (not shown).
+            const account = from?.account ?? (await createPerson(will.owner, name.trim())).accountId;
+            const row: Person = { ...(from ?? { id: newId(), role: "heir" as const }), name: name.trim(), account, ...(eth ? { eth } : {}), ...(btc ? { btc } : {}) };
+            await saveProfile({ people: from ? profile.people.map((x) => (x.id === from.id ? row : x)) : [...profile.people, row] }).catch(() => {});
+            onAdd({ account_id: account, name: name.trim(), pct: Number(pct) || 0, eth: eth || undefined, btc: btc || undefined });
+          }}
+        >
+          Add
+        </ActionButton>
+        <button type="button" className="min-h-11 px-3 text-muted underline" onClick={onCancel}>
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Adds a guardian, lawyer or friend: someone from Profile who has an account goes straight onto the will;
+ * anyone else is invited by name, and the link to send them shows on their row until they accept.
+ */
+function AddByName({ will, role, onDone }: { will: Will; role: InviteRole; onDone: () => void }) {
+  const { refresh } = useAccount();
+  const [profile, saveProfile] = useProfile(will.owner);
+  const [name, setName] = useState("");
+  const [err, setErr] = useState<string | null>(null);
+  const onWill = new Set([...will.heirs.map((h) => h.account_id), ...will.guardians.map((g) => g.account_id), ...will.contacts, ...(will.lawyer ? [will.lawyer] : [])]);
+  const options = profile.people.filter((x) => x.role === role && !(x.account && onWill.has(x.account)));
+  const addAccount = async (account: string) => {
+    const p = peopleOf(will);
+    if (role === "guardian") p.guardians = [...p.guardians, account];
+    else if (role === "lawyer") p.lawyer = account;
+    else p.contacts = [...p.contacts, account];
+    await saveWillPeople(will, p);
+    // Test people made in this browser accept at once.
+    if (role === "guardian" && keys.secret(account)) await acceptAsGuardians(will.owner, [account], () => {});
+  };
+  const invite = async (n: string, person?: Person) => {
+    await createInvite(will.owner, role, n);
+    if (!person) await saveProfile({ people: [...profile.people, { id: newId(), name: n, role }] }).catch(() => {});
+  };
+  const run = (f: () => Promise<unknown>) => async () => {
+    setErr(null);
+    try {
+      await f();
+      refresh();
+      onDone();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    }
+  };
+  return (
+    <div className="mt-3 space-y-3 rounded-xl border border-line bg-bg p-4">
+      {options.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {options.map((x) => (
+            <ActionButton key={x.id} tone="quiet" onClick={run(() => (x.account ? addAccount(x.account) : invite(x.name, x)))}>
+              + {x.name}
+            </ActionButton>
+          ))}
+        </div>
+      )}
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+        <Field label="Name">
+          <input className={`${inputCls} min-w-0`} maxLength={64} value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+        </Field>
+        <ActionButton disabled={!name.trim()} onClick={run(() => invite(name.trim()))}>
+          Invite
+        </ActionButton>
+        <button type="button" className="min-h-11 px-3 text-muted underline" onClick={onDone}>
+          Cancel
+        </button>
+      </div>
+      <p className="text-sm text-muted">
+        You get a link to send them. Opening it makes them a key to sign in with.
+        {role === "guardian" && (
+          <>
+            {" "}
+            Testing alone?{" "}
+            <button type="button" className="underline" onClick={run(async () => addAccount((await createPerson(will.owner, name.trim() || undefined)).accountId))}>
+              Add a test guardian who accepts now
+            </button>
+            .
+          </>
+        )}
+      </p>
+      {err && <ErrorNote>{err}</ErrorNote>}
+    </div>
+  );
+}
+
+function InviteRows({ invites, editing, owner }: { invites: OpenInvite[]; editing: boolean; owner: string }) {
+  return (
+    <>
+      {invites.map((i) => (
+        <PersonRow
+          key={i.hash}
+          name={i.name || "Invited"}
+          right={
+            <>
+              <Pill tone="warn">invited</Pill>
+              {editing ? <RemoveButton onClick={() => void cancelInvite(owner, i.hash)} /> : i.link && <CopyButton text={i.link} />}
+            </>
+          }
+        />
+      ))}
+    </>
+  );
+}
+
+function GuardiansSection({ will, editable }: { will: Will; editable: boolean }) {
+  const label = useAccountLabel();
+  const { refresh } = useAccount();
+  const [invites] = useOpenInvites(will.owner);
+  const [editing, setEditing] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [p, setP] = useState<WillPeople>(() => peopleOf(will));
+  const [err, setErr] = useState<string | null>(null);
+  const key = will.guardians.map((g) => g.account_id).join(",");
+  useEffect(() => {
+    void nameClaimedInvites(will.owner, [
+      ...will.guardians.map((g) => ({ role: "guardian" as const, account: g.account_id })),
+      ...will.contacts.map((c) => ({ role: "friend" as const, account: c })),
+      ...(will.lawyer ? [{ role: "lawyer" as const, account: will.lawyer }] : []),
+    ]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [will.owner, key, will.lawyer, will.contacts.join(",")]);
+  const close = () => (setEditing(false), setErr(null));
+  const pending = invites.filter((i) => i.role === "guardian");
+  const shown = editing ? p.guardians : will.guardians.map((g) => g.account_id);
+  return (
+    <Card title="Guardians" aside={editable ? <GearButton open={editing} label="Edit guardians" onClick={() => (editing ? close() : (setP(peopleOf(will)), setEditing(true)))} /> : undefined}>
+      <ul className="divide-y divide-line">
+        {shown.map((g) => {
+          const accepted = will.guardians.find((x) => x.account_id === g)?.accepted;
+          return (
+            <PersonRow
+              key={g}
+              name={label(g)}
+              right={
+                editing ? (
+                  <RemoveButton onClick={() => setP({ ...p, guardians: p.guardians.filter((x) => x !== g), threshold: Math.min(p.threshold, Math.max(1, p.guardians.length - 1)) })} />
+                ) : (
+                  <>
+                    <Pill tone={accepted ? "accent" : "warn"}>{accepted ? "accepted" : "invited"}</Pill>
+                    {!accepted && <CopyButton text={`${SITE_URL}/guardian/${will.owner}`} />}
+                  </>
+                )
+              }
+            />
+          );
+        })}
+        <InviteRows invites={pending} editing={editing} owner={will.owner} />
+      </ul>
+      {editing ? (
+        <Field label="How many must confirm" group>
+          <Stepper label="guardians who must confirm" value={p.threshold} min={1} max={Math.max(1, p.guardians.length)} onChange={(n) => setP({ ...p, threshold: n })} />
+        </Field>
+      ) : (
+        <p className="mt-2 text-muted">
+          {will.guardian_threshold} of {will.guardians.length} must confirm.{pending.length ? " Invited people count once they accept." : ""}
+        </p>
+      )}
+      {editable && !editing && (adding ? <AddByName will={will} role="guardian" onDone={() => setAdding(false)} /> : <AddButton label="Add guardian" onClick={() => setAdding(true)} />)}
+      {err && <ErrorNote>{err}</ErrorNote>}
+      {editing && (
+        <EditorButtons
+          disabled={p.guardians.length < 1}
+          onCancel={close}
+          onSave={async () => {
+            setErr(null);
+            try {
+              await saveWillPeople(will, p);
+              refresh();
+              close();
+            } catch (e) {
+              setErr(e instanceof Error ? e.message : String(e));
+            }
+          }}
+        />
+      )}
+    </Card>
+  );
+}
+
+function LawyerFriendsSection({ will, editable }: { will: Will; editable: boolean }) {
+  const label = useAccountLabel();
+  const { refresh } = useAccount();
+  const [invites] = useOpenInvites(will.owner);
+  const [editing, setEditing] = useState(false);
+  const [adding, setAdding] = useState<InviteRole | null>(null);
+  const [p, setP] = useState<WillPeople>(() => peopleOf(will));
+  const [err, setErr] = useState<string | null>(null);
+  const cur = editing ? p : peopleOf(will);
+  const lawyerInvite = invites.filter((i) => i.role === "lawyer");
+  const friendInvites = invites.filter((i) => i.role === "friend");
+  const close = () => (setEditing(false), setErr(null));
+  return (
+    <Card title="Lawyer and friends" aside={editable ? <GearButton open={editing} label="Edit lawyer and friends" onClick={() => (editing ? close() : (setP(peopleOf(will)), setEditing(true)))} /> : undefined}>
+      <ul className="divide-y divide-line">
+        {cur.lawyer && <PersonRow name={label(cur.lawyer)} right={editing ? <RemoveButton onClick={() => setP({ ...p, lawyer: null })} /> : <span className="text-muted">Lawyer</span>} />}
+        <InviteRows invites={lawyerInvite} editing={editing} owner={will.owner} />
+        {cur.contacts.map((c) => (
+          <PersonRow key={c} name={label(c)} right={editing ? <RemoveButton onClick={() => setP({ ...p, contacts: p.contacts.filter((x) => x !== c) })} /> : <span className="text-muted">Friend</span>} />
+        ))}
+        <InviteRows invites={friendInvites} editing={editing} owner={will.owner} />
+      </ul>
+      {!cur.lawyer && !cur.contacts.length && !invites.some((i) => i.role !== "guardian") && <p className="text-muted">Friends can only stop things; a lawyer can speed up the release, never skip a step.</p>}
+      {editable &&
+        !editing &&
+        (adding ? (
+          <AddByName will={will} role={adding} onDone={() => setAdding(null)} />
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {!will.lawyer && !lawyerInvite.length && <AddButton label="Add lawyer" onClick={() => setAdding("lawyer")} />}
+            <AddButton label="Add friend" onClick={() => setAdding("friend")} />
+          </div>
+        ))}
+      {err && <ErrorNote>{err}</ErrorNote>}
+      {editing && (
+        <EditorButtons
+          onCancel={close}
+          onSave={async () => {
+            setErr(null);
+            try {
+              await saveWillPeople(will, p);
+              refresh();
+              close();
+            } catch (e) {
+              setErr(e instanceof Error ? e.message : String(e));
+            }
+          }}
+        />
+      )}
+    </Card>
   );
 }

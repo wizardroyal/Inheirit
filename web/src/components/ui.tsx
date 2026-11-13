@@ -1,7 +1,7 @@
 "use client";
 import { useAccountLabel } from "@/lib/names";
 import Link from "next/link";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { SITE_URL } from "@/lib/config";
 import { errorText } from "@/lib/near";
 
@@ -257,5 +257,28 @@ export function GearButton({ open, onClick, label }: { open: boolean; onClick: (
     <button type="button" aria-expanded={open} aria-label={label} title={label} onClick={onClick} className={`flex h-11 w-11 items-center justify-center rounded-lg border border-line text-lg hover:bg-accent-soft ${open ? "bg-accent-soft" : ""}`}>
       ⚙
     </button>
+  );
+}
+
+/** A centred pop-up over a dimmed page; closes on Escape, the backdrop or ✕. */
+export function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+  useEffect(() => {
+    const on = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", on);
+    return () => window.removeEventListener("keydown", on);
+  }, [onClose]);
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label={title}>
+      <button type="button" aria-label="Close" className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="relative max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl border border-line bg-card p-6 shadow-xl">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <h2 className="font-serif text-2xl">{title}</h2>
+          <button type="button" aria-label="Close" className="flex h-11 w-11 items-center justify-center rounded-lg text-xl text-muted hover:bg-accent-soft" onClick={onClose}>
+            ✕
+          </button>
+        </div>
+        {children}
+      </div>
+    </div>
   );
 }

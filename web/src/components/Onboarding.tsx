@@ -13,10 +13,8 @@ import { createPerson } from "@/lib/onboard";
 import { newTestReceive, testReceiveFor } from "@/lib/test-wallets";
 import { useOverview } from "@/lib/hooks";
 import { humanize, nameOf, readable, useAccountLabel, useNames } from "@/lib/names";
-import { signRequest } from "@/lib/near";
 import { acceptedGuardians, isArmed, type Will } from "@/lib/will";
 import { TelegramLink } from "./TelegramLink";
-import { addedFor, saveAdded } from "./account/signs";
 import type { Watching } from "./WillParts";
 import { QuietPeriod, realSchedule } from "./QuietPeriod";
 import { type DraftNote, FinalSecrets, readyNotes } from "./FinalSecrets";
@@ -370,9 +368,7 @@ export function MyWillSetup({
           No check-ins. Every transaction you sign already counts.
         </p>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          <Field label="Your Ethereum wallet (optional)" hint="An address you use, not the vault.">
-            <input className={inputCls} value={evm} onChange={(e) => setEvm(e.target.value.trim())} placeholder="0x…" />
-          </Field>
+          <p className="text-sm text-muted">Connect your other wallets later in Signs of life (you sign a message; no access to funds).</p>
           <div className="text-sm">
             <p className="font-medium">Heartbeat app</p>
             <p className="text-muted">
@@ -610,12 +606,6 @@ export function MyWillSetup({
                 // Test guardians generated here hold their keys in this browser: they accept at once.
                 const local = list(guardians).filter((g) => keys.secret(g));
                 if (local.length) await acceptAsGuardians(owner, local, progress);
-                if (evm) {
-                  progress("Adding your Ethereum wallet as a sign of life…");
-                  // As a listed wallet, so it can be removed later from Signs of life on this device.
-                  await agent.registerOwner(await signRequest(owner, "register_owner", { evm_addresses: [evm] }));
-                  saveAdded(owner, { ...addedFor(owner), evm: [...new Set([...addedFor(owner).evm, evm])] });
-                }
                 // Everyone on the new will is in Profile too; the draft is done.
                 const known = localProfile(owner).people;
                 const add = heirs

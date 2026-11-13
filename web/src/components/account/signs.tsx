@@ -5,6 +5,7 @@ import { useState } from "react";
 import { agent } from "@/lib/agent";
 import { ago, SOURCE_LABELS } from "@/lib/will";
 import { signRequest } from "@/lib/near";
+import { proveEvmWallet, proveNearWallet } from "@/lib/wallet";
 import { TelegramLink } from "../TelegramLink";
 import { ConfirmButton, ErrorNote, Field, inputCls } from "../ui";
 import { SOURCES, strength } from "../WillParts";
@@ -53,7 +54,6 @@ export function SignsList({ owner, viewing }: { owner: string; viewing: boolean 
   const { overview, watching, evmCount, connected } = useSignalStatus(owner);
   const [open, setOpen] = useState<string | null>(null);
   const [added, setAdded] = useState<Added>(() => addedFor(owner));
-  const [wallet, setWallet] = useState("");
   const [github, setGithub] = useState("");
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const obs = overview?.signals?.observations ?? {};
@@ -65,18 +65,19 @@ export function SignsList({ owner, viewing }: { owner: string; viewing: boolean 
     saveAdded(owner, next);
     setAdded(next);
   };
-  const addWallet = async () => {
+  // Wallets are connected and sign a message naming this will (no transaction, no access to funds), so
+  // nobody can add a stranger's busy wallet (2026-11-13).
+  const connect = async (kind: "near" | "evm") => {
     setMsg(null);
-    const kind = detectChain(wallet);
-    if (!kind) return setMsg({ ok: false, text: "That doesn't look like a NEAR, Ethereum or Bitcoin address." });
-    if (kind === "btc") return setMsg({ ok: false, text: "Bitcoin wallets aren't read as signs of life yet. NEAR and Ethereum are." });
-    const a = kind === "near" ? wallet.trim().toLowerCase() : wallet.trim();
-    if (kind === "near" && a === owner) return setMsg({ ok: false, text: "Your own account already counts." });
-    const next = { ...added, [kind]: [...new Set([...added[kind], a])].slice(0, 5) };
     try {
-      await pushList(next, kind);
-      setWallet("");
-      setMsg({ ok: true, text: `Added your ${kind === "near" ? "NEAR" : "Ethereum"} wallet. The agent checks every 15 seconds.` });
+      const proof = kind === "near" ? await proveNearWallet(owner) : await proveEvmWallet(owner);
+      const a = proof.kind === "evm" ? proof.address : proof.account;
+      const next = { ...added, [kind]: [...new Set([...added[kind], a])].slice(0, 5) };
+      const wallet_proofs = [proof.kind === "evm" ? proof : { kind: "near", signed: proof.signed }];
+      await send(kind === "near" ? { near_accounts: next.near, wallet_proofs } : { evm_addresses: next.evm, wallet_proofs });
+      saveAdded(owner, next);
+      setAdded(next);
+      setMsg({ ok: true, text: "Wallet connected. Only its activity times are read." });
     } catch (e) {
       setMsg({ ok: false, text: e instanceof Error ? e.message : String(e) });
     }
@@ -86,14 +87,12 @@ export function SignsList({ owner, viewing }: { owner: string; viewing: boolean 
     if (COMING[source]) return obs[source as keyof typeof obs] ? "simulated" : "coming soon";
     return connected[source] ? "connected" : "not connected";
   };
-  const walletField = (
-    <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-      <Field label="Add a wallet (NEAR, Ethereum or Bitcoin address)">
-        <input className={`${inputCls} min-w-0`} value={wallet} onChange={(e) => (setWallet(e.target.value), setMsg(null))} placeholder="you.near or 0x…" />
-      </Field>
-      <button type="button" disabled={!wallet.trim()} className="min-h-11 rounded-lg bg-accent px-4 py-2 font-medium text-accent-ink disabled:opacity-50" onClick={addWallet}>
-        Add wallet
+  const walletField = (kind: "near" | "evm") => (
+    <div className="space-y-1">
+      <button type="button" className="min-h-11 rounded-lg bg-accent px-4 py-2 font-medium text-accent-ink" onClick={() => connect(kind)}>
+        {kind === "near" ? "Connect a NEAR wallet" : "Connect an Ethereum wallet"}
       </button>
+      <p className="text-sm text-muted">You sign a message; no transaction, no access to funds.</p>
     </div>
   );
   const addedChips = (kind: "near" | "evm") =>
@@ -114,18 +113,18 @@ export function SignsList({ owner, viewing }: { owner: string; viewing: boolean 
       case "near_onchain":
         return (
           <div className="space-y-3">
-            <p>Your own account always counts{watching.near_extra ? `, plus ${watching.near_extra} more wallet${watching.near_extra > 1 ? "s" : ""}` : ""}. Mainnet .near wallets are read too, read-only.</p>
+            <p>Your own account always counts{watching.near_extra ? `, plus ${watching.near_extra} more wallet${watching.near_extra > 1 ? "s" : ""}` : ""}.</p>
             {addedChips("near")}
-            {!viewing && walletField}
+            {!viewing && walletField("near")}
           </div>
         );
       case "evm_onchain":
         return (
           <div className="space-y-3">
-            <p>{evmCount ? `Watching ${evmCount} Ethereum wallet${evmCount > 1 ? "s" : ""}.` : "Add an Ethereum wallet you use (not the vault)."}</p>
+            <p>{evmCount ? `Watching ${evmCount} Ethereum wallet${evmCount > 1 ? "s" : ""}.` : "Connect an Ethereum wallet you use (not the vault)."}</p>
             {addedChips("evm")}
             {evmCount > added.evm.length && <p className="text-sm text-muted">Added sources are private; remove them from the device you added them on.</p>}
-            {!viewing && walletField}
+            {!viewing && walletField("evm")}
           </div>
         );
       case "phone_heartbeat":
@@ -211,7 +210,7 @@ export function SignsList({ owner, viewing }: { owner: string; viewing: boolean 
           );
         })}
       </ul>
-      <p className="text-sm text-muted">Strong and medium signals count alone; weak ones need a second source within 24 hours. Only times are read, never content.</p>
+      <p className="text-sm text-muted">The heartbeat app is strongest. On-chain silence is checked against your other sources before anyone is asked. Only times are read, never content.</p>
     </div>
   );
 }

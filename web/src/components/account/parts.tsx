@@ -4,7 +4,7 @@
 import { humanize, readable, useAccountLabel, useNames } from "@/lib/names";
 import { summarizePolicy, type Policy } from "@agent/policy/policy";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { AiBadge } from "@/components/Attestation";
 
 import { ActionButton, Card, ErrorNote, Field, inputCls, Pill } from "@/components/ui";
@@ -17,7 +17,6 @@ import { agent, type DraftResult } from "@/lib/agent";
 import { DEMO_SCHEDULE, REAL_SCHEDULE } from "@/lib/config";
 import { stagesFor, summarize } from "@agent/policy/schedule";
 import { acceptAsGuardians, addSealedNote, createWill, generateWillAndCast } from "@/lib/demo";
-import { createInvite, type InviteRole, nameClaimedInvites } from "@/lib/invites";
 import { keys } from "@/lib/keys";
 import { useNow, usePoll } from "@/lib/hooks";
 import { topUpAccount } from "@/lib/onboard";
@@ -343,161 +342,11 @@ export function WriteWill({ owner, onCreating, onCreated }: { owner: string; onC
   );
 }
 
-export function NearVaultActions({ owner, refresh }: { owner: string; refresh: () => void }) {
-  const [amount, setAmount] = useState("0.1");
-  return (
-    <div className="mt-3 flex flex-wrap items-start gap-2">
-      <input className={`${inputCls} w-24`} aria-label="Amount in NEAR" value={amount} onChange={(e) => setAmount(e.target.value)} />
-      <ActionButton tone="quiet" onClick={() => call(owner, "deposit_near", {}, nearToYocto(amount)).then(refresh)}>
-        Deposit
-      </ActionButton>
-      <ActionButton
-        tone="quiet"
-        onClick={() => call(owner, "request_withdrawal", { chain: "Near", to: owner, amount: nearToYocto(amount).toString() }, 0n, 100n).then(refresh)}
-      >
-        Withdraw to me
-      </ActionButton>
-    </div>
-  );
-}
-
 /** Decimal string → smallest units (wei or sats), without floating point. */
 export function toUnits(value: string, decimals: number): bigint {
   const [whole, frac = ""] = value.trim().split(".");
   if (!/^\d+$/.test(whole || "0") || !/^\d*$/.test(frac) || frac.length > decimals) throw new Error(`"${value}" is not an amount`);
   return BigInt(whole || "0") * 10n ** BigInt(decimals) + BigInt(frac.padEnd(decimals, "0") || "0");
-}
-
-// The owner can always take coins back out while alive (principle 6): the contract queues the request
-// and the agent sends it from the vault, signed for this withdrawal only.
-export function ForeignWithdraw({ owner, will, refresh }: { owner: string; will: Will; refresh: () => void }) {
-  const [chain, setChain] = useState(will.foreign_chains[0]);
-  const [to, setTo] = useState("");
-  const [amount, setAmount] = useState("");
-  const unit = chain === "Eth" ? "ETH" : "BTC";
-  return (
-    <details className="mt-3 text-sm">
-      <summary className="cursor-pointer text-muted hover:text-ink">Withdraw from the Ethereum or Bitcoin vault</summary>
-      <div className="mt-2 flex flex-wrap items-start gap-2">
-        <select className={`${inputCls} w-28`} value={chain} onChange={(e) => setChain(e.target.value as typeof chain)}>
-          {will.foreign_chains.map((c) => (
-            <option key={c} value={c}>
-              {c === "Eth" ? "Ethereum" : "Bitcoin"}
-            </option>
-          ))}
-        </select>
-        <input className={`${inputCls} w-28`} aria-label={`Amount in ${unit}`} placeholder={`amount (${unit})`} value={amount} onChange={(e) => setAmount(e.target.value)} />
-        <input className={`${inputCls} min-w-0 flex-1`} placeholder={chain === "Eth" ? "0x… your address" : "tb1… your address"} value={to} onChange={(e) => setTo(e.target.value.trim())} />
-        <ActionButton
-          tone="quiet"
-          onClick={() => call(owner, "request_withdrawal", { chain, to, amount: toUnits(amount, chain === "Eth" ? 18 : 8).toString() }, 0n, 100n).then(refresh)}
-        >
-          Withdraw
-        </ActionButton>
-      </div>
-    </details>
-  );
-}
-
-export function InviteByLink({ owner, hasLawyer, will }: { owner: string; hasLawyer: boolean; will: Will }) {
-  // Give claimed invitees the name typed for them (names are per browser).
-  const people = [
-    ...will.guardians.map((g) => ({ role: "guardian" as const, account: g.account_id })),
-    ...will.contacts.map((c) => ({ role: "friend" as const, account: c })),
-    ...(will.lawyer ? [{ role: "lawyer" as const, account: will.lawyer }] : []),
-  ];
-  const key = people.map((p) => p.account).join(",");
-  useEffect(() => {
-    void nameClaimedInvites(owner, people);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [owner, key]);
-  const [role, setRole] = useState<InviteRole>("guardian");
-  const [name, setName] = useState("");
-  const [link, setLink] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
-  return (
-    <details className="mt-3 text-sm">
-      <summary className="cursor-pointer text-muted hover:text-ink">Invite someone by link (no NEAR account needed)</summary>
-      <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-end">
-        <Field label="As">
-          <select className={inputCls} value={role} onChange={(e) => setRole(e.target.value as InviteRole)}>
-            <option value="guardian">guardian</option>
-            <option value="friend">friend</option>
-            {!hasLawyer && <option value="lawyer">lawyer</option>}
-          </select>
-        </Field>
-        <Field label="Their name">
-          <input className={`${inputCls} min-w-0`} maxLength={64} value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Ngozi" />
-        </Field>
-        <ActionButton tone="quiet" onClick={async () => (setCopied(false), setLink(await createInvite(owner, role, name)))}>
-          Make link
-        </ActionButton>
-      </div>
-      {link && (
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            className="rounded-lg border border-line bg-card px-3 py-1 hover:bg-accent-soft"
-            onClick={() => navigator.clipboard.writeText(link).then(() => setCopied(true))}
-          >
-            {copied ? "Link copied" : "Copy link"}
-          </button>
-          <span className="text-xs text-muted">One use, valid 7 days.</span>
-        </div>
-      )}
-    </details>
-  );
-}
-
-export function EmailAlerts({ will }: { will: Will }) {
-  const label = useAccountLabel();
-  const owner = will.owner;
-  const people = [
-    ...will.guardians.map((g) => ({ account: g.account_id, role: "guardian" })),
-    ...will.contacts.map((c) => ({ account: c, role: "friend" })),
-    ...(will.lawyer ? [{ account: will.lawyer, role: "lawyer" }] : []),
-  ];
-  const [mine, setMine] = useState("");
-  const [theirs, setTheirs] = useState<Record<string, string>>({});
-  const [saved, setSaved] = useState<string | null>(null);
-  return (
-    <Card title="Email alerts">
-      <p className="text-sm text-muted">Checks, welfare questions, vote requests and the challenge alarm. Addresses stay in the enclave.</p>
-      <div className="mt-3 space-y-2">
-        <Field label="Your email">
-          <input className={inputCls} type="email" value={mine} onChange={(e) => setMine(e.target.value.trim())} placeholder="you@example.com" />
-        </Field>
-        {people.map((p) => (
-          <Field key={p.account} label={`${label(p.account)} (${p.role})`}>
-            <input
-              className={inputCls}
-              type="email"
-              value={theirs[p.account] ?? ""}
-              onChange={(e) => setTheirs((t) => ({ ...t, [p.account]: e.target.value.trim() }))}
-              placeholder="optional"
-            />
-          </Field>
-        ))}
-      </div>
-      <div className="mt-3">
-        <ActionButton
-          tone="quiet"
-          onClick={async () => {
-            const data: Record<string, unknown> = {};
-            if (mine) data.email = mine;
-            const filled = Object.fromEntries(Object.entries(theirs).filter(([, v]) => v));
-            if (Object.keys(filled).length) data.people_emails = filled;
-            await agent.registerOwner(await signRequest(owner, "register_owner", data));
-            setSaved("Saved.");
-          }}
-        >
-          Save
-        </ActionButton>
-        {saved && <span className="ml-2 text-xs text-accent">{saved}</span>}
-      </div>
-      <p className="mt-2 text-xs text-muted">Empty keeps what&apos;s saved. Each address gets at most 12 emails a day.</p>
-    </Card>
-  );
 }
 
 export function SealedNotes({ will, refresh }: { will: Will; refresh: () => void }) {

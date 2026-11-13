@@ -143,7 +143,7 @@ export interface AgentState {
   notifiedState: Record<string, string>;
   notifications: Notification[];
   /** Pending Telegram deep-link tokens: token -> account (one-time, short-lived). */
-  telegramLinks: Record<string, { account: string; expiresAt: string }>;
+  telegramLinks: Record<string, { account: string; expiresAt: string; name?: string }>;
   /** Linked Telegram chats: account -> chat. */
   telegramChats: Record<string, { chatId: number; linkedAt: string }>;
   /** Latest reply from a linked chat: account -> ISO receive time. Never the text. */
@@ -184,6 +184,8 @@ export interface ProfilePerson {
   telegram?: string;
   eth?: string;
   btc?: string;
+  /** Free text the owner writes (email, phone, how to reach them); only an email in it is used to send. */
+  contact?: string;
 }
 
 export interface OwnerProfile {

@@ -6,7 +6,7 @@
 //  5. release sealed notes to heirs once the will reaches SecretsReleased (secrets last, §5.5).
 import { RateLimiter } from "../auth/rate-limit";
 import { config } from "../config";
-import { type Observation, scoreAlive } from "../liveness/score";
+import { type Observation, scoreAlive, scoreBeforeChecks } from "../liveness/score";
 import {
   acceptedGuardians,
   executionStarted,
@@ -342,7 +342,8 @@ export class Driver {
     const nowS = Math.floor(this.now().getTime() / 1000);
 
     if (stateName(will.state) !== "Completed") {
-      const verdict = scoreAlive(await this.observe(cfg), this.now());
+      const obs = await this.observe(cfg);
+      const verdict = stateName(will.state) === "Active" ? scoreBeforeChecks(obs, this.now(), will.timings.quiet_after) : scoreAlive(obs, this.now());
       if (verdict) {
         const atS = Math.min(Math.floor(verdict.at.getTime() / 1000), nowS - CHAIN_CLOCK_MARGIN_S);
         // Outside Active every newer sign of life is recorded (it's what halts). In Active the record only

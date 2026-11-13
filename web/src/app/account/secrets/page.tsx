@@ -35,6 +35,7 @@ function Secrets({ will }: { will: Will }) {
                 <li key={n.id} className="space-y-3 py-3">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <span className="text-lg">
+                      <span aria-hidden="true" className="mr-2 text-accent">›</span>
                       {n.label} <span className="text-muted">for {who(n.heir)}</span> {released && <Pill tone="accent">released</Pill>}
                     </span>
                     {active && !released && (

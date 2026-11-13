@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { type Observation, scoreAlive } from "../src/liveness/score";
+import { type Observation, scoreAlive, scoreBeforeChecks } from "../src/liveness/score";
 
 const now = new Date("2026-11-01T12:00:00Z");
 const h = (hoursAgo: number) => new Date(now.getTime() - hoursAgo * 3600_000);
@@ -41,5 +41,28 @@ describe("scoreAlive", () => {
   it("a weak pair newer than a strong signal wins", () => {
     const v = scoreAlive([obs("near_onchain", 10, 0.9), obs("x", 2, 0.4), obs("github", 1, 0.5)], now);
     expect(v?.at).toEqual(h(2));
+  });
+});
+
+describe("scoreBeforeChecks (a lone weak signal postpones checks, bounded)", () => {
+  const now = new Date("2026-11-13T12:00:00Z");
+  const ago = (d: number) => new Date(now.getTime() - d * 86_400_000);
+  const day = 86_400;
+  const obs = (source: Observation["source"], at: Date, trustWeight: number): Observation => ({ source, at, trustWeight, simulated: false });
+
+  it("a weak signal after the last strong one, within one quiet period, counts", () => {
+    const v = scoreBeforeChecks([obs("near_onchain", ago(20), 0.9), obs("github", ago(2), 0.5)], now, 30 * day);
+    expect(v?.basis).toEqual(["github"]);
+    expect(v?.at.getTime()).toBe(ago(2).getTime());
+  });
+  it("but not beyond one quiet period after the strong signal", () => {
+    const v = scoreBeforeChecks([obs("near_onchain", ago(40), 0.9), obs("github", ago(2), 0.5)], now, 30 * day);
+    expect(v?.basis).toEqual(["near_onchain"]);
+  });
+  it("and never without any strong signal", () => {
+    expect(scoreBeforeChecks([obs("github", ago(2), 0.5)], now, 30 * day)).toBeNull();
+  });
+  it("scoreAlive itself still ignores a lone weak signal", () => {
+    expect(scoreAlive([obs("near_onchain", ago(20), 0.9), obs("github", ago(2), 0.5)], now)?.basis).toEqual(["near_onchain"]);
   });
 });

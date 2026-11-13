@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { api, type ApiDeps } from "../src/api";
+import { api, type ApiDeps, walletProofText } from "../src/api";
+import { privateKeyToAccount } from "viem/accounts";
 import { AuthError, type SignedAction } from "../src/auth/nep413";
 import type { WillContract, WillView } from "../src/near/will-contract";
 import { checkPolicy, policyHash } from "../src/policy/policy";
@@ -26,6 +27,14 @@ const verifier = {
     return { owner: m.owner, action, issuedAt: 0, data: m.data };
   },
 };
+
+/** A real Ethereum key and its signed proof for alice.testnet's will. */
+const evmKeys = [1, 2, 3].map((i) => privateKeyToAccount(`0x${String(i).padStart(64, "0")}` as `0x${string}`));
+async function evmProof(i: number, owner = "alice.testnet") {
+  const issued_at = Date.now();
+  return { kind: "evm" as const, address: evmKeys[i].address, issued_at, signature: await evmKeys[i].signMessage({ message: walletProofText(owner, issued_at) }) };
+}
+const nearProof = (account: string, forOwner = "alice.testnet") => ({ kind: "near" as const, signed: { owner: account, action: "wallet_proof", data: { for: forOwner } } });
 
 function setup(demoMode: boolean, onChainHash = HASH, ai?: ApiDeps["ai"], extra: Partial<ApiDeps> = {}) {
   const store = new Store(null);
@@ -115,26 +124,39 @@ describe("owner-signed routes", () => {
   });
   it("watches extra NEAR accounts and Sepolia addresses, and never names them in the public status", async () => {
     const t = setup(false);
-    const data = { near_accounts: ["alice.near", "alice-work.testnet"], evm_addresses: ["0x" + "e".repeat(40), "0x" + "f".repeat(40)] };
-    expect((await t.post("/api/owners", { signed: { owner: "alice.testnet", action: "register_owner", data } })).status).toBe(200);
+    const data = { near_accounts: ["alice.near", "alice-work.testnet"], evm_addresses: [evmKeys[0].address, evmKeys[1].address] };
+    const wallet_proofs = [nearProof("alice.near"), nearProof("alice-work.testnet"), await evmProof(0), await evmProof(1)];
+    expect((await t.post("/api/owners", { signed: { owner: "alice.testnet", action: "register_owner", data: { ...data, wallet_proofs } } })).status).toBe(200);
     expect(t.store.get().owners["alice.testnet"]).toMatchObject({ nearAccounts: data.near_accounts, evmAddresses: data.evm_addresses });
     const status = JSON.stringify(await (await t.app.request("/api/status/alice.testnet")).json());
     expect(status).toContain('"near_extra":2');
     expect(status).not.toContain("alice.near");
-    expect(status).not.toContain("e".repeat(40));
+    expect(status).not.toContain(evmKeys[0].address.slice(2));
+  });
+  it("a wallet new to the list needs its own signature; one saved earlier stays without", async () => {
+    const t = setup(false);
+    const post = (data: unknown) => t.post("/api/owners", { signed: { owner: "alice.testnet", action: "register_owner", data } });
+    expect((await post({ evm_addresses: [evmKeys[0].address] })).status).toBe(400);
+    expect((await post({ near_accounts: ["alice-work.testnet"] })).status).toBe(400);
+    // Signed for another will, or by another key: refused.
+    expect((await post({ near_accounts: ["alice-work.testnet"], wallet_proofs: [nearProof("alice-work.testnet", "mallory.testnet")] })).status).toBe(400);
+    expect((await post({ evm_addresses: [evmKeys[0].address], wallet_proofs: [{ ...(await evmProof(1)), address: evmKeys[0].address }] })).status).toBe(400);
+    expect((await post({ evm_addresses: [evmKeys[0].address], wallet_proofs: [await evmProof(0)] })).status).toBe(200);
+    expect((await post({ evm_addresses: [evmKeys[0].address, evmKeys[1].address], wallet_proofs: [await evmProof(1)] })).status).toBe(200);
+    expect(t.store.get().owners["alice.testnet"]?.evmAddresses).toEqual([evmKeys[0].address, evmKeys[1].address]);
   });
   it("an empty GitHub or Ethereum address clears it (removal from Signs of life)", async () => {
     const t = setup(false);
     const post = (data: unknown) => t.post("/api/owners", { signed: { owner: "alice.testnet", action: "register_owner", data } });
-    await post({ github: "alice", evm_address: "0x" + "e".repeat(40) });
-    expect(t.store.get().owners["alice.testnet"]).toMatchObject({ github: "alice", evmAddress: "0x" + "e".repeat(40) });
+    await post({ github: "alice", evm_address: evmKeys[0].address, wallet_proofs: [await evmProof(0)] });
+    expect(t.store.get().owners["alice.testnet"]).toMatchObject({ github: "alice", evmAddress: evmKeys[0].address });
     expect((await post({ github: "", evm_address: "" })).status).toBe(200);
     expect(t.store.get().owners["alice.testnet"]?.github).toBeUndefined();
     expect(t.store.get().owners["alice.testnet"]?.evmAddress).toBeUndefined();
   });
   it("refuses an heir's NEAR account, the owner's own, and more than five extras", async () => {
     const t = setup(false);
-    const post = (near_accounts: string[]) => t.post("/api/owners", { signed: { owner: "alice.testnet", action: "register_owner", data: { near_accounts } } });
+    const post = (near_accounts: string[]) => t.post("/api/owners", { signed: { owner: "alice.testnet", action: "register_owner", data: { near_accounts, wallet_proofs: near_accounts.slice(0, 5).map((a) => nearProof(a)) } } });
     expect((await post(["bola.testnet"])).status).toBe(400);
     expect((await post(["alice.testnet"])).status).toBe(400);
     expect((await post(["a1.near", "a2.near", "a3.near", "a4.near", "a5.near", "a6.near"])).status).toBe(400);
@@ -147,15 +169,15 @@ describe("owner-signed routes", () => {
     expect(t.store.get().owners["alice.testnet"]).toMatchObject({ github: "alice" });
   });
   it("refuses the will's own vault or an heir's receive address as the owner's EVM address", async () => {
-    const vault = "0x" + "c".repeat(40);
-    const heirEth = "0x" + "d".repeat(40);
+    const vault = evmKeys[0].address;
+    const heirEth = evmKeys[1].address;
     const vaults = [{ chain: "Eth", address: async () => vault, balance: async () => 0n }] as unknown as ApiDeps["vaults"];
     const t = setup(false, HASH, undefined, { vaults });
     t.store.update((s) => (s.policies["alice.testnet"] = { ...parsed.policy, heirs: [{ ...parsed.policy.heirs[0], receive: { eth: heirEth } }] }));
-    const reg = (evm_address: string) => t.post("/api/owners", { signed: { owner: "alice.testnet", action: "register_owner", data: { evm_address } } });
-    expect((await reg(vault.toUpperCase().replace("0X", "0x"))).status).toBe(400);
-    expect((await reg(heirEth)).status).toBe(400);
-    expect((await reg("0x" + "e".repeat(40))).status).toBe(200);
+    const reg = async (i: number) => t.post("/api/owners", { signed: { owner: "alice.testnet", action: "register_owner", data: { evm_address: evmKeys[i].address, wallet_proofs: [await evmProof(i)] } } });
+    expect((await reg(0)).status).toBe(400);
+    expect((await reg(1)).status).toBe(400);
+    expect((await reg(2)).status).toBe(200);
   });
   it("refuses a bad signature", async () => {
     const res = await setup(true).post("/api/owners", { signed: { owner: "alice.testnet", action: "register_owner", bad: true } });

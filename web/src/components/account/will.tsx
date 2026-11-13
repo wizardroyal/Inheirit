@@ -9,6 +9,7 @@ import { call, nearToYocto, signRequest } from "@/lib/near";
 import { configFromWill, isSpeedrun } from "@/lib/speedrun";
 import { duration, type Will } from "@/lib/will";
 import { QuietPeriod, realSchedule } from "../QuietPeriod";
+import { Icon } from "../icons";
 import { ActionButton, Card } from "../ui";
 
 const DAY = 86_400;
@@ -47,7 +48,9 @@ export function CloseWill({ will }: { will: Will }) {
             <input type="checkbox" checked={sure} onChange={(e) => setSure(e.target.checked)} /> I understand
           </label>
           <ActionButton tone="danger" disabled={!sure} onClick={() => call(will.owner, "close_will").then(refresh)}>
-            Close will
+            <span className="inline-flex items-center gap-2">
+              <Icon name="stop" className="h-4 w-4" /> Close will
+            </span>
           </ActionButton>
         </div>
       )}
@@ -67,7 +70,6 @@ export function QuietSetting({ will }: { will: Will }) {
     );
   return (
     <Card title="Quiet period">
-      <p className="mb-3 text-muted">Now: checks start after {duration(will.timings.quiet_after)} of silence.</p>
       <QuietPeriod owner={will.owner} value={days} onChange={(d) => (setDays(d), setSaved(false))} />
       <div className="mt-3">
         <ActionButton tone="quiet" disabled={!days || days < 1 || days > 365} onClick={async () => (await saveConfig(will, { quietDays: days! }), setSaved(true))}>

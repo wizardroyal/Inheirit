@@ -122,3 +122,44 @@ export async function walletSignMessage(accountId: string, message: string, nonc
   return { publicKey: signed.publicKey, signature: signed.signature };
 }
 
+
+/** Must match walletProofText in the agent's src/api.ts exactly. */
+export const walletProofText = (owner: string, issuedAt: number) =>
+  `Inheirit: let ${owner}'s will read this wallet's activity times. This grants no access to funds. ${issuedAt}`;
+
+/**
+ * Connect a NEAR wallet and sign a message naming `owner` (no transaction, no key added). The wallet is
+ * signed out again afterwards, so the owner's own sign-in is unchanged.
+ */
+export async function proveNearWallet(owner: string): Promise<{ kind: "near"; account: string; signed: { account_id: string; public_key: string; signature: string; nonce: string; message: string } }> {
+  const s = await selector();
+  const active = s.store.getState().accounts.find((a) => a.active)?.accountId;
+  if (active === owner) throw new Error("That's the account you're signed in with; it already counts. Switch account in your wallet to add another.");
+  const account = active ?? (await connectWallet());
+  if (account === owner) {
+    throw new Error("That's your own account; it already counts. Pick another account in the wallet.");
+  }
+  try {
+    const nonce = crypto.getRandomValues(new Uint8Array(32));
+    const message = JSON.stringify({ action: "wallet_proof", owner: account, issued_at: Date.now(), data: { for: owner } });
+    const w = await walletSignMessage(account, message, nonce);
+    return { kind: "near", account, signed: { account_id: account, public_key: w.publicKey, signature: w.signature, nonce: btoa(String.fromCharCode(...nonce)), message } };
+  } finally {
+    if (walletAccountId() !== owner) await disconnectWallet().catch(() => {});
+  }
+}
+
+type Eip1193 = { request: (a: { method: string; params?: unknown[] }) => Promise<unknown> };
+
+/** Connect an Ethereum wallet in the browser (MetaMask, Rabby…) and sign a message naming `owner`. */
+export async function proveEvmWallet(owner: string): Promise<{ kind: "evm"; address: string; issued_at: number; signature: string }> {
+  const eth = (window as { ethereum?: Eip1193 }).ethereum;
+  if (!eth) throw new Error("No Ethereum wallet found in this browser. Install MetaMask or Rabby, then try again.");
+  const [address] = (await eth.request({ method: "eth_requestAccounts" })) as string[];
+  if (!address) throw new Error("The wallet didn't share an address");
+  const issued_at = Date.now();
+  const text = walletProofText(owner, issued_at);
+  const hex = "0x" + Array.from(new TextEncoder().encode(text), (b) => b.toString(16).padStart(2, "0")).join("");
+  const signature = (await eth.request({ method: "personal_sign", params: [hex, address] })) as string;
+  return { kind: "evm", address, issued_at, signature };
+}

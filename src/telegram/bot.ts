@@ -74,15 +74,22 @@ export class TelegramBot {
   }
 
   /** A one-time deep link that binds the chat that opens it to `account`. */
-  issueLink(account: string): { url: string; expires_at: string } {
+  issueLink(account: string, name?: string): { url: string; expires_at: string } {
     const token = randomBytes(24).toString("base64url");
     const expiresAt = new Date(this.now().getTime() + LINK_TTL_MS).toISOString();
     const nowMs = this.now().getTime();
     this.store.update((s) => {
       for (const [t, l] of Object.entries(s.telegramLinks)) if (Date.parse(l.expiresAt) < nowMs) delete s.telegramLinks[t];
-      s.telegramLinks[token] = { account, expiresAt };
+      s.telegramLinks[token] = { account, expiresAt, ...(name ? { name } : {}) };
     });
     return { url: `https://t.me/${this.username}?start=${token}`, expires_at: expiresAt };
+  }
+
+  /** Forgets the chat linked to `account` (owner-signed in the API). */
+  unlink(account: string): void {
+    this.store.update((s) => {
+      delete s.telegramChats[account];
+    });
   }
 
   isLinked(account: string): boolean {
@@ -131,7 +138,7 @@ export class TelegramBot {
       this.log(`[telegram] linked for ${link.account}`);
       await this.api.sendMessage(
         chatId,
-        `Linked to ${link.account}. If you go quiet for longer than usual, I'll check in here. Any reply tells me you're fine, and nothing else happens. Send /unlink to stop.`,
+        `Linked to your ${link.name ? `${link.name} ` : ""}Inheirit profile. If you go quiet for longer than usual, I'll check in here. Any reply tells me you're fine, and nothing else happens. Send /unlink to stop.`,
       );
       return;
     }

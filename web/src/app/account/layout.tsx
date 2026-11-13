@@ -21,7 +21,7 @@ const SCREENS = [
   { href: "/account/vault", label: "Vault" },
   { href: "/account/activity", label: "Activity" },
   { href: "/account/speedrun", label: "Try a speedrun" },
-  { href: "/mainnet", label: "Mainnet" },
+  { href: "/account/mainnet", label: "Mainnet" },
 ];
 
 export default function AccountLayout({ children }: { children: ReactNode }) {

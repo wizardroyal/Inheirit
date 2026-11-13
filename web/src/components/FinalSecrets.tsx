@@ -1,7 +1,7 @@
 "use client";
 // Final secrets (CLAUDE.md §2.1 insight 3, §8 item 4): optional sealed notes written during setup, sealed in
 // this browser to the enclave's key and saved right after the will is created. Released last, per heir.
-import { Field, inputCls } from "./ui";
+import { inputCls } from "./ui";
 
 export interface DraftNote {
   heir: string; // heir account
@@ -22,7 +22,6 @@ export function FinalSecrets({ heirs, notes, onChange }: { heirs: { account: str
   const add = (t?: { label: string; text: string }) => onChange([...notes, { heir: heirs[0]?.account ?? "", label: t?.label ?? "", text: t?.text ?? "" }]);
   return (
     <div className="space-y-3">
-      <p className="text-sm text-muted">Released last, per heir, after everything else is handed over. Split secrets: seed phrase here, passphrase with someone else.</p>
       {notes.map((n, i) => (
         <div key={i} className="space-y-2 rounded-lg border border-line p-3">
           <div className="flex flex-col gap-2 sm:flex-row">
@@ -42,7 +41,6 @@ export function FinalSecrets({ heirs, notes, onChange }: { heirs: { account: str
         </div>
       ))}
       {heirs.length > 0 && (
-        <Field label="Add a note" group>
           <div className="flex flex-wrap gap-2">
             {TEMPLATES.map((t) => (
               <button key={t.label} type="button" className="min-h-11 rounded-full border border-line bg-card px-4 py-2 text-sm hover:bg-accent-soft" onClick={() => add(t)}>
@@ -50,10 +48,9 @@ export function FinalSecrets({ heirs, notes, onChange }: { heirs: { account: str
               </button>
             ))}
             <button type="button" className="min-h-11 rounded-full border border-line bg-card px-4 py-2 text-sm hover:bg-accent-soft" onClick={() => add()}>
-              Blank
+              Custom
             </button>
           </div>
-        </Field>
       )}
     </div>
   );

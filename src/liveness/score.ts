@@ -76,3 +76,29 @@ export function scoreAlive(
   }
   return best;
 }
+
+/**
+ * Before checks start (the will is at All good): an on-chain silence is first compared with the weak
+ * sources, because someone can stop transacting for their own reasons while still being active. A lone
+ * weak signal newer than the last strong one postpones the checks, but by at most one quiet period after
+ * that strong signal, so scheduled posts can never hold a will off for ever. Once checks have started,
+ * only the rules in `scoreAlive` count (human decision 2026-11-13).
+ */
+export function scoreBeforeChecks(
+  observations: Observation[],
+  now: Date,
+  quietAfterS: number,
+  opts: ScoreOptions = DEFAULT_SCORE_OPTIONS,
+): AliveVerdict | null {
+  const base = scoreAlive(observations, now, opts);
+  if (!base) return null;
+  const limit = base.at.getTime() + quietAfterS * 1000;
+  let best: AliveVerdict = base;
+  for (const o of observations) {
+    if (o.trustWeight >= opts.strongWeight) continue;
+    const t = Math.min(o.at.getTime(), now.getTime());
+    if (o.at.getTime() > now.getTime() + opts.maxFutureSkewMs) continue;
+    if (t > best.at.getTime() && t <= limit) best = { at: new Date(t), basis: [o.source] };
+  }
+  return best;
+}

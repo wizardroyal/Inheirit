@@ -59,6 +59,10 @@ export async function saveProfile(owner: string, patch: Partial<Profile>): Promi
 function clean(p: Person): Person {
   const out: Person = { id: p.id, name: p.name.trim().slice(0, 64) || "Someone", role: p.role };
   for (const k of ["account", "email", "telegram", "eth", "btc"] as const) if (p[k]?.trim()) out[k] = p[k]!.trim();
+  if (p.contact?.trim()) out.contact = p.contact.trim().slice(0, 500);
+  // The agent emails people on the will at an address it can read: take one from the contact text.
+  const found = out.email ?? /[^\s@<>(),;]+@[^\s@<>(),;]+\.[a-z]{2,}/i.exec(out.contact ?? "")?.[0];
+  if (found) out.email = found;
   return out;
 }
 
@@ -100,7 +104,7 @@ export function missingFromProfile(will: Will | null, profile: Profile): Person[
   const add = (account: string, role: Role, name?: string) => {
     if (known.has(account)) return;
     known.add(account);
-    out.push({ id: newId(), name: name ?? nameOf(account) ?? account.split(".")[0], role, account });
+    out.push({ id: `w_${account}`.slice(0, 40), name: name ?? nameOf(account) ?? account.split(".")[0], role, account });
   };
   will.heirs.forEach((h) => add(h.account_id, "heir", h.name));
   will.guardians.forEach((g) => add(g.account_id, "guardian"));
