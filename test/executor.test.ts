@@ -124,6 +124,13 @@ describe("StagedExecutor", () => {
     expect(t.contract.completed).toEqual(["3:0xw3"]);
   });
 
+  it("sends foreign withdrawals while the will is paused too (audit 2026-11-13)", async () => {
+    const t = setup();
+    const pending_withdrawals = [{ id: 5, chain: "Eth" as const, to: ETH1, amount: "5", signatures: 0 }];
+    await t.ex.withdraw("alice.testnet", will(0, { state: { Paused: { until: 9_999_999_999 } }, pending_withdrawals } as never));
+    expect(t.vault.withdrawals).toEqual([5]);
+  });
+
   it("releases stage 0 by policy shares and marks it done", async () => {
     const t = setup();
     await t.ex.run("alice.testnet", will(0));

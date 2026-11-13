@@ -32,17 +32,16 @@ function savePending(p: Pending[]) {
 export async function nameClaimedInvites(owner: string, people: { role: InviteRole; account: string }[]): Promise<void> {
   const mine = pending().filter((p) => p.owner === owner);
   if (!mine.length) return;
-  const keep: Pending[] = pending().filter((p) => p.owner !== owner);
+  const gone = new Set<string>();
   for (const p of mine) {
     const open = await inviteOpen(owner, "", p.hash).catch(() => ({ role: p.role, expires_at: 0 }));
-    if (open) {
-      keep.push(p);
-      continue;
-    }
+    if (open) continue;
+    gone.add(p.hash);
     const fresh = people.filter((x) => x.role === p.role && !nameOf(x.account));
     if (fresh.length === 1 && p.name) nameAccounts({ [fresh[0].account]: p.name });
   }
-  savePending(keep);
+  // Re-read: an invite made while we were checking must not be dropped.
+  if (gone.size) savePending(pending().filter((p) => !(p.owner === owner && gone.has(p.hash))));
 }
 
 export type InviteRole = "guardian" | "friend" | "lawyer";

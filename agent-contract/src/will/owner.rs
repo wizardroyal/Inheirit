@@ -17,6 +17,9 @@ impl Contract {
         config.validate(&owner);
         let initial = env::storage_usage();
         let mut will = Will::new(owner.clone(), config, now_s());
+        if previous.is_some() {
+            super::invites::bump_invite_epoch(&owner);
+        }
         if let Some(old) = &previous {
             // NEAR credited back after a failed payout stays the owner's; the agent keys executions and
             // payouts by round and notes by id, so numbering continues instead of restarting.
@@ -353,6 +356,7 @@ impl Contract {
         env::storage_write(&closed_key(&owner), &near_sdk::borsh::to_vec(&(will.execution_round, will.next_note_id)).unwrap());
         self.wills.remove(&owner);
         self.wills.flush();
+        super::invites::bump_invite_epoch(&owner);
         self.total_vault_near -= vault;
         emit("will_closed", serde_json::json!({ "owner": owner, "near_returned": vault.to_string(), "notes_dropped": will.sealed_notes.len() }));
         // Freed storage is refunded by settle_storage; the vault goes back in the same transfer batch.

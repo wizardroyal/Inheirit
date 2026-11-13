@@ -5,7 +5,7 @@ import { useState } from "react";
 import { agent } from "@/lib/agent";
 import { ago, SOURCE_LABELS } from "@/lib/will";
 import { signRequest } from "@/lib/near";
-import { proveEvmWallet, proveNearWallet } from "@/lib/wallet";
+import { proveEvmWallet, proveNearWallet, walletAccountId } from "@/lib/wallet";
 import { TelegramLink } from "../TelegramLink";
 import { ConfirmButton, ErrorNote, Field, inputCls } from "../ui";
 import { SOURCES, strength } from "../WillParts";
@@ -31,14 +31,6 @@ export function saveAdded(owner: string, a: Added) {
   }
 }
 
-/** Which chain an address belongs to, from its format. */
-export function detectChain(a: string): "near" | "evm" | "btc" | null {
-  const s = a.trim();
-  if (/^0x[0-9a-fA-F]{40}$/.test(s)) return "evm";
-  if (/^(bc1|tb1|[13mn2])[a-zA-HJ-NP-Z0-9]{25,62}$/.test(s)) return "btc";
-  if (/^[0-9a-f]{64}$/.test(s) || /^(?=.{2,64}$)([a-z\d]+[-_])*[a-z\d]+(\.([a-z\d]+[-_])*[a-z\d]+)+$/.test(s)) return "near";
-  return null;
-}
 
 const COMING: Record<string, string> = {
   google_calendar: "Reading when you last used Google needs Google's app review, which takes weeks. Coming soon.",
@@ -115,7 +107,9 @@ export function SignsList({ owner, viewing }: { owner: string; viewing: boolean 
           <div className="space-y-3">
             <p>Your own account always counts{watching.near_extra ? `, plus ${watching.near_extra} more wallet${watching.near_extra > 1 ? "s" : ""}` : ""}.</p>
             {addedChips("near")}
-            {!viewing && walletField("near")}
+            {!viewing &&
+              // A wallet-signed owner would have to switch the wallet's account, which signs them out here.
+              (walletAccountId() === owner ? <p className="text-sm text-muted">You signed in with this wallet, so it already counts. A second NEAR wallet can be added only from an account not signed in through a wallet.</p> : walletField("near"))}
           </div>
         );
       case "evm_onchain":

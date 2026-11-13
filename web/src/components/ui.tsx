@@ -2,7 +2,6 @@
 import { useAccountLabel } from "@/lib/names";
 import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
-import { SITE_URL } from "@/lib/config";
 import { errorText } from "@/lib/near";
 
 export function Card({ title, aside, children, className = "" }: { title?: ReactNode; aside?: ReactNode; children: ReactNode; className?: string }) {
@@ -135,26 +134,6 @@ export function short(s: string, n = 10): string {
 }
 
 /** A full link on this site with a copy button, for sending to guardians, contacts or heirs. */
-export function CopyLink({ path }: { path: string }) {
-  const [copied, setCopied] = useState(false);
-  const url = `${SITE_URL}${path}`;
-  return (
-    <span className="inline-flex max-w-full flex-wrap items-center gap-2">
-      <button
-        type="button"
-        className="rounded-lg border border-line bg-card px-3 py-1 text-sm hover:bg-accent-soft"
-        onClick={() =>
-          navigator.clipboard.writeText(url).then(
-            () => (setCopied(true), setTimeout(() => setCopied(false), 1500)),
-            () => setCopied(false),
-          )
-        }
-      >
-        {copied ? "Link copied" : "Copy invitation link"}
-      </button>
-    </span>
-  );
-}
 
 export function ErrorNote({ children }: { children: ReactNode }) {
   return <p className="rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger">{children}</p>;
@@ -181,11 +160,15 @@ export function NoWill({ owner }: { owner: string }) {
 export function ConfirmButton({ label, question, onConfirm }: { label: string; question: string; onConfirm: () => Promise<unknown> }) {
   const [asking, setAsking] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
   if (!asking)
     return (
-      <button type="button" className="min-h-11 rounded-lg border border-line px-4 py-2 hover:bg-danger-soft hover:text-danger" onClick={() => setAsking(true)}>
-        {label}
-      </button>
+      <span className="inline-flex flex-wrap items-center gap-2">
+        <button type="button" className="min-h-11 rounded-lg border border-line px-4 py-2 hover:bg-danger-soft hover:text-danger" onClick={() => (setErr(null), setAsking(true))}>
+          {label}
+        </button>
+        {err && <span className="text-sm text-danger">{err}</span>}
+      </span>
     );
   return (
     <span className="inline-flex flex-wrap items-center gap-2">
@@ -198,6 +181,8 @@ export function ConfirmButton({ label, question, onConfirm }: { label: string; q
           setBusy(true);
           try {
             await onConfirm();
+          } catch (e) {
+            setErr(errorText(e));
           } finally {
             setBusy(false);
             setAsking(false);

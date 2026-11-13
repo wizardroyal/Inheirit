@@ -51,9 +51,13 @@ describe("explainLiveness", () => {
     expect(v.headline).toBe("Alive. Last strong signal: NEAR transaction 10 minutes ago.");
     expect(v.ignored).toEqual([]);
   });
-  it("explains why a lone post is ignored", () => {
+  it("at All good a lone post newer than the last strong signal only postpones the checks (2026-11-13)", () => {
     const v = explainLiveness(will(), [o("near_onchain", 600, 0.9), o("x", 60, 0.4, true)], now);
-    expect(v.details[0]).toBe(
+    expect(v.headline).toMatch(/On its own it only postpones the checks/);
+  });
+  it("explains why a lone post is ignored once checks have started", () => {
+    const v = explainLiveness(will({ Quiet: { since: nowS - 60 } }, { last_alive_at: nowS - 600 }), [o("near_onchain", 600, 0.9), o("x", 60, 0.4, true)], now);
+    expect(v.details.find((d) => d.startsWith("One X post"))).toBe(
       "One X post (SIMULATED) seen 60 seconds ago; ignored on its own because posts can be scheduled or run by someone else; it counts only if another independent source agrees within 24 hours.",
     );
   });

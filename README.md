@@ -31,7 +31,7 @@ Inheirit notices the signs of life you already give off, privately, and only rea
 | Real cross-chain execution: NEAR, Ethereum (Sepolia) and Bitcoin (testnet4) released in stages, with explorer links | [Then the full run](#then-the-full-run-about-15-minutes) |
 | An attested TEE agent and private AI, verifiable on-chain | `npx tsx scripts/verify.ts`: one read-only command, PASS/FAIL per check (explained in [`docs/VERIFY.md`](docs/VERIFY.md)); the trust badges under *Signs of life*; [`deploy/tee-agent.json`](deploy/tee-agent.json) lists every deployed compose hash |
 | NEAR Intents on mainnet | two real payouts (public Base → Solana, confidential Base → Arbitrum) with explorer links on [`/mainnet`](https://inheirit.xyz/mainnet); live quotes on the heir page |
-| Tests and security work | 265 agent tests, 193 contract unit tests plus sandbox flows, run on every push ([CI](.github/workflows/ci.yml)); five adversarial review rounds logged finding by finding in [`CLAUDE.md`](CLAUDE.md) (Decision log) and summarised in [`docs/AUDITS.md`](docs/AUDITS.md) |
+| Tests and security work | 267 agent tests, 196 contract unit tests plus sandbox flows, run on every push ([CI](.github/workflows/ci.yml)); five adversarial review rounds logged finding by finding in [`CLAUDE.md`](CLAUDE.md) (Decision log) and summarised in [`docs/AUDITS.md`](docs/AUDITS.md) |
 | What's real and what's simulated | [Real vs simulated](#real-vs-simulated) |
 
 ### Real vs simulated
@@ -41,7 +41,7 @@ Inheirit notices the signs of life you already give off, privately, and only rea
 | The will contract, guardians, challenge period and staged release on NEAR testnet | Social and work signals (Google, X, Instagram, TikTok, Facebook, LinkedIn): listed as *coming soon* with their weights; the control panel can send a SIMULATED one to show how weak signals are handled |
 | NEAR, Sepolia ETH and testnet4 BTC payouts, signed by Chain Signatures (MPC) | DM check messages |
 | The agent in an Intel TDX enclave on Phala, attested on-chain | The onward NEAR Intents swap on testnet (NEAR Intents has no testnet; priced with live quotes) |
-| Signs of life: transactions from your NEAR accounts (testnet, and mainnet `.near` read-only) and Sepolia addresses, the signed heartbeat, Telegram replies, GitHub | |
+| Signs of life: transactions from your NEAR testnet and Sepolia wallets (each added wallet is connected and signs a message proving it is yours), the signed heartbeat, Telegram replies, GitHub | |
 | Email checks and alerts, sent from `mail.inheirit.xyz` to addresses you enter (*Email alerts*): your check-ins, welfare questions, guardian vote requests, the challenge alarm. Only the time is kept, never the content | |
 | Sealed notes encrypted in the browser, re-sealed inside the enclave | |
 | Plain-English drafting and the heir guide on an attested NEAR AI Cloud model | |
@@ -212,7 +212,7 @@ See [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md). In short:
 
 - **Experimental stack.** The Shade Agent Framework is unaudited and testnet-only. The will runs on NEAR testnet, Sepolia and BTC testnet4.
 - **Vault model.** Assets must be moved into vaults the will controls: the NEAR vault in the contract, and Sepolia/BTC addresses derived by Chain Signatures. The owner can withdraw while the will is at All good or paused.
-- **Signals not connected yet:** Google Calendar, Gmail, X, Instagram, TikTok, Facebook, LinkedIn are listed as *coming soon* (the control panel can send a SIMULATED one, labelled so). Real: transactions from your NEAR accounts (testnet, and mainnet `.near` read-only) and Sepolia addresses, the signed heartbeat, Telegram replies, GitHub.
+- **Signals not connected yet:** Google Calendar, Gmail, X, Instagram, TikTok, Facebook, LinkedIn are listed as *coming soon* (the control panel can send a SIMULATED one, labelled so). Real: transactions from your NEAR testnet and Sepolia wallets (each added wallet is connected and signs a message proving it is yours), the signed heartbeat, Telegram replies, GitHub.
 - **Email limits.** On the free sending tier (about 100 a day), demo-timing wills get one email per address per run from a smaller daily budget, so real-timing wills keep room; when a limit is reached, the message stays in the app with a note. Replies to these emails aren't read: the email says to open the heartbeat app or reply on Telegram.
 - **Heirs are hidden in the UI only.** The app and agent don't reveal heirs before the release, but heir accounts and NEAR shares are in contract state, which anyone can read. Commit-reveal is on the roadmap.
 - **Payload-blind gate.** The contract decides *when* and *which vault* can be signed, not *what* the transaction says. That rests on the attested agent code and a per-stage signature cap.

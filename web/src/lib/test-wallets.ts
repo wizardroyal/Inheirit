@@ -81,4 +81,3 @@ export function testReceiveFor(taken: string[], pool: { eth: string; btc: string
   return newTestReceive();
 }
 
-export const _test = { ethAddress, btcAddress };

@@ -18,7 +18,7 @@ const ADD_LABEL: Record<Role, string> = { heir: "Add heir", guardian: "Add guard
 function CopyInvite({ text }: { text: string }) {
   const [done, setDone] = useState(false);
   return (
-    <button type="button" className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-line px-3 py-1 text-sm hover:bg-accent-soft" onClick={() => navigator.clipboard.writeText(text).then(() => setDone(true))}>
+    <button type="button" className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-line px-3 py-1 text-sm hover:bg-accent-soft" onClick={() => navigator.clipboard.writeText(text).then(() => setDone(true), () => window.prompt("Copy this link:", text))}>
       <Icon name="copy" className="h-4 w-4" />
       {done ? "Copied" : "Copy invite"}
     </button>

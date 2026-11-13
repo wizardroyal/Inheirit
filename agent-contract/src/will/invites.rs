@@ -29,6 +29,26 @@ fn index_key(code_hash: &str) -> Vec<u8> {
     format!("invh:{code_hash}").into_bytes()
 }
 
+/// Which will an owner is on (bumped when a will is closed or replaced by Start over). An invite remembers
+/// the epoch it was made in, so a link shared for an earlier will can't add someone to the next one
+/// (audit 2026-11-13). Raw keys again: no layout change.
+fn epoch_key(owner: &AccountId) -> Vec<u8> {
+    format!("invep:{owner}").into_bytes()
+}
+fn invite_epoch_key(owner: &AccountId, code_hash: &str) -> Vec<u8> {
+    format!("inve:{owner}:{code_hash}").into_bytes()
+}
+fn read_u64(key: &[u8]) -> u64 {
+    env::storage_read(key).map(|b| u64::from_le_bytes(b.try_into().unwrap_or([0; 8]))).unwrap_or(0)
+}
+pub(crate) fn current_epoch(owner: &AccountId) -> u64 {
+    read_u64(&epoch_key(owner))
+}
+/// Called when a will ends (close_will) or is replaced (Start over): every earlier invite goes stale.
+pub(crate) fn bump_invite_epoch(owner: &AccountId) {
+    env::storage_write(&epoch_key(owner), &(current_epoch(owner) + 1).to_le_bytes());
+}
+
 fn read_invite(owner: &AccountId, code_hash: &str) -> Option<Invite> {
     env::storage_read(&invite_key(owner, code_hash)).map(|b| borsh::from_slice(&b).expect("invite record"))
 }
@@ -49,6 +69,7 @@ impl Contract {
         let record = Invite { role: role.clone(), expires_at: now_s() + ttl_s };
         let existed = env::storage_write(&invite_key(&owner, &code_hash), &borsh::to_vec(&record).unwrap());
         require!(!existed, "That invite already exists");
+        env::storage_write(&invite_epoch_key(&owner, &code_hash), &current_epoch(&owner).to_le_bytes());
         require!(
             !env::storage_write(&index_key(&code_hash), owner.as_bytes()),
             "That invite code is already in use"
@@ -66,6 +87,7 @@ impl Contract {
         let initial = env::storage_usage();
         require!(env::storage_remove(&invite_key(&owner, &code_hash)), "Invite not found or already used");
         env::storage_remove(&index_key(&code_hash));
+        env::storage_remove(&invite_epoch_key(&owner, &code_hash));
         self.settle_storage(&owner, initial, NearToken::from_yoctonear(0));
     }
 
@@ -76,11 +98,15 @@ impl Contract {
         let code_hash = hex::encode(env::sha256(code.as_bytes()));
         let invite = read_invite(&owner, &code_hash).unwrap_or_else(|| env::panic_str("Invite not found or already used"));
         require!(now_s() <= invite.expires_at, "This invite has expired");
+        // Invites made before this change have no epoch record: they count as epoch 0, valid until the
+        // owner's first close or Start over.
+        require!(read_u64(&invite_epoch_key(&owner, &code_hash)) == current_epoch(&owner), "This invite was for an earlier will");
         let mut will = self.will(&owner);
         require!(will.state == WillState::Active, "Invites can be claimed only while Active");
         let initial = env::storage_usage();
         env::storage_remove(&invite_key(&owner, &code_hash));
         env::storage_remove(&index_key(&code_hash));
+        env::storage_remove(&invite_epoch_key(&owner, &code_hash));
         let heirs: Vec<&AccountId> = will.heirs.iter().map(|h| &h.account_id).collect();
         match invite.role.as_str() {
             "guardian" => {
@@ -113,11 +139,17 @@ impl Contract {
     pub fn find_invite(&self, code_hash: String) -> Option<(AccountId, Invite)> {
         let raw = env::storage_read(&index_key(&code_hash))?;
         let owner: AccountId = String::from_utf8(raw).ok()?.parse().ok()?;
+        if read_u64(&invite_epoch_key(&owner, &code_hash)) != current_epoch(&owner) {
+            return None;
+        }
         read_invite(&owner, &code_hash).map(|i| (owner, i))
     }
 
     /// Whether an invite is open (for the join page), by sha256(code).
     pub fn get_invite(&self, owner: AccountId, code_hash: String) -> Option<Invite> {
+        if read_u64(&invite_epoch_key(&owner, &code_hash)) != current_epoch(&owner) {
+            return None;
+        }
         read_invite(&owner, &code_hash)
     }
 }

@@ -177,6 +177,11 @@
       "compose_hash": "0607eb37324df8dd75cd7f0d7703f98e9fb4ffdf674901fe900c340ed6930ff6",
       "image": "unwizarding/inheirit-agent@sha256:b48ff1b5438c01b3936733d29be0bc40cb601f01be8f441f0286517a744c2484",
       "at": "2026-11-13T10:41:09.116Z"
+    },
+    {
+      "compose_hash": "c2b9daf68e67c91506a81ba2e63e55dfa9bc249d7e5c1a98eb8a219000385349",
+      "image": "unwizarding/inheirit-agent@sha256:6944bc6d19f1976b01887f24e3dd5b6bacae1ded2cf5cccdc4db2a7450358a4f",
+      "at": "2026-11-13T11:05:39.428Z"
     }
   ]
 }

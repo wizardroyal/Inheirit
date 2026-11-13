@@ -11,11 +11,7 @@ import { acceptAsGuardians, addSealedNote, createWill } from "@/lib/demo";
 import { keys } from "@/lib/keys";
 import { createPerson } from "@/lib/onboard";
 import { newTestReceive, testReceiveFor } from "@/lib/test-wallets";
-import { useOverview } from "@/lib/hooks";
 import { humanize, nameOf, readable, useAccountLabel, useNames } from "@/lib/names";
-import { acceptedGuardians, isArmed, type Will } from "@/lib/will";
-import { TelegramLink } from "./TelegramLink";
-import type { Watching } from "./WillParts";
 import { QuietPeriod, realSchedule } from "./QuietPeriod";
 import { type DraftNote, FinalSecrets, readyNotes } from "./FinalSecrets";
 import { ActionButton, Avatar, Card, Field, inputCls, Pill, SimulatedTag, Stepper } from "./ui";
@@ -646,58 +642,3 @@ export function MyWillSetup({
   );
 }
 
-/** Will strength (CLAUDE.md §8): what makes the will armed, and what makes it more robust. */
-export function StrengthChecklist({ will }: { will: Will }) {
-  const owner = will.owner;
-  const { data: overview } = useOverview(owner);
-  const signals = overview?.signals;
-  const status = overview?.status;
-  const tg = overview?.telegram;
-  // Newer agents return flags and counts (evm/github/near_extra/evm_count); older ones returned the values themselves.
-  const watching = (status?.watching ?? {}) as Watching;
-  // Strong sources actually connected: the owner's NEAR account always, plus extras, Sepolia addresses, the heartbeat app.
-  const strongCount = 1 + (watching.near_extra ?? 0) + (watching.evm_count ?? (watching.evm || watching.evmAddress ? 1 : 0)) + (signals?.heartbeat ? 1 : 0);
-  const accepted = acceptedGuardians(will).length;
-  const items: { label: string; done: boolean; required?: boolean; hint?: string }[] = [
-    { label: `Enough guardians accepted (${accepted} accepted, ${will.guardian_threshold} needed)`, done: isArmed(will), required: true, hint: "Send the link under People" },
-    { label: "At least one heir", done: will.heirs.length > 0, required: true },
-    { label: "A strong sign-of-life source (your NEAR account)", done: true, required: true },
-    { label: "Heartbeat app opened once", done: !!signals?.heartbeat, hint: "Add it to your phone's home screen" },
-    { label: `Two or more strong sources (${strongCount} connected)`, done: strongCount >= 2, hint: "Open the heartbeat app, or connect another NEAR or Ethereum wallet" },
-    { label: "GitHub connected (weak; counts with another source)", done: !!watching.github },
-    { label: "Telegram linked for checks", done: !!tg?.linked },
-    { label: "Email for checks", done: !!watching.email, hint: "Add it under Email alerts" },
-    { label: "Friends for a welfare check", done: will.contacts.length > 0 },
-    { label: "A lawyer", done: !!will.lawyer },
-    { label: "A sealed note for an heir (optional)", done: will.sealed_notes.length > 0, hint: "Add one under Sealed notes" },
-    { label: "Heirs hidden in the app until release (readable on-chain)", done: will.heirs_hidden },
-    { label: "NEAR vault funded", done: BigInt(will.near_balance) > 0n },
-  ];
-  const optional = items.filter((i) => !i.required);
-  const score = Math.round((optional.filter((i) => i.done).length / optional.length) * 100);
-  const armed = isArmed(will);
-  return (
-    <Card title="Will strength" aside={<Pill tone={armed ? "accent" : "warn"}>{armed ? `armed · ${score}%` : "not armed"}</Pill>}>
-      <ul className="space-y-1 text-sm">
-        {items.map((i) => (
-          <li key={i.label} className="flex items-start gap-2">
-            <span className="sr-only">{i.done ? "Done: " : "To do: "}</span>
-            <span aria-hidden className={i.done ? "text-accent" : i.required ? "text-danger" : "text-muted"}>
-              {i.done ? "✓" : "○"}
-            </span>
-            <span>
-              {i.label}
-              {i.required && <span className="text-xs text-muted"> · needed to arm</span>}
-              {!i.done && i.hint && <span className="block text-xs text-muted">{i.hint}</span>}
-            </span>
-          </li>
-        ))}
-      </ul>
-      {!tg?.linked && (
-        <div className="mt-3">
-          <TelegramLink account={owner} purpose="Checks reach you there first." />
-        </div>
-      )}
-    </Card>
-  );
-}

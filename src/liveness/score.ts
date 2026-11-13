@@ -95,7 +95,8 @@ export function scoreBeforeChecks(
   const limit = base.at.getTime() + quietAfterS * 1000;
   let best: AliveVerdict = base;
   for (const o of observations) {
-    if (o.trustWeight >= opts.strongWeight) continue;
+    // A source already counted (two weak sources agreeing) isn't a "lone" signal on top of itself.
+    if (o.trustWeight >= opts.strongWeight || base.basis.includes(o.source)) continue;
     const t = Math.min(o.at.getTime(), now.getTime());
     if (o.at.getTime() > now.getTime() + opts.maxFutureSkewMs) continue;
     if (t > best.at.getTime() && t <= limit) best = { at: new Date(t), basis: [o.source] };

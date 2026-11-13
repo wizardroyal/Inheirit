@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { WillGate } from "@/components/account/home";
 import { CloseWill } from "@/components/account/will";
 import { Icon } from "@/components/icons";
-import { ActionButton, Avatar, Card, ErrorNote, Field, GearButton, inputCls, Pill, Stepper } from "@/components/ui";
+import { ActionButton, Avatar, Card, ConfirmButton, ErrorNote, Field, GearButton, inputCls, Pill, Stepper } from "@/components/ui";
 import { useAccount } from "@/lib/account";
 import { agent } from "@/lib/agent";
 import { REAL_SCHEDULE, SITE_URL } from "@/lib/config";
@@ -71,9 +71,11 @@ function Actions({ will }: { will: Will }) {
   );
   if (s === "Paused")
     return (
-      <button type="button" className={btn} onClick={() => call(will.owner, "resume_will").then(refresh)}>
-        <Icon name="play" className="h-4 w-4" /> Resume
-      </button>
+      <ActionButton onClick={() => call(will.owner, "resume_will").then(refresh)}>
+        <span className="inline-flex items-center gap-2">
+          <Icon name="play" className="h-4 w-4" /> Resume
+        </span>
+      </ActionButton>
     );
   if (s !== "Active") return isSpeedrun(will) ? speedrun : null;
   return (
@@ -198,7 +200,7 @@ function CopyButton({ text, label = "Copy invite" }: { text: string; label?: str
     <button
       type="button"
       className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-line px-3 py-1 text-sm hover:bg-accent-soft"
-      onClick={() => navigator.clipboard.writeText(text).then(() => setDone(true))}
+      onClick={() => navigator.clipboard.writeText(text).then(() => setDone(true), () => window.prompt("Copy this link:", text))}
     >
       <Icon name="copy" className="h-4 w-4" />
       {done ? "Copied" : label}
@@ -257,10 +259,12 @@ function HeirsSection({ will, editable }: { will: Will; editable: boolean }) {
   const [editing, setEditing] = useState(false);
   const [adding, setAdding] = useState(false);
   const [p, setP] = useState<WillPeople>(() => peopleOf(will));
+  // What's typed in each share box, so "33." can become "33.5".
+  const [raw, setRaw] = useState<Record<string, string>>({});
   const [err, setErr] = useState<string | null>(null);
   const total = p.heirs.reduce((s, h) => s + (Number(h.pct) || 0), 0);
-  const close = () => (setEditing(false), setAdding(false), setErr(null));
-  const open = () => (setP(peopleOf(will)), setEditing(true));
+  const close = () => (setEditing(false), setAdding(false), setErr(null), setRaw({}));
+  const open = () => (setP(peopleOf(will)), setRaw({}), setEditing(true));
   return (
     <Card title="Heirs" aside={editable ? <GearButton open={editing} label="Edit heirs" onClick={() => (editing ? close() : open())} /> : undefined}>
       <ul className="divide-y divide-line">
@@ -276,8 +280,8 @@ function HeirsSection({ will, editable }: { will: Will; editable: boolean }) {
                       className={`${inputCls} w-24 pr-7`}
                       inputMode="decimal"
                       aria-label={`${h.name}'s share in percent`}
-                      value={h.pct}
-                      onChange={(e) => setP({ ...p, heirs: p.heirs.map((x, j) => (j === i ? { ...x, pct: Number(e.target.value) || 0 } : x)) })}
+                      value={raw[h.account_id] ?? h.pct}
+                      onChange={(e) => (setRaw({ ...raw, [h.account_id]: e.target.value }), setP({ ...p, heirs: p.heirs.map((x, j) => (j === i ? { ...x, pct: Number(e.target.value) || 0 } : x)) }))}
                     />
                     <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted">%</span>
                   </span>
@@ -295,7 +299,7 @@ function HeirsSection({ will, editable }: { will: Will; editable: boolean }) {
         (adding ? (
           <AddHeir
             will={will}
-            taken={[...(editing ? p : peopleOf(will)).heirs.map((h) => h.account_id), ...will.guardians.map((g) => g.account_id)]}
+            taken={[...(editing ? p : peopleOf(will)).heirs.map((h) => h.account_id), ...will.guardians.map((g) => g.account_id), ...will.contacts, ...(will.lawyer ? [will.lawyer] : [])]}
             onCancel={() => setAdding(false)}
             onAdd={(h) => {
               const base = editing ? p : peopleOf(will);
@@ -482,7 +486,7 @@ function InviteRows({ invites, editing, owner }: { invites: OpenInvite[]; editin
           right={
             <>
               <Pill tone="warn">invited</Pill>
-              {editing ? <RemoveButton onClick={() => void cancelInvite(owner, i.hash)} /> : i.link && <CopyButton text={i.link} />}
+              {editing ? <ConfirmButton label="Remove" question={`Withdraw ${i.name || "this"} invite?`} onConfirm={() => cancelInvite(owner, i.hash)} /> : i.link && <CopyButton text={i.link} />}
             </>
           }
         />

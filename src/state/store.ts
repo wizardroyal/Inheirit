@@ -171,6 +171,8 @@ export interface AgentState {
    * Owner-signed, kept here in the enclave, never on-chain, never in a public route.
    */
   profiles: Record<string, OwnerProfile>;
+  /** Wallets each owner proved they control (kept when a demo will stops being watched). */
+  walletsProven?: Record<string, string[]>;
   /** Pause reminders already sent: owner -> `${until}:${days}` keys. */
   pauseReminders: Record<string, string[]>;
 }
@@ -184,7 +186,7 @@ export interface ProfilePerson {
   telegram?: string;
   eth?: string;
   btc?: string;
-  /** Free text the owner writes (email, phone, how to reach them); only an email in it is used to send. */
+  /** Free text the owner writes (email, phone, how to reach them), for the owner's own reference; the web app copies an email in it to `email`, which is what gets used to send. */
   contact?: string;
 }
 

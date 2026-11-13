@@ -89,6 +89,8 @@ export class TelegramBot {
   unlink(account: string): void {
     this.store.update((s) => {
       delete s.telegramChats[account];
+      // A link issued before the unlink must not bind a chat afterwards.
+      for (const [t, l] of Object.entries(s.telegramLinks)) if (l.account === account) delete s.telegramLinks[t];
     });
   }
 

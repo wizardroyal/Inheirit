@@ -7,7 +7,7 @@ import { summarizePolicy, type Policy } from "@agent/policy/policy";
 import { useState } from "react";
 import { AiBadge } from "@/components/Attestation";
 
-import { ActionButton, Card, ErrorNote, Field, inputCls, Pill } from "@/components/ui";
+import { ActionButton, Card, ErrorNote, Field, inputCls } from "@/components/ui";
 import { MyWillSetup, PeopleField } from "@/components/Onboarding";
 import { QuietPeriod, realSchedule } from "@/components/QuietPeriod";
 import { type DraftNote, FinalSecrets, readyNotes } from "@/components/FinalSecrets";
@@ -20,8 +20,8 @@ import { acceptAsGuardians, addSealedNote, createWill, generateWillAndCast } fro
 import { keys } from "@/lib/keys";
 import { useNow, usePoll } from "@/lib/hooks";
 import { topUpAccount } from "@/lib/onboard";
-import { balanceOf, call, formatNear, nearToYocto, signRequest } from "@/lib/near";
-import { ago, duration, stateName, type Will } from "@/lib/will";
+import { balanceOf, formatNear, nearToYocto, signRequest } from "@/lib/near";
+import { duration } from "@/lib/will";
 
 /** A wallet account with almost no testnet NEAR can't create a will; offer a free top-up. */
 export function LowBalance({ owner }: { owner: string }) {
@@ -347,69 +347,6 @@ export function toUnits(value: string, decimals: number): bigint {
   const [whole, frac = ""] = value.trim().split(".");
   if (!/^\d+$/.test(whole || "0") || !/^\d*$/.test(frac) || frac.length > decimals) throw new Error(`"${value}" is not an amount`);
   return BigInt(whole || "0") * 10n ** BigInt(decimals) + BigInt(frac.padEnd(decimals, "0") || "0");
-}
-
-export function SealedNotes({ will, refresh }: { will: Will; refresh: () => void }) {
-  const who = useAccountLabel();
-  const [heir, setHeir] = useState(will.heirs[0]?.account_id ?? "");
-  const [label, setLabel] = useState("");
-  const [text, setText] = useState("");
-  const active = stateName(will.state) === "Active";
-  return (
-    <Card title="Sealed notes" aside={<Pill>{will.sealed_notes.length} of 10</Pill>}>
-      <p className="text-sm text-muted">
-        Encrypted here to the enclave&apos;s key. Released last, per heir, after distribution and one more wait.
-      </p>
-      <ul className="mt-3 space-y-1 text-sm">
-        {will.sealed_notes.map((n) => {
-          const released = will.released_notes.some((r) => r.note_id === n.id);
-          return (
-            <li key={n.id} className="flex flex-wrap items-center justify-between gap-2">
-              <span>
-                {n.label} <span className="text-muted">for {who(n.heir)}</span> {released && <Pill tone="accent">released</Pill>}
-              </span>
-              {active && (
-                <ActionButton tone="quiet" onClick={() => call(will.owner, "remove_sealed_note", { note_id: n.id }).then(refresh)}>
-                  Remove
-                </ActionButton>
-              )}
-            </li>
-          );
-        })}
-        {will.sealed_notes.length === 0 && <li className="text-muted">No notes yet (optional).</li>}
-      </ul>
-      {active && (
-        <div className="mt-4 space-y-2">
-          <div className="grid gap-2 sm:grid-cols-2">
-            <select className={inputCls} aria-label="Heir the note is for" value={heir} onChange={(e) => setHeir(e.target.value)}>
-              {will.heirs.map((h) => (
-                <option key={h.account_id} value={h.account_id}>
-                  for {h.name}
-                </option>
-              ))}
-            </select>
-            <input className={inputCls} aria-label="Note title" placeholder="Title (anyone can see it on-chain)" value={label} onChange={(e) => setLabel(e.target.value)} maxLength={64} />
-          </div>
-          <textarea className={`${inputCls} h-24 w-full`} aria-label="Note text" placeholder="What should they know? (Encrypted here.)" maxLength={1200} value={text} onChange={(e) => setText(e.target.value)} />
-          <ActionButton
-            disabled={!label || !text}
-            onClick={async () => {
-              await addSealedNote(will.owner, heir, label, text);
-              setText("");
-              setLabel("");
-              refresh();
-            }}
-          >
-            Seal and save
-          </ActionButton>
-          <p className="text-xs text-muted">
-            Tip: instructions beat raw keys. Split a seed phrase from its passphrase.
-          </p>
-        </div>
-      )}
-      {will.released_notes.length > 0 && <p className="mt-2 text-xs text-muted">Last release {ago(will.released_notes[will.released_notes.length - 1].at)}.</p>}
-    </Card>
-  );
 }
 
 /** "If you go quiet: earliest anything moves ≈ X; full distribution ≈ Y; secrets ≈ Z." (CLAUDE.md §8) */

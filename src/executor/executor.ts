@@ -50,11 +50,12 @@ export class StagedExecutor implements Executor {
 
   /**
    * The owner's pending withdrawals from foreign vaults (§5.2; principle 6: the owner never loses
-   * control while alive). The contract signs them only while the will is Active and only for a
+   * control while alive). The contract signs them only while the will is Active or Paused and only for a
    * matching request on the same chain; NEAR withdrawals are paid by the contract itself.
    */
   async withdraw(owner: string, will: WillView): Promise<void> {
-    if (stateName(will.state) !== "Active") return;
+    // Active or Paused: the owner keeps control while alive, pause included (the contract signs in both).
+    if (!["Active", "Paused"].includes(stateName(will.state))) return;
     for (const w of will.pending_withdrawals) {
       if (w.chain === "Near") continue;
       const vault = this.vaults.find((v) => v.chain === w.chain);

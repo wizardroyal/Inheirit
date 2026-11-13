@@ -15,7 +15,7 @@ import { call, formatNear, nearToYocto } from "@/lib/near";
 import { useProfile } from "@/lib/profile";
 import { stateName, type Will } from "@/lib/will";
 import { Icon } from "../icons";
-import { ActionButton, Card, ErrorNote, Field, GearButton, inputCls, Modal, short } from "../ui";
+import { ActionButton, Card, ConfirmButton, ErrorNote, Field, GearButton, inputCls, Modal, short } from "../ui";
 
 export function VaultName({ owner }: { owner: string }) {
   const [profile, save] = useProfile(owner);
@@ -60,7 +60,7 @@ function useHoldings(will: Will) {
 }
 
 export function VaultSection({ will }: { will: Will }) {
-  const { viewing } = useAccount();
+  const { viewing, refresh } = useAccount();
   const label = useAccountLabel();
   const { rows, tokens, total } = useHoldings(will);
   const [modal, setModal] = useState<"deposit" | "withdraw" | null>(null);
@@ -83,7 +83,10 @@ export function VaultSection({ will }: { will: Will }) {
         {will.pending_withdrawals.length > 0 && (
           <ul className="mt-2 space-y-1 text-sm text-muted">
             {will.pending_withdrawals.map((w) => (
-              <li key={w.id}>Withdrawal to {w.chain === "Near" ? label(w.to) : short(w.to, 8)}: on its way</li>
+              <li key={w.id} className="flex flex-wrap items-center justify-between gap-2">
+                <span>Withdrawal to {w.chain === "Near" ? label(w.to) : short(w.to, 8)}: on its way</span>
+                {!viewing && <ConfirmButton label="Cancel" question="Cancel this withdrawal? If it was already sent, it still arrives." onConfirm={() => call(will.owner, "cancel_withdrawal", { id: w.id }).then(refresh)} />}
+              </li>
             ))}
           </ul>
         )}
@@ -101,7 +104,7 @@ export function VaultSection({ will }: { will: Will }) {
         )}
       </Card>
       {modal === "deposit" && <DepositModal will={will} rows={rows} tokens={tokens} onClose={() => setModal(null)} />}
-      {modal === "withdraw" && <WithdrawModal will={will} onClose={() => setModal(null)} />}
+      {modal === "withdraw" && <WithdrawModal will={will} rows={rows} onClose={() => setModal(null)} />}
     </div>
   );
 }
@@ -167,15 +170,15 @@ function DepositModal({ will, rows, tokens, onClose }: { will: Will; rows: Retur
             </ActionButton>
           </>
         )}
-        {route?.kind === "vault" && !vaultRow?.address && <p className="text-muted">Loading the address…</p>}
+        {route?.kind === "vault" && !vaultRow?.address && <p className="text-muted">Loading the address… (the agent may be restarting; try again in a minute)</p>}
         {route?.kind === "vault" && vaultRow?.address && (
           <>
-            <p className="text-sm text-muted">Your deposit address ({route.vault === "Eth" ? "Ethereum Sepolia testnet" : "Bitcoin testnet4"})</p>
+            <p className="text-sm text-muted">Your deposit address ({route.vault === "Eth" ? "Ethereum, test network" : "Bitcoin, test network"})</p>
             <p className="break-all rounded-lg border border-line bg-bg p-3 font-mono text-sm">{vaultRow.address}</p>
-            <button type="button" className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-line hover:bg-accent-soft" onClick={() => navigator.clipboard.writeText(vaultRow.address!).then(() => setCopied(true))}>
+            <button type="button" className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-line hover:bg-accent-soft" onClick={() => navigator.clipboard.writeText(vaultRow.address!).then(() => setCopied(true), () => setErr("Couldn't copy; select the address instead."))}>
               <Icon name="copy" className="h-4 w-4" /> {copied ? "Copied" : "Copy address"}
             </button>
-            <button type="button" className="min-h-11 text-sm text-accent underline" onClick={() => fundFromFaucet(will.owner, (m) => setLog((l) => [...l, m]))}>
+            <button type="button" className="min-h-11 text-sm text-accent underline" onClick={() => fundFromFaucet(will.owner, (m) => setLog((l) => [...l, m])).catch((e) => setLog((l) => [...l, e instanceof Error ? e.message : String(e)]))}>
               Or fill empty vaults with free test coins
             </button>
             {log.length > 0 && <p className="text-sm text-muted">{log[log.length - 1]}</p>}
@@ -221,7 +224,7 @@ function DepositModal({ will, rows, tokens, onClose }: { will: Will; rows: Retur
   );
 }
 
-function WithdrawModal({ will, onClose }: { will: Will; onClose: () => void }) {
+function WithdrawModal({ will, rows, onClose }: { will: Will; rows: ReturnType<typeof useHoldings>["rows"]; onClose: () => void }) {
   const { refresh } = useAccount();
   const [chain, setChain] = useState<Chain>("Near");
   const [amount, setAmount] = useState("");
@@ -255,6 +258,11 @@ function WithdrawModal({ will, onClose }: { will: Will; onClose: () => void }) {
           disabled={!(Number(amount) > 0) || (chain !== "Near" && !to)}
           onClick={async () => {
             setErr(null);
+            // A foreign withdrawal the agent can't send stays pending (and blocks Close), so check it here.
+            const have = rows.find((r) => r.chain === chain)?.amount;
+            if (have !== null && have !== undefined && Number(amount) > have) return setErr(`The vault holds ${have} ${unit}.`);
+            if (chain === "Eth" && !/^0x[0-9a-fA-F]{40}$/.test(to)) return setErr("An Ethereum address starts with 0x and has 40 more characters.");
+            if (chain === "Btc" && !/^(tb1|[mn2])[a-zA-HJ-NP-Z0-9]{25,62}$/.test(to)) return setErr("Give a Bitcoin testnet address (tb1…).");
             try {
               const units = chain === "Near" ? nearToYocto(amount) : toUnits(amount, chain === "Eth" ? 18 : 8);
               await call(will.owner, "request_withdrawal", { chain, to: chain === "Near" ? will.owner : to, amount: units.toString() }, 0n, 100n);

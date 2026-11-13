@@ -1991,3 +1991,33 @@ fn invite_found_by_code_alone() {
     assert!(t.c.find_invite(code_hash("s3cret-code")).is_none(), "claimed invites leave the index");
     assert!(t.c.find_invite(code_hash("other")).is_none());
 }
+
+// ---------------------------------------------------------------- invites end with the will (audit 2026-11-13)
+
+#[test]
+#[should_panic(expected = "This invite was for an earlier will")]
+fn invite_from_a_closed_will_cannot_join_the_next_one() {
+    let mut t = with_invite("guardian", "old-link", 30 * 86_400);
+    t.as_(OWNER).close_will();
+    t.pay(OWNER, STORAGE_DEPOSIT).create_will(config());
+    t.as_(NEWBIE).claim_invite(acc(OWNER), "old-link".into());
+}
+
+#[test]
+#[should_panic(expected = "This invite was for an earlier will")]
+fn invite_from_before_start_over_cannot_join_the_new_will() {
+    let mut t = with_invite("guardian", "old-link", 30 * 86_400);
+    t.to_completed();
+    t.pay(OWNER, STORAGE_DEPOSIT).create_will(config());
+    t.as_(NEWBIE).claim_invite(acc(OWNER), "old-link".into());
+}
+
+#[test]
+fn invite_made_for_the_new_will_still_works() {
+    let mut t = T::with_will();
+    t.as_(OWNER).close_will();
+    t.pay(OWNER, STORAGE_DEPOSIT).create_will(config());
+    t.pay(OWNER, NearToken::from_millinear(10)).create_invite("guardian".into(), code_hash("new-link"), 3600);
+    t.as_(NEWBIE).claim_invite(acc(OWNER), "new-link".into());
+    assert!(t.will().guardians.iter().any(|g| g.account_id == acc(NEWBIE) && g.accepted));
+}

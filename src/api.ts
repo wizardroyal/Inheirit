@@ -74,7 +74,7 @@ const NEAR_ACCOUNT = /^(?=.{2,64}$)([a-z\d]+[-_])*[a-z\d]+(\.([a-z\d]+[-_])*[a-z
 const OwnerFields = z.object({
   /** An empty string clears it (owner-signed removal from Signs of life). */
   evm_address: z.union([z.string().regex(/^0x[0-9a-fA-F]{40}$/), z.literal("")]).optional(),
-  /** Extra Sepolia addresses and NEAR accounts (testnet, or mainnet *.near) the owner uses; replace the saved lists. */
+  /** Extra Sepolia addresses and NEAR testnet accounts the owner uses; replace the saved lists. New ones need a wallet proof (below). */
   evm_addresses: z.array(z.string().regex(/^0x[0-9a-fA-F]{40}$/)).max(5).optional(),
   near_accounts: z.array(z.string().regex(NEAR_ACCOUNT)).max(5).optional(),
   /** How heirs, guardians and friends see the owner named in messages. */
@@ -284,11 +284,17 @@ export function api(deps: ApiDeps): Hono {
           }
         }
       }
-      const known = new Set([...(prev?.evmAddresses ?? []), ...(prev?.evmAddress ? [prev.evmAddress] : [])].map((a) => a.toLowerCase()));
+      const earlier = store.get().walletsProven?.[r.owner] ?? [];
+      const known = new Set([...(prev?.evmAddresses ?? []), ...(prev?.evmAddress ? [prev.evmAddress] : []), ...earlier].map((a) => a.toLowerCase()));
       for (const e of [...(evm_addresses ?? []), ...(evm_address ? [evm_address] : [])])
         if (!known.has(e.toLowerCase()) && !proven.has(e.toLowerCase())) return c.json({ error: `Connect ${e.slice(0, 6)}…${e.slice(-4)} with its wallet and sign, so we know it's yours` }, 400);
-      const knownNear = new Set(prev?.nearAccounts ?? []);
+      const knownNear = new Set([...(prev?.nearAccounts ?? []), ...earlier]);
       for (const n of near_accounts ?? []) if (!knownNear.has(n) && !proven.has(n)) return c.json({ error: `Connect ${n} with its wallet and sign, so we know it's yours` }, 400);
+      if (proven.size)
+        store.update((s) => {
+          s.walletsProven ??= {};
+          s.walletsProven[r.owner] = [...new Set([...(s.walletsProven[r.owner] ?? []), ...proven])].slice(-20);
+        });
     }
     // The release itself must not count as a sign of life: the will's own ETH vault (its nonce rises
     // with every slice) and an heir's receive address are refused.
@@ -530,7 +536,7 @@ export function api(deps: ApiDeps): Hono {
 
   app.post("/api/telegram/unlink", async (c) => {
     if (!deps.telegram) return c.json({ error: "Telegram is not configured on this agent" }, 503);
-    const r = await ownerRequest(await c.req.json(), "telegram_link", z.object({}).passthrough(), "Unlinking Telegram must be signed by the account");
+    const r = await ownerRequest(await c.req.json(), "telegram_unlink", z.object({}).passthrough(), "Unlinking Telegram must be signed by the account");
     if (r.error) return c.json(r.error.body, r.error.status);
     deps.telegram.unlink(r.owner);
     return c.json({ ok: true });

@@ -8,7 +8,7 @@ import { serialize } from "borsh";
 import { createHash } from "node:crypto";
 import { z } from "zod";
 
-export type SignedAction = "heartbeat" | "register_owner" | "draft_policy" | "heir_guide" | "demo_faucet" | "telegram_link" | "payout_pref" | "demo_signal" | "profile" | "profile_read" | "wallet_proof";
+export type SignedAction = "heartbeat" | "register_owner" | "draft_policy" | "heir_guide" | "demo_faucet" | "telegram_link" | "payout_pref" | "demo_signal" | "profile" | "profile_read" | "wallet_proof" | "telegram_unlink";
 
 export const SignedRequest = z.object({
   account_id: z.string().min(2),
@@ -23,7 +23,7 @@ export const SignedRequest = z.object({
 export type SignedRequest = z.infer<typeof SignedRequest>;
 
 const Message = z.object({
-  action: z.enum(["heartbeat", "register_owner", "draft_policy", "heir_guide", "demo_faucet", "telegram_link", "payout_pref", "demo_signal", "profile", "profile_read", "wallet_proof"]),
+  action: z.enum(["heartbeat", "register_owner", "draft_policy", "heir_guide", "demo_faucet", "telegram_link", "payout_pref", "demo_signal", "profile", "profile_read", "wallet_proof", "telegram_unlink"]),
   owner: z.string().min(2),
   issued_at: z.number().int(),
   data: z.unknown().optional(),

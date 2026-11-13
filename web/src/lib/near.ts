@@ -126,7 +126,7 @@ export interface SignedRequest {
 const b64 = (u: Uint8Array) => btoa(String.fromCharCode(...u));
 
 /** NEP-413 message addressed to the will contract, as the agent's /api routes expect. */
-export async function signRequest(accountId: string, action: "heartbeat" | "register_owner" | "draft_policy" | "heir_guide" | "demo_faucet" | "telegram_link" | "payout_pref" | "demo_signal" | "profile" | "profile_read" | "wallet_proof", data?: unknown): Promise<SignedRequest> {
+export async function signRequest(accountId: string, action: "heartbeat" | "register_owner" | "draft_policy" | "heir_guide" | "demo_faucet" | "telegram_link" | "payout_pref" | "demo_signal" | "profile" | "profile_read" | "wallet_proof" | "telegram_unlink", data?: unknown): Promise<SignedRequest> {
   const secret = keys.secret(accountId);
   const message = JSON.stringify({ action, owner: accountId, issued_at: Date.now(), data });
   const nonce = crypto.getRandomValues(new Uint8Array(32));

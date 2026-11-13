@@ -16,7 +16,7 @@ services:
       NOTIFY_FROM_EMAIL: ${NOTIFY_FROM_EMAIL}
     platform: linux/amd64
     # Pinned by digest: the compose hash (and so the approved measurements) covers this line
-    image: unwizarding/inheirit-agent@sha256:b48ff1b5438c01b3936733d29be0bc40cb601f01be8f441f0286517a744c2484
+    image: unwizarding/inheirit-agent@sha256:6944bc6d19f1976b01887f24e3dd5b6bacae1ded2cf5cccdc4db2a7450358a4f
     container_name: shade-agent-app
     ports:
       - 3000:3000

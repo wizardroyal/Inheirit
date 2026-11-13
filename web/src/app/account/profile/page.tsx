@@ -108,7 +108,7 @@ function LinkedAccounts({ owner, hasWill }: { owner: string; hasWill: boolean })
   );
   const field = (placeholder: string, save: () => Promise<unknown>) => (
     <li className="flex flex-wrap gap-2 pb-3">
-      <input className={`${inputCls} min-w-0 flex-1`} placeholder={placeholder} value={value} onChange={(e) => setValue(e.target.value.trim())} autoFocus />
+      <input className={`${inputCls} min-w-0 flex-1`} aria-label={placeholder} placeholder={placeholder} value={value} onChange={(e) => setValue(e.target.value.trim())} autoFocus />
       <ActionButton disabled={!value} onClick={run(save)}>
         Save
       </ActionButton>
@@ -119,7 +119,7 @@ function LinkedAccounts({ owner, hasWill }: { owner: string; hasWill: boolean })
       <ul className="divide-y divide-line">
         <Row icon="telegram" label="Telegram" status={connected.telegram ? "connected" : "not connected"}>
           {connected.telegram ? (
-            <ConfirmButton label="Disconnect" question="Unlink Telegram?" onConfirm={() => signRequest(owner, "telegram_link", {}).then((s) => agent.telegramUnlink(s))} />
+            <ConfirmButton label="Disconnect" question="Unlink Telegram?" onConfirm={() => signRequest(owner, "telegram_unlink", {}).then((s) => agent.telegramUnlink(s))} />
           ) : (
             connectBtn("telegram")
           )}

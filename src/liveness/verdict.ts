@@ -3,7 +3,7 @@
 // timestamps only; never from content.
 import { acceptedGuardians, isArmed, stateName, type WillView } from "../near/will-contract";
 import { everyPhrase } from "./baseline";
-import { DEFAULT_SCORE_OPTIONS, type Observation, scoreAlive, type SignalSource } from "./score";
+import { DEFAULT_SCORE_OPTIONS, type Observation, scoreAlive, scoreBeforeChecks, type SignalSource } from "./score";
 
 const NOUN: Record<SignalSource, string> = {
   near_onchain: "NEAR transaction",
@@ -59,7 +59,8 @@ function label(o: Pick<Observation, "source" | "simulated">): string {
  */
 export function explainLiveness(will: WillView, observations: Observation[], now: Date, opts = DEFAULT_SCORE_OPTIONS, usualGapS: number | null = null, ownerName = will.owner): Verdict {
   const nowMs = now.getTime();
-  const best = scoreAlive(observations, now, opts);
+  // Same rule as the driver: at All good a lone weak signal can postpone the checks (bounded).
+  const best = stateName(will.state) === "Active" && will.timings ? scoreBeforeChecks(observations, now, will.timings.quiet_after, opts) : scoreAlive(observations, now, opts);
   const details: string[] = [];
   const ignored: Verdict["ignored"] = [];
   const lastAliveMs = will.last_alive_at * 1000;
@@ -84,6 +85,8 @@ export function explainLiveness(will: WillView, observations: Observation[], now
   const lastSeen = () => {
     if (!best) return will.last_alive_at ? `Last counted sign of life: ${since(nowMs - lastAliveMs)}.` : "No sign of life counted yet.";
     const obs = best.basis.map((s) => observations.find((o) => o.source === s)!);
+    if (best.basis.length === 1 && obs[0].trustWeight < opts.strongWeight)
+      return `Last sign of life: ${label(obs[0])} ${since(nowMs - best.at.getTime())}. On its own it only postpones the checks, by at most one quiet period after the last strong signal.`;
     return best.basis.length === 1
       ? `Last strong signal: ${label(obs[0])} ${since(nowMs - best.at.getTime())}.`
       : `Two independent signals agree: ${obs.map(label).join(" and ")}, ${since(nowMs - best.at.getTime())}.`;

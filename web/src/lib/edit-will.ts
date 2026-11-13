@@ -49,6 +49,13 @@ export async function saveWillPeople(w: Will, next: WillPeople): Promise<void> {
   config.contacts = next.contacts;
 
   const old = savedPolicy(w.owner);
+  // Did who inherits, or their shares, change? Only then are the Ethereum and Bitcoin splits touched; an
+  // edit of guardians or friends keeps every asset's own split (audit 2026-11-13).
+  const before = peopleOf(w).heirs.map((h) => `${h.account_id}:${h.pct}`).join(",");
+  const heirsChanged = before !== next.heirs.map((h) => `${h.account_id}:${h.pct}`).join(",");
+  if (!old && heirsChanged && w.foreign_chains.length) {
+    throw new Error("This will's Ethereum and Bitcoin split is kept in the browser that created it. Change heirs there, so every chain follows the same people.");
+  }
   let policy: Policy | null = null;
   if (old) {
     const ids = next.heirs.map((h) => old.heirs.find((x) => x.near_account === h.account_id)?.id ?? `h_${h.account_id.split(".")[0].replace(/[^a-z0-9]/g, "")}`);
@@ -56,7 +63,7 @@ export async function saveWillPeople(w: Will, next: WillPeople): Promise<void> {
     const draft = {
       ...old,
       heirs: next.heirs.map((h, i) => ({ id: ids[i], name: h.name, near_account: h.account_id, receive: { ...(h.eth ? { eth: h.eth } : {}), ...(h.btc ? { btc: h.btc } : {}) } })),
-      allocations: old.allocations.map((a) => ({ ...a, shares })),
+      allocations: heirsChanged ? old.allocations.map((a) => ({ ...a, shares })) : old.allocations,
       guardians: next.guardians,
       guardian_threshold: next.threshold,
       contacts: next.contacts,
