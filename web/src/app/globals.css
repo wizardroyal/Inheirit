@@ -140,3 +140,51 @@ body {
   .snap-flash, .snap-wash { animation: none; }
   .ladder-fill { transition: none; }
 }
+
+/* Landing (2026-11-13): a dawn-sky hero, dark "film" bands and gradient tiles. Fixed colours: they read
+   the same in light and dark mode, like photographs. */
+.sky {
+  background:
+    radial-gradient(60% 40% at 20% 30%, rgb(255 255 255 / 0.55), transparent 70%),
+    radial-gradient(50% 35% at 80% 20%, rgb(255 255 255 / 0.45), transparent 70%),
+    linear-gradient(180deg, #a9c6e0 0%, #cfdeea 45%, #f3ebdf 100%);
+  color: #1f2320;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .sky {
+    background:
+      radial-gradient(60% 40% at 20% 30%, rgb(255 255 255 / 0.08), transparent 70%),
+      linear-gradient(180deg, #24364a 0%, #2b3440 50%, #1d1b18 100%);
+    color: #f2ede4;
+  }
+}
+:root[data-theme="dark"] .sky {
+  background:
+    radial-gradient(60% 40% at 20% 30%, rgb(255 255 255 / 0.08), transparent 70%),
+    linear-gradient(180deg, #24364a 0%, #2b3440 50%, #1d1b18 100%);
+  color: #f2ede4;
+}
+.film {
+  background: #151412;
+  color: #efe9df;
+}
+.film .film-muted {
+  color: #a39b8e;
+}
+.film-card {
+  background: #1f1d1a;
+  border: 1px solid #2f2c27;
+  color: #efe9df;
+}
+.tile-dusk {
+  background: radial-gradient(80% 60% at 70% 20%, #f3c66b, transparent 70%), linear-gradient(160deg, #e39b2d, #a4561c);
+  color: #fffaf0;
+}
+.tile-meadow {
+  background: radial-gradient(70% 50% at 30% 25%, #c7e08a, transparent 70%), linear-gradient(170deg, #5d8a3a, #23471f);
+  color: #fbfff4;
+}
+.tile-clay {
+  background: radial-gradient(90% 60% at 60% 0%, #9cc3e3, transparent 60%), linear-gradient(175deg, #d58a4f, #8e4220);
+  color: #fff7ef;
+}

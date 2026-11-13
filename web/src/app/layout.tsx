@@ -8,7 +8,7 @@ import { HeaderNav } from "@/components/HeaderNav";
 import { REPO_URL, X_POST_URL } from "@/lib/config";
 
 const body = Inter({ variable: "--font-body", subsets: ["latin"] });
-const display = Fraunces({ variable: "--font-display", subsets: ["latin"], axes: ["opsz"] });
+const display = Fraunces({ variable: "--font-display", subsets: ["latin"], axes: ["opsz"], style: ["normal", "italic"] });
 const code = JetBrains_Mono({ variable: "--font-code", subsets: ["latin"] });
 
 export const metadata: Metadata = {

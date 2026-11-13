@@ -1,5 +1,7 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { HeroLoop } from "@/components/HeroLoop";
+import { Icon } from "@/components/icons";
 import { REPO_URL } from "@/lib/config";
 
 // The first slice of a real test will (released 2026-11-05 on the hosted stack), one link per chain.
@@ -7,16 +9,6 @@ const PROOF: [string, string][] = [
   ["NEAR", "https://testnet.nearblocks.io/address/alice.inheirit-gzdcfh.testnet"],
   ["Ethereum", "https://sepolia.etherscan.io/tx/0x0df06408e6ae91219b8c7fb45a3fefa8c8f2eff54d3e9f6b0e65fe8a16ef76ff"],
   ["Bitcoin", "https://mempool.space/testnet4/tx/50876126ed1784ed78ad41e5dbbe544031e0b0fd0ded2f36efc7f7f6fdfc4dae"],
-];
-
-const STEPS = [
-  ["All good", "The agent reads the signs of life you already give off: transactions in your NEAR, Ethereum and Bitcoin wallets, the heartbeat app, Telegram. Socials are coming soon. You do nothing."],
-  ["Quiet", "Quiet longer than your usual (measured from your transactions)? It checks in. Any reply ends it."],
-  ["Welfare check", "Still nothing? Your guardians, friends and lawyer are asked if they've heard from you."],
-  ["Guardian vote", "Guardians are asked if you've passed away. One “they're alive” stops it."],
-  ["Challenge period", "Enough guardians confirm; you're alerted everywhere. Any sign of life cancels."],
-  ["Released in stages", "10% first, then six months, the longest wait: a slice leaving is the loudest alarm. Then 20/30/40%, three months apart, on NEAR, Ethereum and Bitcoin. A sign of life stops the rest."],
-  ["Secrets last", "Sealed notes open per heir three months after everything is handed over. A secret can't be taken back."],
 ];
 
 const PROBLEMS = [
@@ -27,71 +19,169 @@ const PROBLEMS = [
   ["Secrets in public wills", "A seed phrase can't go into a will that becomes public.", "Sealed notes, opened in an enclave and re-sealed to the heir, last."],
 ];
 
+const PRINCIPLES = [
+  ["Private by construction", "The agent runs in an attested TDX enclave; only timestamps leave it. Your will's text goes only to an attested NEAR AI Cloud model."],
+  ["If Inheirit disappears", "Nothing is released. NEAR slices are paid by the contract; any newly approved agent can resume Ethereum and Bitcoin from its records."],
+  ["Alongside a legal will", "It complements one, not replaces it. Your lawyer can file a death certificate to speed up (never skip) the release."],
+  ["Honest about limits", "Wills run on testnet; payout quotes are live mainnet. Sources not connected yet are labelled SIMULATED."],
+];
+
+const em = (s: string) => <em className="italic">{s}</em>;
+
+/** A small dark product card with its caption underneath, for the scrolling row. */
+function Shot({ title, text, children }: { title: string; text: string; children: ReactNode }) {
+  return (
+    <figure className="w-72 shrink-0 snap-start space-y-3">
+      <div className="film-card tech h-56 rounded-2xl p-4 text-sm">{children}</div>
+      <figcaption>
+        <span className="block font-medium">{title}</span>
+        <span className="text-sm text-muted">{text}</span>
+      </figcaption>
+    </figure>
+  );
+}
+
+const row = "flex items-center justify-between gap-2 border-b border-[#2f2c27] py-1.5 last:border-0";
+
 export default function Home() {
   return (
     <div className="space-y-20">
-      <section className="grid items-center gap-12 pt-6 lg:grid-cols-[1.25fr_1fr]">
-        <div className="space-y-6">
-          <h1 className="font-serif text-5xl leading-[1.05] sm:text-6xl">A will that doesn&apos;t make you prove you&apos;re alive.</h1>
-          <p className="max-w-xl text-lg text-muted">
-            It reaches out only when you&apos;ve gone quiet for longer than usual. Silence never sets it off; people do. Assets go in reversible
-            slices, secrets last.
-          </p>
-          <div className="flex flex-wrap items-center gap-4">
-            <Link href="/account" className="rounded-lg bg-accent px-6 py-3 font-medium text-accent-ink hover:opacity-90">
-              Try it in 3 minutes
-            </Link>
-          </div>
-          <div className="space-y-2 border-t border-line pt-4">
-            <p className="text-sm text-muted">
-              Real on testnet: a test will&apos;s first 10%, released on three chains by an attested TDX agent.
-            </p>
-            <div className="tech flex flex-wrap gap-2">
-              {PROOF.map(([label, href]) => (
-                <a key={label} href={href} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center rounded border border-line-strong px-3 py-2 hover:bg-accent-soft">
-                  {label} ↗
-                </a>
-              ))}
-            </div>
-          </div>
+      {/* Hero: dawn sky, the pitch, and the product's one moment in a phone. */}
+      <section className="sky -mx-4 overflow-hidden px-4 pt-14 sm:mx-0 sm:rounded-3xl">
+        <div className="mx-auto max-w-3xl space-y-5 text-center">
+          <h1 className="font-serif text-5xl leading-[1.05] sm:text-6xl">A will that doesn&apos;t make you {em("prove")} you&apos;re alive.</h1>
+          <p className="mx-auto max-w-xl text-lg opacity-80">It reaches out only when you&apos;ve gone quiet for longer than usual. Silence never sets it off; people do.</p>
+          <Link href="/account" className="inline-flex min-h-11 items-center gap-2 rounded-full bg-[#fffdf9] px-6 py-3 font-medium text-[#1f2320] shadow hover:opacity-90">
+            Try it in 3 minutes →
+          </Link>
         </div>
-        <HeroLoop />
+        <div className="mx-auto mt-10 w-full max-w-sm rounded-t-[2.5rem] border-[10px] border-b-0 border-[#151412] bg-[#151412] px-1 pt-6">
+          <HeroLoop />
+        </div>
       </section>
 
-      <section className="space-y-6">
-        <h2 className="font-serif text-3xl">How it works</h2>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="rounded-2xl bg-card p-5">
-            <div className="tech-label">Layer 1</div>
-            <div className="mt-1 font-serif text-xl">Signs of life</div>
-            <p className="mt-2 text-sm text-muted">
-              Signals weighted by how hard they are to fake. A transaction or heartbeat counts alone; a post needs a second source.
-            </p>
-          </div>
-          <div className="rounded-2xl bg-card p-5">
-            <div className="tech-label">Layer 2</div>
-            <div className="mt-1 font-serif text-xl">Checks</div>
-            <p className="mt-2 text-sm text-muted">
-              After your quiet period: heartbeat app, Telegram, then people you trust. Any reply resets it.
-            </p>
-          </div>
-        </div>
-        <p className="max-w-2xl text-lg text-muted">
-          <strong className="text-ink">Signals can stop it; only people can start it.</strong>
-        </p>
-        <ol className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {STEPS.map(([title, text], i) => (
-            <li key={title} className={`rounded-2xl bg-card p-5 ${i === STEPS.length - 1 ? "sm:col-span-2 lg:col-span-3" : ""}`}>
-              <div className="tech-label">Step {i + 1}</div>
-              <div className="mt-1 font-serif text-xl">{title}</div>
-              <p className="mt-2 text-sm text-muted">{text}</p>
-            </li>
+      {/* A dark band with the line that matters and the proof, like laurels. */}
+      <section className="film -mx-4 space-y-6 px-6 py-14 text-center sm:mx-0 sm:rounded-3xl">
+        <h2 className="font-serif text-3xl sm:text-4xl">You shouldn&apos;t have to {em("check in")} to stay alive.</h2>
+        <p className="film-muted mx-auto max-w-xl">Signals can stop it; only people can start it. Assets go in reversible slices, secrets last.</p>
+        <div className="flex flex-wrap justify-center gap-3">
+          {PROOF.map(([label, href]) => (
+            <a key={label} href={href} target="_blank" rel="noreferrer" className="tech inline-flex min-h-11 items-center gap-2 rounded-full border border-[#3a362f] px-4 py-2 text-sm hover:bg-[#24211d]">
+              ❧ 10% released on {label} ↗
+            </a>
           ))}
-        </ol>
+        </div>
+        <p className="film-muted text-sm">A real test will, released on three chains by an attested TDX agent.</p>
+      </section>
+
+      {/* The product in small pieces. */}
+      <section className="space-y-6">
+        <h2 className="text-center font-serif text-4xl">See your {em("whole")} will.</h2>
+        <div className="-mx-4 flex snap-x gap-4 overflow-x-auto px-4 pb-2">
+          <Shot title="Signs of life" text="Activity you already produce, weighted by how hard it is to fake.">
+            {[
+              ["Heartbeat app", "strong", "● 2 min"],
+              ["NEAR wallet", "strong", "● 1 day"],
+              ["Telegram", "medium", "● 3 days"],
+              ["GitHub", "weak", "○"],
+            ].map(([a, b, c]) => (
+              <div key={a} className={row}>
+                <span>{a}</span>
+                <span className="text-[#a39b8e]">{b}</span>
+                <span className="text-[#9fd3b8]">{c}</span>
+              </div>
+            ))}
+          </Shot>
+          <Shot title="People decide" text="Only guardians who accepted can confirm. One “they're alive” stops it.">
+            <p className="text-[#a39b8e]">Guardian vote · 2 of 3 must confirm</p>
+            {[
+              ["Lazarus", "✓ confirmed"],
+              ["Mary", "✓ confirmed"],
+              ["Geti", "invited"],
+            ].map(([a, b]) => (
+              <div key={a} className={row}>
+                <span>{a}</span>
+                <span className={b.startsWith("✓") ? "text-[#9fd3b8]" : "text-[#e7c27a]"}>{b}</span>
+              </div>
+            ))}
+          </Shot>
+          <Shot title="Released in stages" text="10% first, then the longest wait: a slice leaving is the loudest alarm.">
+            {[
+              [10, "sent", "w-[10%]"],
+              [20, "in 6 months", "w-[20%]"],
+              [30, "3 months later", "w-[30%]"],
+              [40, "3 months later", "w-[40%]"],
+            ].map(([p, when, w]) => (
+              <div key={p} className="py-1.5">
+                <div className="flex justify-between">
+                  <span>{p}%</span>
+                  <span className="text-[#a39b8e]">{when}</span>
+                </div>
+                <div className="mt-1 h-1.5 rounded bg-[#2f2c27]">
+                  <div className={`h-1.5 rounded ${p === 10 ? "bg-[#9fd3b8]" : "bg-[#4a463f]"} ${w}`} />
+                </div>
+              </div>
+            ))}
+          </Shot>
+          <Shot title="Heirs get what they use" text="Each heir picks the asset and chain; NEAR Intents converts every slice.">
+            <p className="text-[#a39b8e]">Ada chose</p>
+            <p className="mt-1 font-serif text-2xl">USDC on Base</p>
+            <div className={`${row} mt-4`}>
+              <span>$10 of NEAR</span>
+              <span className="text-[#9fd3b8]">≈ 10.01 USDC</span>
+            </div>
+            <p className="mt-2 text-[#a39b8e]">live mainnet quote</p>
+          </Shot>
+        </div>
+      </section>
+
+      {/* The check-in, as it arrives. */}
+      <section className="space-y-6 text-center">
+        <h2 className="font-serif text-4xl">Receive {em("gentle")} check-ins.</h2>
+        <div className="film mx-auto flex max-w-xl items-start gap-3 rounded-2xl p-4 text-left shadow-lg">
+          <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#2a2723]">
+            <Icon name="telegram" className="h-4 w-4" />
+          </span>
+          <span className="text-sm">
+            Just checking in: we haven&apos;t seen any activity from you for a while. Reply with anything (or open the heartbeat app) and that&apos;s it, nothing else happens.
+          </span>
+          <span className="film-muted ml-auto text-xs">now</span>
+        </div>
+        <p className="text-muted">Only after silence longer than your usual. Any reply is a sign of life.</p>
+      </section>
+
+      {/* Alternating tiles: the three ideas, each next to what it looks like. */}
+      <section className="grid gap-4 sm:grid-cols-2">
+        <div className="tile-dusk order-1 flex min-h-64 sm:order-none flex-col justify-between rounded-3xl p-8">
+          <h3 className="font-serif text-4xl">We {em("watch")} quietly</h3>
+          <p className="opacity-90">Timestamps only, read inside an attested enclave. Never content.</p>
+        </div>
+        <div className="film-card tech order-2 flex min-h-64 flex-col justify-center gap-3 rounded-3xl p-8 text-sm sm:order-none">
+          <p className="text-[#9fd3b8]">Alive. Last strong signal: heartbeat app 2 minutes ago.</p>
+          <p className="text-[#a39b8e]">One X post seen 1 hour ago; on its own it only postpones the checks, because posts can be scheduled or run by someone else.</p>
+        </div>
+        <div className="film-card tech order-4 flex min-h-64 flex-col justify-center gap-2 rounded-3xl p-8 text-sm sm:order-none">
+          <p className="text-[#a39b8e]">Challenge period</p>
+          <p>Guardians have confirmed. You&apos;re alerted on every channel; any sign of life cancels everything.</p>
+          <p className="text-[#e7c27a]">A lawyer&apos;s death certificate can shorten the waits, never skip one.</p>
+        </div>
+        <div className="tile-meadow order-3 flex min-h-64 sm:order-none flex-col justify-between rounded-3xl p-8">
+          <h3 className="font-serif text-4xl">People {em("decide")}</h3>
+          <p className="opacity-90">Silence alone never moves a coin. Guardians agree, then a challenge period.</p>
+        </div>
+        <div className="tile-clay order-5 flex min-h-64 sm:order-none flex-col justify-between rounded-3xl p-8">
+          <h3 className="font-serif text-4xl">Secrets come {em("last")}</h3>
+          <p className="opacity-90">A slice can be stopped; a revealed secret can&apos;t. Notes open per heir after everything is handed over.</p>
+        </div>
+        <div className="film-card tech order-6 flex min-h-64 flex-col justify-center gap-2 rounded-3xl p-8 text-sm sm:order-none">
+          <p className="text-[#a39b8e]">Sealed note · for Ada</p>
+          <p className="font-serif text-xl">“The Ledger is in the blue folder in the study…”</p>
+          <p className="text-[#a39b8e]">Opened in the enclave, re-sealed to Ada&apos;s key, three months after the last slice.</p>
+        </div>
       </section>
 
       <section className="space-y-6">
-        <h2 className="font-serif text-3xl">Why earlier attempts failed</h2>
+        <h2 className="font-serif text-3xl">Why earlier attempts {em("failed")}</h2>
         <div className="overflow-x-auto rounded-2xl bg-card">
           <table className="w-full text-sm">
             <thead className="tech-label text-left">
@@ -115,14 +205,7 @@ export default function Home() {
       </section>
 
       <section className="grid gap-4 sm:grid-cols-2">
-        {[
-          ["Private by construction", "The agent runs in an attested TDX enclave; only timestamps leave it. Your will's text goes only to an attested NEAR AI Cloud model."],
-          ["Staged and reversible", "Slices, not lump sums. A sign of life stops the rest; withdraw any time at All good."],
-          ["Heirs get what they use", "Each slice is paid in the asset and chain the heir chose, via NEAR Intents. Optional: pay in dollars."],
-          ["If Inheirit disappears", "Nothing is released. NEAR slices are paid by the contract; any newly approved agent can resume Ethereum and Bitcoin from its records."],
-          ["Alongside a legal will", "It complements one, not replaces it. Your lawyer can file a death certificate to speed up (never skip) the release."],
-          ["Honest about limits", "Wills run on testnet; payout quotes are live mainnet. Sources not connected yet are labelled SIMULATED."],
-        ].map(([t, d]) => (
+        {PRINCIPLES.map(([t, d]) => (
           <div key={t} className="rounded-2xl bg-card p-5">
             <div className="font-serif text-xl">{t}</div>
             <p className="mt-2 text-sm text-muted">{d}</p>
@@ -130,9 +213,14 @@ export default function Home() {
         ))}
       </section>
 
-      <section className="rounded-2xl bg-accent-soft p-6">
-        <p className="tech-label">Next</p>
-        <p className="mt-2 font-serif text-2xl text-accent">Next: gifts that release at milestones.</p>
+      {/* Closing call to action. */}
+      <section className="tile-meadow -mx-4 space-y-5 px-6 py-16 text-center sm:mx-0 sm:rounded-3xl">
+        <h2 className="font-serif text-4xl sm:text-5xl">Set your will in {em("three minutes")}.</h2>
+        <p className="opacity-90">Free on testnet. A demo account needs no wallet.</p>
+        <Link href="/account" className="inline-flex min-h-11 items-center rounded-full bg-[#fffdf9] px-6 py-3 font-medium text-[#1f2320] hover:opacity-90">
+          Get started →
+        </Link>
+        <p className="text-sm opacity-80">Next: gifts that release at milestones.</p>
       </section>
 
       <p className="text-sm text-muted">
