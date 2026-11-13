@@ -58,11 +58,18 @@ function Actions({ will }: { will: Will }) {
   const [pausing, setPausing] = useState(false);
   const [days, setDays] = useState(30);
   const s = stateName(will.state);
+  // Testnet: any will can be run on a clock of minutes to see how it would execute.
+  const speedrun = (
+    <Link href="/account/speedrun" className="inline-flex min-h-11 items-center rounded-lg border border-line px-4 py-2 hover:bg-accent-soft">
+      {isSpeedrun(will) ? "Speedrun" : "Try a speedrun"}
+    </Link>
+  );
   if (s === "Paused")
     return <ActionButton onClick={() => call(will.owner, "resume_will").then(refresh)}>Resume</ActionButton>;
-  if (s !== "Active") return null;
+  if (s !== "Active") return isSpeedrun(will) ? speedrun : null;
   return (
     <>
+      {speedrun}
       {pausing ? (
         <span className="flex flex-wrap items-center gap-2 rounded-xl border border-line bg-card p-2">
           <span>Pause for</span>

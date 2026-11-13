@@ -88,7 +88,16 @@ export async function createCastAccounts(): Promise<Record<"heir" | "g1" | "g2" 
  * A test person (heir, guardian, friend or lawyer) with a random first name, key in this browser. Made by
  * the owner when the owner's key is here, else by the onboarding route (wallets won't add full-access keys).
  */
-export async function createPerson(owner: string, given?: string): Promise<{ accountId: string; name: string }> {
+// One at a time: test people are made with the owner's key (or the parent's on the server), and two at
+// once collide on the access key's nonce ("Transaction nonce … must be larger").
+let personQueue: Promise<unknown> = Promise.resolve();
+export function createPerson(owner: string, given?: string): Promise<{ accountId: string; name: string }> {
+  const run = personQueue.then(() => createPersonNow(owner, given));
+  personQueue = run.catch(() => {});
+  return run;
+}
+
+async function createPersonNow(owner: string, given?: string): Promise<{ accountId: string; name: string }> {
   const name = given ?? randomPeople(1)[0];
   let accountId: string;
   if (keys.secret(owner)) {

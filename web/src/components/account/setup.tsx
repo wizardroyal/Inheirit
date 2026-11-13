@@ -11,6 +11,7 @@ const STEPS = ["Username", "Recovery key", "Your people", "Your vault"];
 
 export function AccountSetup({ owner, onDone }: { owner: string; onDone: () => void }) {
   const [step, setStep] = useState(0);
+  const back = () => setStep(Math.max(0, step - 1));
   const next = async () => {
     if (step < STEPS.length - 1) return setStep(step + 1);
     await saveProfile(owner, { setupDone: true }).catch(() => {});
@@ -33,17 +34,17 @@ export function AccountSetup({ owner, onDone }: { owner: string; onDone: () => v
           ))}
         </ol>
       </div>
-      {step === 0 && <UsernameStep owner={owner} onNext={next} />}
+      {step === 0 && <UsernameStep owner={owner} />}
       {step === 1 && <BackupAccess owner={owner} />}
       {step === 2 && <PeopleStep owner={owner} />}
       {step === 3 && <VaultStep owner={owner} />}
       <div className="flex flex-wrap items-center gap-3">
         {step > 0 && (
-          <ActionButton onClick={next}>{step === STEPS.length - 1 ? "Finish" : "Next"}</ActionButton>
+          <button type="button" className="min-h-11 rounded-lg border border-line px-4 py-2 hover:bg-accent-soft" onClick={back}>
+            Back
+          </button>
         )}
-        <button type="button" className="min-h-11 px-3 text-muted underline" onClick={next}>
-          Skip{step === STEPS.length - 1 ? " and finish" : ""}
-        </button>
+        <ActionButton onClick={next}>{step === STEPS.length - 1 ? "Finish" : "Next"}</ActionButton>
         <button
           type="button"
           className="ml-auto min-h-11 px-3 text-sm text-muted underline"
@@ -56,19 +57,22 @@ export function AccountSetup({ owner, onDone }: { owner: string; onDone: () => v
   );
 }
 
-function UsernameStep({ owner, onNext }: { owner: string; onNext: () => Promise<void> }) {
+function UsernameStep({ owner }: { owner: string }) {
   const [name, setDraft] = useState(() => (nameOf(owner) ?? "").replace(/([a-z])([A-Z])/g, "$1 $2"));
   return (
     <Card title="Your username">
       <p className="mb-3 text-muted">We made one up. Change it to what your people call you; it&apos;s used in emails, Telegram and your will.</p>
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-        <Field label="Username">
-          <input className={inputCls} maxLength={64} value={name} onChange={(e) => setDraft(e.target.value)} />
-        </Field>
-        <ActionButton disabled={!name.trim()} onClick={async () => (setName(owner, name.trim()), await onNext())}>
-          Save and continue
-        </ActionButton>
-      </div>
+      <input
+        className={`${inputCls} w-full max-w-sm`}
+        aria-label="Username"
+        maxLength={64}
+        value={name}
+        onChange={(e) => {
+          setDraft(e.target.value);
+          // Saved as you type (this browser); an empty box keeps the old name.
+          if (e.target.value.trim()) setName(owner, e.target.value.trim());
+        }}
+      />
     </Card>
   );
 }

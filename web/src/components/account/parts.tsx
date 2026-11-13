@@ -19,9 +19,8 @@ import { stagesFor, summarize } from "@agent/policy/schedule";
 import { acceptAsGuardians, addSealedNote, createWill, generateWillAndCast } from "@/lib/demo";
 import { createInvite, type InviteRole, nameClaimedInvites } from "@/lib/invites";
 import { keys } from "@/lib/keys";
-import { useKeys, useNow, usePoll } from "@/lib/hooks";
+import { useNow, usePoll } from "@/lib/hooks";
 import { topUpAccount } from "@/lib/onboard";
-import { disconnectWallet, walletAccountId } from "@/lib/wallet";
 import { balanceOf, call, formatNear, nearToYocto, signRequest } from "@/lib/near";
 import { ago, duration, stateName, type Will } from "@/lib/will";
 
@@ -42,23 +41,6 @@ export function LowBalance({ owner }: { owner: string }) {
 }
 
 /** Sign-out for a wallet; another sign-in. */
-export function AccountActions({ owner, onSignIn, onSignedOut }: { owner: string; onSignIn: () => void; onSignedOut: () => void }) {
-  useKeys(); // re-render when the wallet or the key store changes
-  const wallet = !!owner && walletAccountId() === owner;
-  return (
-    <div className="flex flex-wrap items-center gap-3 text-xs">
-      {wallet && (
-        <button type="button" className="min-h-11 px-1 text-accent underline" onClick={() => disconnectWallet().then(onSignedOut)}>
-          Disconnect wallet
-        </button>
-      )}
-      <button type="button" className="min-h-11 px-1 text-muted underline hover:text-ink" onClick={onSignIn}>
-        Use another account
-      </button>
-    </div>
-  );
-}
-
 /** useState that survives a reload of this tab (sessionStorage), e.g. a 2-minute AI draft. */
 export function useSessionState<T>(key: string, initial: T): [T, (v: T) => void] {
   const [v, setV] = useState<T>(() => {
@@ -207,7 +189,7 @@ export function WriteWill({ owner, onCreating, onCreated }: { owner: string; onC
   const [draft, setDraft] = useSessionState<DraftResult | null>(`inheirit:draft:${owner}`, null);
   const [draftingSince, setDraftingSince] = useState<number | null>(null);
   const now = useNow();
-  const [demoClock, setDemoClock] = useState(true);
+  const demoClock = false; // a speedrun is started later from My will
   const [notes, setNotes] = useState<DraftNote[]>([]);
   const [notesOnly, setNotesOnly] = useState(false);
   const [quietDays, setQuietDays] = useState<number | null>(null);
@@ -293,11 +275,7 @@ export function WriteWill({ owner, onCreating, onCreated }: { owner: string; onC
                 <input className={inputCls} value={deposit} onChange={(e) => setDeposit(e.target.value)} />
               </Field>
             </div>
-            <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" checked={demoClock} onChange={(e) => setDemoClock(e.target.checked)} />
-              Demo clock: quiet after {duration(DEMO_SCHEDULE.timings.quiet_after)} instead of days
-            </label>
-            {!demoClock && <QuietPeriod owner={owner} value={quietDays} onChange={setQuietDays} />}
+            <QuietPeriod owner={owner} value={quietDays} onChange={setQuietDays} />
             <SetupSummary stagesPct={policy.stages_pct} demoClock={demoClock} quietDays={quietDays} />
             <label className="flex items-start gap-2 text-sm">
               <input type="checkbox" className="mt-1" checked={notesOnly} onChange={(e) => setNotesOnly(e.target.checked)} />

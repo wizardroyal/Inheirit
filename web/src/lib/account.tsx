@@ -8,7 +8,12 @@ import { ensureName, rememberOwner } from "./names";
 import { canSign } from "./near";
 import type { Will } from "./will";
 
-const CURRENT = "inheirit:current-owner";
+export const CURRENT_OWNER_KEY = "inheirit:current-owner";
+const CURRENT = CURRENT_OWNER_KEY;
+/** Fired when the signed-in account changes (the site header shows its avatar). */
+export const OWNER_EVENT = "inheirit:owner";
+/** Fired by the header's profile/menu button: the account area opens its side bar. */
+export const MENU_EVENT = "inheirit:menu";
 
 interface Account {
   owner: string;
@@ -45,6 +50,7 @@ export function AccountProvider({ children }: { children: ReactNode }) {
     } catch {
       // storage blocked
     }
+    window.dispatchEvent(new Event(OWNER_EVENT));
   };
   const { data: will, loaded, refresh } = useWill(owner || null);
   const [creating, setCreating] = useState(false);

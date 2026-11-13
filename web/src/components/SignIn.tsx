@@ -50,7 +50,9 @@ function GoogleButton({ clientId, onAccount, onError }: { clientId: string; onAc
               .finally(() => setBusy(false));
           },
         });
-        g.accounts.id.renderButton(el.current, { theme: "outline", size: "large", text: "continue_with", shape: "pill" });
+        // Same width as the wallet button beside it (Google allows 200-400 px).
+        const width = Math.max(200, Math.min(400, el.current.offsetWidth || 300));
+        g.accounts.id.renderButton(el.current, { theme: "outline", size: "large", text: "continue_with", shape: "rectangular", width });
       })
       .catch((e) => cb.current.onError(e.message));
     return () => {
@@ -58,8 +60,8 @@ function GoogleButton({ clientId, onAccount, onError }: { clientId: string; onAc
     };
   }, [clientId]);
   return (
-    <div>
-      <div ref={el} />
+    <div className="w-full">
+      <div ref={el} className="flex min-h-11 w-full items-center justify-center" />
       {busy && <p className="mt-1 text-xs text-muted">Creating your testnet account (about 5 seconds)…</p>}
     </div>
   );
@@ -79,25 +81,20 @@ export function SignIn({ onSignedIn: signedIn }: { onSignedIn: (accountId: strin
   }, []);
   return (
     <Card title="Sign in">
-      <div className="grid gap-6 sm:grid-cols-3">
-        <div className="space-y-3">
-          <p className="font-medium">NEAR wallet</p>
-          <ActionButton onClick={async () => onSignedIn(await connectWallet())}>Connect a wallet</ActionButton>
-        </div>
-        <div className="space-y-3">
-          <p className="font-medium">Google</p>
+      <div className="space-y-3">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <ActionButton full className="min-h-12 text-base" onClick={async () => onSignedIn(await connectWallet())}>
+            Connect a NEAR wallet
+          </ActionButton>
           {info?.enabled && info.googleClientId ? (
             <GoogleButton clientId={info.googleClientId} onAccount={onSignedIn} onError={setError} />
           ) : (
-            <p className="text-sm text-muted">{info ? "Not available here." : "…"}</p>
+            <p className="flex min-h-12 items-center justify-center text-sm text-muted">{info ? "Google sign-in isn't available here." : "…"}</p>
           )}
         </div>
-        <div className="space-y-3">
-          <p className="font-medium">No sign-in</p>
-          <ActionButton tone="quiet" disabled={info !== null && !info.enabled} onClick={async () => onSignedIn(await createDemoAccount())}>
-            Try with a demo account
-          </ActionButton>
-        </div>
+        <ActionButton full tone="quiet" className="min-h-12 text-base" disabled={info !== null && !info.enabled} onClick={async () => onSignedIn(await createDemoAccount())}>
+          Try with a demo account
+        </ActionButton>
       </div>
       {error && (
         <div className="mt-4">

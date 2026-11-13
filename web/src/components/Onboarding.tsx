@@ -21,7 +21,7 @@ import type { Watching } from "./WillParts";
 import { QuietPeriod, realSchedule } from "./QuietPeriod";
 import { type DraftNote, FinalSecrets, readyNotes } from "./FinalSecrets";
 import { ActionButton, Avatar, Card, Field, inputCls, Pill, SimulatedTag, Stepper } from "./ui";
-import { localProfile, newId, saveProfile, useProfile, type Role } from "@/lib/profile";
+import { localProfile, newId, saveProfile, useProfile, type Person, type Role } from "@/lib/profile";
 
 const ACCOUNT = /^[a-z0-9._-]{2,64}$/;
 
@@ -123,6 +123,18 @@ export function GenerateButton({ owner, what, name, onMade }: { owner: string; w
   );
 }
 
+/**
+ * The NEAR account for someone picked from Profile. People saved by name only get a funded test account
+ * (testnet), which is written back to their Profile row so the next pick reuses it.
+ */
+async function accountFor(owner: string, p: Person): Promise<{ accountId: string; created: boolean }> {
+  if (p.account) return { accountId: p.account, created: false };
+  const made = await createPerson(owner, p.name);
+  const all = localProfile(owner).people;
+  await saveProfile(owner, { people: all.map((x) => (x.id === p.id ? { ...x, account: made.accountId } : x)) }).catch(() => {});
+  return { accountId: made.accountId, created: true };
+}
+
 /** A comma-separated list of NEAR accounts shown as name chips, with a box to add one and a refresh button to generate one. */
 export function PeopleField({
   owner,
@@ -143,8 +155,8 @@ export function PeopleField({
   const people = list(value);
   const [profile] = useProfile(owner);
   const role = (["guardian", "lawyer", "friend", "heir"] as Role[]).find((r) => r === what) ?? "guardian";
-  // People already in Profile for this role (with a NEAR account), not yet chosen here.
-  const fromProfile = profile.people.filter((p) => p.role === role && p.account && !people.includes(p.account));
+  // People already in Profile for this role, not yet chosen here (someone saved by name only gets a test account on pick).
+  const fromProfile = profile.people.filter((p) => p.role === role && !(p.account && people.includes(p.account)));
   const add = (id: string, name?: string) => {
     if (!id || people.includes(id)) return;
     onChange((single ? [id] : [...people, id]).join(", "));
@@ -158,9 +170,9 @@ export function PeopleField({
       {(!single || people.length === 0) && fromProfile.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {fromProfile.map((p) => (
-            <button key={p.id} type="button" className="min-h-11 rounded-lg border border-dashed border-line px-3 py-2 text-sm hover:bg-accent-soft" onClick={() => add(p.account!, p.name)}>
+            <ActionButton key={p.id} tone="quiet" className="border-dashed" onClick={async () => add((await accountFor(owner, p)).accountId, p.name)}>
               + {p.name}
-            </button>
+            </ActionButton>
           ))}
         </div>
       )}
@@ -239,7 +251,8 @@ export function MyWillSetup({
   // Notes only: no money in any vault, just sealed notes released last (the zero-custody way in).
   const [notesOnly, setNotesOnly] = useState(false);
   const [notes, setNotes] = useState<DraftNote[]>([]);
-  const [demoClock, setDemoClock] = useState(true);
+  // Setup always uses real timings; a speedrun is started later from My will.
+  const demoClock = false;
   const [quietDays, setQuietDays] = useState<number | null>(30);
   const [stable, setStable] = useState(false);
   const [log, setLog] = useState<string[]>([]);
@@ -274,13 +287,12 @@ export function MyWillSetup({
     setAssets(d.assets);
     setDeposit(d.deposit);
     setNotesOnly(d.notesOnly);
-    setDemoClock(d.speedrun);
     setQuietDays(d.quietDays);
     setStable(d.stable);
   }, [profile.draft]);
   const [draftSaved, setDraftSaved] = useState(false);
-  const draftForm = (): DraftForm => ({ v: 1, name, jurisdiction, evm, heirs, guardians, threshold, lawyer, contacts, assets, deposit, notesOnly, speedrun: demoClock, quietDays, stable });
-  const profileHeirs = profile.people.filter((p) => p.role === "heir" && p.account && !heirs.some((h) => h.account === p.account));
+  const draftForm = (): DraftForm => ({ v: 1, name, jurisdiction, evm, heirs, guardians, threshold, lawyer, contacts, assets, deposit, notesOnly, speedrun: false, quietDays, stable });
+  const profileHeirs = profile.people.filter((p) => p.role === "heir" && !(p.account && heirs.some((h) => h.account === p.account)));
 
   const label = useAccountLabel();
   const names = useNames();
@@ -441,20 +453,23 @@ export function MyWillSetup({
             <div className="flex flex-wrap items-center gap-2 text-sm">
               <span className="text-muted">From your people:</span>
               {profileHeirs.map((p) => (
-                <button
+                <ActionButton
                   key={p.id}
-                  type="button"
-                  className="min-h-11 rounded-lg border border-dashed border-line px-3 py-2 hover:bg-accent-soft"
-                  onClick={() =>
+                  tone="quiet"
+                  className="border-dashed"
+                  onClick={async () => {
+                    const { accountId, created } = await accountFor(owner, p);
                     setHeirs((hs) => {
-                      const row = { name: p.name, account: p.account!, pct: "0", eth: p.eth ?? "", btc: p.btc ?? "" };
+                      // A new test account also gets test receive addresses, like ↻.
+                      const recv = created ? testReceiveFor(hs.map((o) => o.eth), pool.current) : { eth: "", btc: "" };
+                      const row = { name: p.name, account: accountId, pct: "0", eth: p.eth || recv.eth, btc: p.btc || recv.btc };
                       const empty = hs.findIndex((h) => !h.name.trim() && !h.account.trim());
                       return empty >= 0 ? hs.map((h, j) => (j === empty ? { ...row, pct: h.pct } : h)) : [...hs, row];
-                    })
-                  }
+                    });
+                  }}
                 >
                   + {p.name}
-                </button>
+                </ActionButton>
               ))}
             </div>
           )}
@@ -542,17 +557,9 @@ export function MyWillSetup({
           <p className="mt-1 text-xs text-muted">10% → 20% → 30% → 40%, longest wait after the first. Fund ETH and BTC vaults afterwards.</p>
         </div>
         </>)}
-        <label className="mt-3 flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={demoClock} onChange={(e) => setDemoClock(e.target.checked)} />
-          <span>
-            <b>Speedrun</b>: minutes instead of months, for trying it
-          </span>
-        </label>
-        {!demoClock && (
-          <div className="mt-3">
-            <QuietPeriod owner={owner} evm={evm} value={quietDays} onChange={setQuietDays} />
-          </div>
-        )}
+        <div className="mt-3">
+          <QuietPeriod owner={owner} evm={evm} value={quietDays} onChange={setQuietDays} />
+        </div>
         <div className="mt-2">{summary(STANDARD_PCT, demoClock, quietDays)}</div>
       </Card>
 

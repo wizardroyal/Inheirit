@@ -43,9 +43,26 @@ export function configFromWill(w: Will, preset: SchedulePreset) {
   };
 }
 
+// A real will's own timings (e.g. the quiet period the owner chose), kept here while it runs a speedrun so
+// "Back to real timings" restores them rather than the defaults.
+const realKey = (owner: string) => `inheirit:real-timings:${owner}`;
+
 /** Switches an Active will to demo timings (or back). Storage barely changes; the excess is refunded. */
 export async function setTimings(w: Will, demo: boolean): Promise<void> {
-  await call(w.owner, "update_will", { config: configFromWill(w, demo ? DEMO_SCHEDULE : REAL_SCHEDULE) }, nearToYocto("0.02"));
+  let config = configFromWill(w, demo ? DEMO_SCHEDULE : REAL_SCHEDULE);
+  try {
+    if (demo && !isSpeedrun(w))
+      localStorage.setItem(realKey(w.owner), JSON.stringify({ timings: w.timings, stages: w.stages, accelerated_stages: w.accelerated_stages }));
+    const saved = !demo ? localStorage.getItem(realKey(w.owner)) : null;
+    if (saved) {
+      const r = JSON.parse(saved) as Pick<Will, "timings" | "stages" | "accelerated_stages">;
+      // Only when the percentages are unchanged; otherwise the defaults fit the new slices.
+      if (r.stages.map((x) => x.pct).join() === w.stages.map((x) => x.pct).join()) config = { ...config, timings: r.timings, stages: r.stages, accelerated_stages: r.accelerated_stages };
+    }
+  } catch {
+    // storage blocked: defaults
+  }
+  await call(w.owner, "update_will", { config }, nearToYocto("0.02"));
   // The agent stops watching a speedrun will after a few hours; switching timings starts it watching again.
   await agent.registerOwner(await signRequest(w.owner, "register_owner", {}));
 }

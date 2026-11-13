@@ -4,6 +4,7 @@ import Link from "next/link";
 import "@near-wallet-selector/modal-ui/styles.css";
 import "./globals.css";
 
+import { HeaderNav } from "@/components/HeaderNav";
 import { REPO_URL, X_POST_URL } from "@/lib/config";
 
 const body = Inter({ variable: "--font-body", subsets: ["latin"] });
@@ -18,18 +19,12 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = { themeColor: "#2f5d50" };
 
-const NAV = [
-  { href: "/account", label: "Your will" },
-  { href: "/heartbeat", label: "Heartbeat" },
-  { href: "/mainnet", label: "Mainnet" },
-];
-
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${body.variable} ${display.variable} ${code.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col font-sans">
         <header className="border-b border-line">
-          <nav className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-4">
+          <nav className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3">
             <span className="flex items-center gap-2">
               <Link href="/" className="font-serif text-2xl">
                 Inheirit
@@ -38,13 +33,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
                 Testnet
               </span>
             </span>
-            <div className="flex flex-wrap gap-x-5 gap-y-1 text-sm">
-              {NAV.map((n) => (
-                <Link key={n.href} href={n.href} className="text-muted hover:text-ink">
-                  {n.label}
-                </Link>
-              ))}
-            </div>
+            <HeaderNav />
           </nav>
         </header>
         <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">{children}</main>

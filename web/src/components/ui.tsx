@@ -33,7 +33,10 @@ export function ActionButton({
   tone = "primary",
   disabled,
   className = "",
+  full,
 }: {
+  /** Fill the width of its container. */
+  full?: boolean;
   onClick: () => Promise<unknown>;
   children: ReactNode;
   tone?: Tone;
@@ -43,7 +46,7 @@ export function ActionButton({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   return (
-    <span className="inline-flex flex-col gap-1">
+    <span className={`${full ? "flex w-full" : "inline-flex"} flex-col gap-1`}>
       <button
         type="button"
         disabled={busy || disabled}
