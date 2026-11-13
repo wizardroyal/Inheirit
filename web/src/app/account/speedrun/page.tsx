@@ -1,5 +1,6 @@
 "use client";
 // Try a speedrun: demo tooling lives here, never on a real account's screens. No will yet: generate a sample.
+import { FinishSetup } from "@/components/account/home";
 import { GenerateWill } from "@/components/account/parts";
 import { SignsOfLife } from "@/components/SignsOfLife";
 import { Speedrun } from "@/components/Speedrun";
@@ -17,6 +18,7 @@ export default function SpeedrunPage() {
         !viewing && <GenerateWill owner={owner} onCreating={setCreating} onCreated={refresh} />
       ) : (
         <>
+          <FinishSetup will={will} />
           <SignsOfLife owner={will.owner} will={will} />
           <Speedrun will={will} refresh={refresh} />
         </>

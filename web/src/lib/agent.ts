@@ -16,7 +16,32 @@ async function req<T>(path: string, body?: unknown): Promise<T> {
   return out;
 }
 
+/** Re-signs a signed request with a fresh nonce and time (set by near.ts; avoids an import cycle). */
+let resign: ((signed: SignedRequest) => Promise<SignedRequest>) | null = null;
+export function setResigner(f: (signed: SignedRequest) => Promise<SignedRequest>) {
+  resign = f;
+}
+export const FINISHING_EVENT = "inheirit:finishing";
+
 async function send<T>(path: string, body?: unknown): Promise<T> {
+  try {
+    return await sendOnce<T>(path, body);
+  } catch (e) {
+    // A brand-new key the agent looked up too early: it remembers the miss for 30 s. Wait it out and retry
+    // once, re-signed, saying "Finishing setup…" rather than showing an error.
+    const signed = (body as { signed?: SignedRequest } | undefined)?.signed;
+    if (!signed || !resign || !(e instanceof Error) || !/key is not on/.test(e.message)) throw e;
+    window.dispatchEvent(new CustomEvent(FINISHING_EVENT, { detail: true }));
+    try {
+      await new Promise((r) => setTimeout(r, 31_000));
+      return await sendOnce<T>(path, { ...(body as object), signed: await resign(signed) });
+    } finally {
+      window.dispatchEvent(new CustomEvent(FINISHING_EVENT, { detail: false }));
+    }
+  }
+}
+
+async function sendOnce<T>(path: string, body?: unknown): Promise<T> {
   const res = await fetch(`${AGENT_URL}${path}`, body === undefined ? {} : { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).catch(() => {
     throw new Error("The will agent isn't answering right now (it may be restarting or switched off). Try again in a minute.");
   });

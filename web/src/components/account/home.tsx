@@ -6,7 +6,9 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useAccount } from "@/lib/account";
 import { useOverview } from "@/lib/hooks";
 import { humanize, useNames } from "@/lib/names";
-import { call, canSign } from "@/lib/near";
+import { agent } from "@/lib/agent";
+import { savedPolicy } from "@/lib/demo";
+import { call, canSign, signRequest } from "@/lib/near";
 import { ago, dateText, duration, LADDER, nextStepIn, pausedUntil, SOURCE_LABELS, stateName, type Will } from "@/lib/will";
 import { useNow } from "@/lib/hooks";
 import { ActionButton, NoWill, Skeleton } from "../ui";
@@ -126,4 +128,44 @@ export function RecentLine({ owner }: { owner: string }) {
 /** "a, b and c" */
 function listWords(xs: string[]): string {
   return xs.length < 2 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`;
+}
+
+/**
+ * A will exists on-chain but the agent isn't watching it (e.g. a setup request was refused): instead of a
+ * dead end with a disabled "I'm here", one button re-sends the will's details and asks the agent to watch.
+ */
+export function FinishSetup({ will }: { will: Will }) {
+  const { viewing } = useAccount();
+  const { data: overview, refresh } = useOverview(will.owner);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const st = overview?.status;
+  const policy = savedPolicy(will.owner);
+  if (viewing || !canSign(will.owner) || !st) return null;
+  const needPolicy = !st.has_policy && !!policy;
+  if (st.watching && !needPolicy) return null;
+  return (
+    <div className="flex flex-wrap items-center gap-3 rounded-xl bg-warn-soft px-4 py-3" role="status">
+      <span className="flex-1">Your will is on-chain, but the agent hasn&apos;t started watching it yet.</span>
+      <ActionButton
+        disabled={busy}
+        onClick={async () => {
+          setBusy(true);
+          setErr(null);
+          try {
+            if (needPolicy) await agent.submitPolicy(will.owner, policy!);
+            await agent.registerOwner(await signRequest(will.owner, "register_owner", policy?.display_name ? { display_name: policy.display_name } : {}));
+            refresh();
+          } catch (e) {
+            setErr(e instanceof Error ? e.message : String(e));
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        {busy ? "Finishing setup…" : "Finish setup"}
+      </ActionButton>
+      {err && <span className="w-full text-sm text-danger">{err}</span>}
+    </div>
+  );
 }

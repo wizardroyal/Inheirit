@@ -7,6 +7,7 @@ import { Suspense, useEffect, useState, type ReactNode } from "react";
 import { RestoreAccess } from "@/components/account/access";
 import { SignIn } from "@/components/SignIn";
 import { Avatar } from "@/components/ui";
+import { FINISHING_EVENT } from "@/lib/agent";
 import { AccountProvider, isDemoAccount, MENU_EVENT, useAccount } from "@/lib/account";
 import { useKeys, useMyAccounts } from "@/lib/hooks";
 import { accountLabel, useNames } from "@/lib/names";
@@ -97,6 +98,7 @@ function Shell({ children }: { children: ReactNode }) {
             {isDemoAccount(owner) ? "Demo account" : "Speedrun on"}: <b>try a speedrun</b>. Watch your will go quiet, release and snap back in minutes. →
           </Link>
         )}
+        <FinishingNotice />
         <main>{children}</main>
       </div>
     </div>
@@ -150,5 +152,21 @@ function SideBar({ owner, viewing, onSignOut }: { owner: string; viewing: boolea
         {viewing ? "Back to my account" : "Sign out"}
       </button>
     </nav>
+  );
+}
+
+/** Shown while a signed request waits for a brand-new key to reach the agent (agent.ts send). */
+function FinishingNotice() {
+  const [on, setOn] = useState(false);
+  useEffect(() => {
+    const f = (e: Event) => setOn(Boolean((e as CustomEvent).detail));
+    window.addEventListener(FINISHING_EVENT, f);
+    return () => window.removeEventListener(FINISHING_EVENT, f);
+  }, []);
+  if (!on) return null;
+  return (
+    <p className="rounded-xl bg-accent-soft px-4 py-3" role="status">
+      Finishing setup… (your new account is still reaching the network; this takes about half a minute)
+    </p>
   );
 }

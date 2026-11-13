@@ -3,7 +3,7 @@
 // Speedrun badge instead of minutes), then sections that each open for editing with ⚙.
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { WillGate } from "@/components/account/home";
+import { FinishSetup, WillGate } from "@/components/account/home";
 import { CloseWill } from "@/components/account/will";
 import { CreateWill, LowBalance } from "@/components/account/parts";
 import { Icon } from "@/components/icons";
@@ -151,6 +151,7 @@ function MyWill({ will }: { will: Will }) {
   return (
     <div className="space-y-6">
       <StatusBar status={status}>{!viewing && <Actions will={will} />}</StatusBar>
+      <FinishSetup will={will} />
       {s !== "Active" && s !== "Paused" && <p className="text-muted">Now: {stateLabel(s)}. Changes can be made only at All good.</p>}
       <WillText will={will} />
       <HeirsSection will={will} editable={editable} />

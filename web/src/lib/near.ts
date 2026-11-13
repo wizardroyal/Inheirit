@@ -6,11 +6,44 @@ import { KeyPair, type KeyPairString } from "@near-js/crypto";
 import { KeyPairSigner } from "@near-js/signers";
 import { actionCreators } from "@near-js/transactions";
 import { CONTRACT_ID, NEAR_RPC } from "./config";
-import { keys } from "./keys";
+import { setResigner } from "./agent";
+import { keyAdded, keys } from "./keys";
 import { rpcProvider } from "./rpc";
 import { walletAccountId, walletCall, walletSignMessage } from "./wallet";
 
 export const provider = rpcProvider(NEAR_RPC);
+
+/**
+ * A key created in this browser takes a moment to be visible at finality "final", which is what the agent
+ * checks a signature against; a request signed before then is refused, and the agent remembers the miss
+ * for 30 s. So every new key is checked here (every second, up to 20 s) and signed requests for that
+ * account wait for it.
+ */
+const keyReady = new Map<string, Promise<void>>();
+function trackNewKey(accountId: string) {
+  const secret = keys.secret(accountId);
+  if (!secret) return;
+  const publicKey = KeyPair.fromString(secret as KeyPairString).getPublicKey().toString();
+  keyReady.set(
+    accountId,
+    (async () => {
+      for (let i = 0; i < 20; i++) {
+        try {
+          await provider.viewAccessKey(accountId, publicKey, { finality: "final" });
+          return;
+        } catch {
+          await new Promise((r) => setTimeout(r, 1000));
+        }
+      }
+    })(),
+  );
+}
+if (typeof window !== "undefined") keyAdded.push(trackNewKey);
+
+/** Resolves once this browser's key for `accountId` is visible on-chain (at once for older keys). */
+export async function keyVisible(accountId: string): Promise<void> {
+  await keyReady.get(accountId);
+}
 export const YOCTO = 10n ** 24n;
 /** Gas for the small role calls (accept, attest, confirm, register a key): cast accounts hold little NEAR,
  *  and testnet reserves ~0.001 NEAR per Tgas up front, so the 100 Tgas default would need 0.1 NEAR each. */
@@ -127,6 +160,7 @@ const b64 = (u: Uint8Array) => btoa(String.fromCharCode(...u));
 
 /** NEP-413 message addressed to the will contract, as the agent's /api routes expect. */
 export async function signRequest(accountId: string, action: "heartbeat" | "register_owner" | "draft_policy" | "heir_guide" | "demo_faucet" | "telegram_link" | "payout_pref" | "demo_signal" | "profile" | "profile_read" | "wallet_proof" | "telegram_unlink", data?: unknown): Promise<SignedRequest> {
+  await keyVisible(accountId);
   const secret = keys.secret(accountId);
   const message = JSON.stringify({ action, owner: accountId, issued_at: Date.now(), data });
   const nonce = crypto.getRandomValues(new Uint8Array(32));
@@ -163,3 +197,9 @@ export async function createSubaccounts(funder: string, specs: { name: string; n
   return ids;
 }
 
+
+// The agent client re-signs a request it has to retry (see agent.ts send).
+setResigner(async (signed) => {
+  const m = JSON.parse(signed.message) as { action: Parameters<typeof signRequest>[1]; owner: string; data?: unknown };
+  return signRequest(m.owner, m.action, m.data);
+});

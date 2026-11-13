@@ -44,6 +44,9 @@ function save(s: Saved) {
   window.dispatchEvent(new Event("inheirit-keys"));
 }
 
+/** Called with each account whose key this browser just stored (near.ts waits for it to be on-chain). */
+export const keyAdded: ((accountId: string) => void)[] = [];
+
 export const keys = {
   accounts: () => Object.keys(load().near),
   secret: (accountId: string) => load().near[accountId] ?? null,
@@ -51,6 +54,7 @@ export const keys = {
     const s = load();
     s.near[accountId] = secret;
     save(s);
+    for (const f of keyAdded) f(accountId);
   },
   heirSeed: (owner: string, heir: string) => load().heirSeeds[`${owner}:${heir}`] ?? null,
   setHeirSeed(owner: string, heir: string, seedHex: string) {

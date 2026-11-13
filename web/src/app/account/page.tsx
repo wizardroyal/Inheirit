@@ -5,7 +5,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { RecentLine, StatusHero } from "@/components/account/home";
+import { FinishSetup, RecentLine, StatusHero } from "@/components/account/home";
 import { FrontDoor } from "@/components/account/parts";
 import { AccountSetup } from "@/components/account/setup";
 import { NextStep, StrengthBar } from "@/components/account/strength";
@@ -35,6 +35,7 @@ export default function HomePage() {
   }
   return (
     <div className="space-y-6">
+      <FinishSetup will={will} />
       <StatusHero will={will} refresh={refresh} />
       <StrengthBar will={will} />
       {!viewing && <NextStep will={will} />}
