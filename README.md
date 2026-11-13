@@ -15,9 +15,9 @@ Inheirit notices the signs of life you already give off, privately, and only rea
 
 <p>
   <img src="docs/screenshots/home-phone.png" alt="Home on a phone: the will's state in plain words, when it last saw you, I'm here, the strength bar and one next step" width="19%">
-  <img src="docs/screenshots/will-phone.png" alt="My will on a phone: a status pill with Pause and Close, then the will written out in plain sentences with a Speedrun badge" width="19%">
-  <img src="docs/screenshots/profile-phone.png" alt="Profile on a phone: your people as rows with a gear to edit each, then the vault and the account" width="19%">
-  <img src="docs/screenshots/signs-phone.png" alt="Signs of life on a phone: one list, strongest first, each source connected, not connected or coming soon" width="19%">
+  <img src="docs/screenshots/will-phone.png" alt="My will on a phone: a status pill with Try a speedrun and Pause, then the will written out in plain sentences with a Speedrun badge" width="19%">
+  <img src="docs/screenshots/profile-phone.png" alt="Profile on a phone: the username, linked accounts, the recovery key, then heirs, guardians, lawyer and friends" width="19%">
+  <img src="docs/screenshots/signs-phone.png" alt="Signs of life on a phone: one list, heartbeat app first, each source connected, not connected or coming soon" width="19%">
   <img src="docs/screenshots/heir-quotes.png" alt="An heir chooses how to be paid, with live NEAR Intents quotes from mainnet" width="19%">
 </p>
 
@@ -87,7 +87,7 @@ Everything runs on testnet, in your browser:
 4. Click **I'm here (send a heartbeat)**.
    → Within seconds the ladder **snaps back to All good**, and the verdict says nothing moved. That's the whole idea: signals can stop it; only people can start it.
 
-Measured: about 3 minutes from sign-in to the snap-back (generating takes under a minute; the snap-back about 4 seconds). To write your own will instead, choose **Set it up myself** (or go to **My will**), add people, and **Start my will**; it starts on real timings, and **Try a speedrun** on My will runs it in minutes.
+Measured on the live site (2026-11-13, phone width): 3 minutes from sign-in to the snap-back; generating took 61 seconds, the snap-back 7 seconds. To write your own will instead, choose **Set it up myself** (or go to **My will**), add people, and **Start my will**; it starts on real timings, and **Try a speedrun** on My will runs it in minutes.
 
 ## Then the full run (about 15 minutes)
 
