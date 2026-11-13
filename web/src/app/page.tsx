@@ -14,16 +14,16 @@ const PROOF: [string, string][] = [
 const PROBLEMS = [
   ["Check-in fatigue", "Dead-man's switches make you prove you're alive. People forget.", "No check-ins. It reads activity you already produce."],
   ["False triggers", "A hospital stay or a lost phone shouldn't hand over your savings.", "Silence never triggers it. Guardians must agree, then a challenge period."],
-  ["One chain only", "Bitcoin-only or EVM-only tools leave the rest behind.", "One will across NEAR, Ethereum and Bitcoin via Chain Signatures."],
-  ["Heirs can't claim", "No wallet on the right chain, or no idea the assets exist.", "Each heir picks the asset and chain via NEAR Intents."],
-  ["Secrets in public wills", "A seed phrase can't go into a will that becomes public.", "Sealed notes, opened in an enclave and re-sealed to the heir, last."],
+  ["One chain only", "Bitcoin-only or EVM-only tools leave the rest behind.", "One will across NEAR, Ethereum and Bitcoin; the Ethereum and Bitcoin vaults use Chain Signatures."],
+  ["Heirs can't claim", "No wallet on the right chain, or no idea the assets exist.", "Each heir picks the asset and chain they receive, via NEAR Intents."],
+  ["Secrets in public wills", "A seed phrase can't go into a will that becomes public.", "Sealed notes, released last: opened in an enclave and re-sealed to each heir."],
 ];
 
 const PRINCIPLES = [
-  ["Private by construction", "The agent runs in an attested TDX enclave; only timestamps leave it. Your will's text goes only to an attested NEAR AI Cloud model."],
-  ["If Inheirit disappears", "Nothing is released. NEAR slices are paid by the contract; any newly approved agent can resume Ethereum and Bitcoin from its records."],
-  ["Alongside a legal will", "It complements one, not replaces it. Your lawyer can file a death certificate to speed up (never skip) the release."],
-  ["Honest about limits", "Wills run on testnet; payout quotes are live mainnet. Sources not connected yet are labelled SIMULATED."],
+  ["Private by construction", "The agent runs in an attested TDX enclave and reads only timestamps. A will written in plain English goes only to an attested NEAR AI Cloud model."],
+  ["If Inheirit disappears", "The rules live in the contract: guardians still decide, NEAR slices are still paid, and a newly approved agent can resume Ethereum and Bitcoin from its records."],
+  ["Alongside a legal will", "It complements a legal will; it doesn't replace one. Your lawyer can file a death certificate to shorten the waits, never to skip a step."],
+  ["Honest about limits", "Wills run on testnet; payout quotes are live mainnet. Sources not connected yet are marked coming soon."],
 ];
 
 const em = (s: string) => <em className="italic">{s}</em>;
@@ -31,7 +31,7 @@ const em = (s: string) => <em className="italic">{s}</em>;
 /** A small dark product card with its caption underneath, for the scrolling row. */
 function Shot({ title, text, children }: { title: string; text: string; children: ReactNode }) {
   return (
-    <figure className="w-72 shrink-0 snap-start space-y-3">
+    <figure className="w-72 shrink-0 snap-start space-y-3 lg:w-auto">
       <div className="film-card tech h-56 rounded-2xl p-4 text-sm">{children}</div>
       <figcaption>
         <span className="block font-medium">{title}</span>
@@ -50,7 +50,7 @@ export default function Home() {
       <section className="sky -mx-4 overflow-hidden px-4 pt-14 sm:mx-0 sm:rounded-3xl">
         <div className="mx-auto max-w-3xl space-y-5 text-center">
           <h1 className="font-serif text-5xl leading-[1.05] sm:text-6xl">A will that doesn&apos;t make you {em("prove")} you&apos;re alive.</h1>
-          <p className="mx-auto max-w-xl text-lg opacity-80">It reaches out only when you&apos;ve gone quiet for longer than usual. Silence never sets it off; people do.</p>
+          <p className="mx-auto max-w-xl text-lg opacity-80">It checks in only when you&apos;ve been quiet for longer than usual, and silence alone never releases anything: your guardians decide.</p>
           <Link href="/account" className="inline-flex min-h-11 items-center gap-2 rounded-full bg-[#fffdf9] px-6 py-3 font-medium text-[#1f2320] shadow hover:opacity-90">
             Try it in 3 minutes →
           </Link>
@@ -63,26 +63,26 @@ export default function Home() {
       {/* A dark band with the line that matters and the proof, like laurels. */}
       <section className="film -mx-4 space-y-6 px-6 py-14 text-center sm:mx-0 sm:rounded-3xl">
         <h2 className="font-serif text-3xl sm:text-4xl">You shouldn&apos;t have to {em("check in")} to stay alive.</h2>
-        <p className="film-muted mx-auto max-w-xl">Signals can stop it; only people can start it. Assets go in reversible slices, secrets last.</p>
+        <p className="film-muted mx-auto max-w-xl">Signs of life can stop it; only people can start it. Assets go out in slices that any sign of life can halt, and secrets go last.</p>
         <div className="flex flex-wrap justify-center gap-3">
           {PROOF.map(([label, href]) => (
             <a key={label} href={href} target="_blank" rel="noreferrer" className="tech inline-flex min-h-11 items-center gap-2 rounded-full border border-[#3a362f] px-4 py-2 text-sm hover:bg-[#24211d]">
-              ❧ 10% released on {label} ↗
+              ❧ First 10% on {label} ↗
             </a>
           ))}
         </div>
-        <p className="film-muted text-sm">A real test will, released on three chains by an attested TDX agent.</p>
+        <p className="film-muted text-sm">A real test will on testnet: its first slice, paid on three chains.</p>
       </section>
 
       {/* The product in small pieces. */}
       <section className="space-y-6">
         <h2 className="text-center font-serif text-4xl">See your {em("whole")} will.</h2>
-        <div className="-mx-4 flex snap-x gap-4 overflow-x-auto px-4 pb-2">
+        <div className="-mx-4 flex snap-x gap-4 overflow-x-auto px-4 pb-2 lg:mx-0 lg:grid lg:grid-cols-4 lg:overflow-visible lg:px-0">
           <Shot title="Signs of life" text="Activity you already produce, weighted by how hard it is to fake.">
             {[
-              ["Heartbeat app", "strong", "● 2 min"],
-              ["NEAR wallet", "strong", "● 1 day"],
-              ["Telegram", "medium", "● 3 days"],
+              ["Heartbeat", "strong", "● 2 min"],
+              ["NEAR", "strong", "● 1 day"],
+              ["Telegram", "medium", "● 3 d"],
               ["GitHub", "weak", "○"],
             ].map(([a, b, c]) => (
               <div key={a} className={row}>
@@ -92,7 +92,7 @@ export default function Home() {
               </div>
             ))}
           </Shot>
-          <Shot title="People decide" text="Only guardians who accepted can confirm. One “they're alive” stops it.">
+          <Shot title="Guardian vote" text="Only guardians who accepted count. One “they're alive” stops it.">
             <p className="text-[#a39b8e]">Guardian vote · 2 of 3 must confirm</p>
             {[
               ["Lazarus", "✓ confirmed"],
@@ -123,14 +123,14 @@ export default function Home() {
               </div>
             ))}
           </Shot>
-          <Shot title="Heirs get what they use" text="Each heir picks the asset and chain; NEAR Intents converts every slice.">
+          <Shot title="Heirs get what they use" text="Each heir picks the asset and chain they receive; NEAR Intents pays each slice in it.">
             <p className="text-[#a39b8e]">Ada chose</p>
             <p className="mt-1 font-serif text-2xl">USDC on Base</p>
             <div className={`${row} mt-4`}>
               <span>$10 of NEAR</span>
               <span className="text-[#9fd3b8]">≈ 10.01 USDC</span>
             </div>
-            <p className="mt-2 text-[#a39b8e]">live mainnet quote</p>
+            <p className="mt-2 text-[#a39b8e]">example; heirs see live mainnet quotes</p>
           </Shot>
         </div>
       </section>
@@ -147,36 +147,36 @@ export default function Home() {
           </span>
           <span className="film-muted ml-auto text-xs">now</span>
         </div>
-        <p className="text-muted">Only after silence longer than your usual. Any reply is a sign of life.</p>
+        <p className="text-muted">Only after the quiet period you set. A Telegram reply or opening the heartbeat app is a sign of life.</p>
       </section>
 
       {/* Alternating tiles: the three ideas, each next to what it looks like. */}
       <section className="grid gap-4 sm:grid-cols-2">
         <div className="tile-dusk order-1 flex min-h-64 sm:order-none flex-col justify-between rounded-3xl p-8">
           <h3 className="font-serif text-4xl">We {em("watch")} quietly</h3>
-          <p className="opacity-90">Timestamps only, read inside an attested enclave. Never content.</p>
+          <p className="opacity-90">It reads when you were active, never what you did, inside an attested enclave.</p>
         </div>
         <div className="film-card tech order-2 flex min-h-64 flex-col justify-center gap-3 rounded-3xl p-8 text-sm sm:order-none">
           <p className="text-[#9fd3b8]">Alive. Last strong signal: heartbeat app 2 minutes ago.</p>
-          <p className="text-[#a39b8e]">One X post seen 1 hour ago; on its own it only postpones the checks, because posts can be scheduled or run by someone else.</p>
+          <p className="text-[#a39b8e]">Usually active every 3 days, from the last 90 days of transactions.</p>
         </div>
         <div className="film-card tech order-4 flex min-h-64 flex-col justify-center gap-2 rounded-3xl p-8 text-sm sm:order-none">
           <p className="text-[#a39b8e]">Challenge period</p>
-          <p>Guardians have confirmed. You&apos;re alerted on every channel; any sign of life cancels everything.</p>
+          <p>Guardians have confirmed. You&apos;re alerted on every channel, and any sign of life cancels it. Nothing has moved yet.</p>
           <p className="text-[#e7c27a]">A lawyer&apos;s death certificate can shorten the waits, never skip one.</p>
         </div>
         <div className="tile-meadow order-3 flex min-h-64 sm:order-none flex-col justify-between rounded-3xl p-8">
           <h3 className="font-serif text-4xl">People {em("decide")}</h3>
-          <p className="opacity-90">Silence alone never moves a coin. Guardians agree, then a challenge period.</p>
+          <p className="opacity-90">Silence alone never moves a coin. Your guardians must agree, then you get a challenge period.</p>
         </div>
         <div className="tile-clay order-5 flex min-h-64 sm:order-none flex-col justify-between rounded-3xl p-8">
           <h3 className="font-serif text-4xl">Secrets come {em("last")}</h3>
-          <p className="opacity-90">A slice can be stopped; a revealed secret can&apos;t. Notes open per heir after everything is handed over.</p>
+          <p className="opacity-90">Unsent slices can still be stopped; a revealed secret can&apos;t be taken back. Notes open for each heir only after everything is handed over.</p>
         </div>
         <div className="film-card tech order-6 flex min-h-64 flex-col justify-center gap-2 rounded-3xl p-8 text-sm sm:order-none">
           <p className="text-[#a39b8e]">Sealed note · for Ada</p>
           <p className="font-serif text-xl">“The Ledger is in the blue folder in the study…”</p>
-          <p className="text-[#a39b8e]">Opened in the enclave, re-sealed to Ada&apos;s key, three months after the last slice.</p>
+          <p className="text-[#a39b8e]">Opened in the enclave and re-sealed to Ada&apos;s key, after the last slice and a final wait.</p>
         </div>
       </section>
 
@@ -216,7 +216,7 @@ export default function Home() {
       {/* Closing call to action. */}
       <section className="tile-meadow -mx-4 space-y-5 px-6 py-16 text-center sm:mx-0 sm:rounded-3xl">
         <h2 className="font-serif text-4xl sm:text-5xl">Set your will in {em("three minutes")}.</h2>
-        <p className="opacity-90">Free on testnet. A demo account needs no wallet.</p>
+        <p className="opacity-90">Free on testnet. A demo account needs no wallet and no sign-up.</p>
         <Link href="/account" className="inline-flex min-h-11 items-center rounded-full bg-[#fffdf9] px-6 py-3 font-medium text-[#1f2320] hover:opacity-90">
           Get started →
         </Link>
