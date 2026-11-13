@@ -19,8 +19,8 @@ export function WillGate({ children }: { children: (will: Will) => ReactNode }) 
     return (
       <p className="text-lg">
         You don&apos;t have a will yet.{" "}
-        <Link href="/account" className="text-accent underline">
-          Write it on Home
+        <Link href="/account/will" className="text-accent underline">
+          Create your will
         </Link>
         .
       </p>

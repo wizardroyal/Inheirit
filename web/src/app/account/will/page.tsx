@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { WillGate } from "@/components/account/home";
 import { CloseWill } from "@/components/account/will";
+import { CreateWill, LowBalance } from "@/components/account/parts";
 import { Icon } from "@/components/icons";
 import { ActionButton, Avatar, Card, ConfirmButton, ErrorNote, Field, GearButton, inputCls, Pill, Stepper } from "@/components/ui";
 import { useAccount } from "@/lib/account";
@@ -24,19 +25,14 @@ import { isSpeedrun } from "@/lib/speedrun";
 import { dateText, duration, pausedUntil, schedule, stateLabel, stateName, type Will } from "@/lib/will";
 
 export default function MyWillPage() {
-  const { owner, will, loaded, viewing } = useAccount();
-  const [profile] = useProfile(owner);
-  // A draft lives off-chain until Start.
-  if (loaded && !will && !viewing && (profile.draft as { v?: number } | undefined)?.v === 1)
+  const { owner, will, loaded, viewing, creating, setCreating, refresh } = useAccount();
+  // Wills are created here (a saved draft opens in the same form).
+  if (loaded && !viewing && (!will || creating))
     return (
       <div className="space-y-6">
-        <StatusBar status="Draft" />
-        <Card>
-          <p className="text-lg">Your will is a draft. Nothing is on-chain and nothing watches for silence until you start it.</p>
-          <Link href="/account" className="mt-4 inline-flex min-h-11 items-center rounded-lg bg-accent px-4 py-2 font-medium text-accent-ink">
-            Continue and start
-          </Link>
-        </Card>
+        <h1 className="font-serif text-3xl sm:text-4xl">Create your will</h1>
+        {!creating && <LowBalance owner={owner} />}
+        <CreateWill owner={owner} onCreating={setCreating} onCreated={refresh} />
       </div>
     );
   return <WillGate>{(w) => <MyWill will={w} />}</WillGate>;

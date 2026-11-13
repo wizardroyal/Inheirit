@@ -4,6 +4,7 @@
 import { humanize, readable, useAccountLabel, useNames } from "@/lib/names";
 import { summarizePolicy, type Policy } from "@agent/policy/policy";
 
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { AiBadge } from "@/components/Attestation";
 
@@ -94,6 +95,71 @@ export function CreateWill(props: { owner: string; onCreating: (b: boolean) => v
 }
 
 /** One click: a test cast (heir, guardians, friend, lawyer) with keys in this browser, and a complete will. */
+/**
+ * The front door for demo accounts (final round): one click makes a complete will with test people on the
+ * demo clock and opens Try a speedrun on scenario a; or set it up yourself.
+ */
+export function FrontDoor({ owner, onCreating, onCreated, onSetUp }: { owner: string; onCreating: (b: boolean) => void; onCreated: () => void; onSetUp: () => void }) {
+  const router = useRouter();
+  const [log, setLog] = useState<string[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  return (
+    <Card>
+      <h1 className="font-serif text-3xl">Start with a will</h1>
+      <p className="mt-2 max-w-xl text-muted">Generate a complete will with test people, then watch it run in minutes. Or write your own.</p>
+      <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+        <button
+          type="button"
+          disabled={busy}
+          className="min-h-12 rounded-lg bg-accent px-6 py-3 font-medium text-accent-ink hover:opacity-90 disabled:opacity-60"
+          onClick={async () => {
+            setErr(null);
+            setLog([]);
+            setBusy(true);
+            try {
+              await agent.info();
+              onCreating(true);
+              await generateWillAndCast(owner, { schedule: DEMO_SCHEDULE, foreignChains: ["Eth", "Btc"], depositNear: "0.5", stable: false }, (m) => setLog((l) => [...l, m]));
+              try {
+                localStorage.setItem(`inheirit:scenario:${owner}`, "returns");
+              } catch {
+                // storage blocked: scenario a is the default anyway
+              }
+              onCreated();
+              onCreating(false);
+              router.push("/account/speedrun");
+            } catch (e) {
+              setErr(e instanceof Error ? e.message : String(e));
+              setBusy(false);
+            }
+          }}
+        >
+          {busy ? "Generating… (about a minute)" : "Generate a complete will (1 click)"}
+        </button>
+        <button type="button" disabled={busy} className="min-h-12 rounded-lg border border-line px-6 py-3 hover:bg-accent-soft disabled:opacity-60" onClick={onSetUp}>
+          Set it up myself
+        </button>
+      </div>
+      {err && (
+        <div className="mt-3 space-y-2">
+          <ErrorNote>{err}</ErrorNote>
+          <ActionButton tone="quiet" onClick={async () => (onCreating(false), onCreated())}>
+            Go to my dashboard anyway
+          </ActionButton>
+        </div>
+      )}
+      {log.length > 0 && (
+        <ul className="mt-3 font-mono text-xs text-muted">
+          {log.map((l, i) => (
+            <li key={i}>{l}</li>
+          ))}
+        </ul>
+      )}
+    </Card>
+  );
+}
+
 export function GenerateWill({ owner, onCreating, onCreated }: { owner: string; onCreating: (b: boolean) => void; onCreated: () => void }) {
   const [chains, setChains] = useState({ Eth: true, Btc: true });
   const [demoClock, setDemoClock] = useState(true);

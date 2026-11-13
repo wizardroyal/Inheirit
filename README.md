@@ -77,18 +77,17 @@ Billions in crypto are lost when holders die or become incapacitated. Earlier at
 
 ## Try it in 3 minutes (no wallet, no money)
 
-Everything runs on testnet. One path, start to finish:
+Everything runs on testnet, in your browser:
 
-1. Open **https://inheirit.xyz/account** and click **Try with a demo account**. You get a fresh, funded testnet account whose key stays in your browser. A NEAR testnet wallet or Google sign-in works too.
-   → **Set up your account**: a username (made up for you, editable), *Save your recovery key*, your people (a name is enough) and your vault (a name and its chains), with **Back** and **Next**. Every step can be skipped; all of it lives in **Profile** later.
-2. On **Home**, the will form: the people you added show as **+ Name** buttons (someone saved by name only gets a funded test account when picked), or tap ↻ next to the heir and twice next to the guardians. Add a final secret if you like, then **Start my will** (**Save as draft** keeps it off-chain instead). The will starts on real timings.
-   → **Home** shows the will at **All good**, when it last saw you, **I'm here**, the **Will strength** bar and one next step. **My will** reads like a will.
-3. On **My will**, click **Try a speedrun** (any will can, on testnet), then **Start the speedrun**. The card is on scenario **a · The owner comes back** (quiet after 2 minutes instead of 60 days). Do nothing for about 2 minutes.
-   → The ladder climbs to **Quiet** and then **Welfare check**; the checks are listed under **Activity** (heartbeat app, email if you added one, Telegram if linked, a SIMULATED DM).
+1. Open **https://inheirit.xyz/account** and click **Try with a demo account**. You get a fresh, funded testnet account whose key stays in your browser.
+2. Click **Generate a complete will (1 click)**. It makes test people (heir, three guardians, friend, lawyer), funds the vaults, adds a sealed note and starts the will on a clock of minutes (about a minute).
+   → You land on **Try a speedrun**, on scenario **a · The owner comes back**.
+3. Do nothing for about 2 minutes.
+   → The ladder climbs to **Quiet** and then **Welfare check**; the checks are listed under **Activity** (heartbeat app, Telegram if linked, a SIMULATED DM).
 4. Click **I'm here (send a heartbeat)**.
    → Within seconds the ladder **snaps back to All good**, and the verdict says nothing moved. That's the whole idea: signals can stop it; only people can start it.
 
-In a hurry? On the speedrun page, **Generate my will** makes a complete will with a full cast, funded vaults and a sealed note in one click.
+Measured: about 3 minutes from sign-in to the snap-back (generating takes under a minute; the snap-back about 4 seconds). To write your own will instead, choose **Set it up myself** (or go to **My will**), add people, and **Start my will**; it starts on real timings, and **Try a speedrun** on My will runs it in minutes.
 
 ## Then the full run (about 15 minutes)
 
@@ -99,9 +98,7 @@ On **Try a speedrun**, pick another scenario. The card shows a checklist with a 
 
 **View as** (on the same card) opens the guardian, heir, friend and lawyer pages as those accounts; each links back to the speedrun. On the heir's page, once an address is entered, **Get live quotes** shows real NEAR Intents quotes from mainnet, public and confidential side by side (dry runs: no money moves; the confidential column needs our partner key on the deployment). The same quote is on **https://inheirit.xyz/mainnet**. Afterwards: **Back to real timings**, or, once Completed, **Start over with the same people**.
 
-**At any step, try to break the rule "signals stop it, people start it":** on the [control panel](https://inheirit.xyz/demo), a lone **X post** (SIMULATED) is ignored on purpose, and the verdict says why (*"ignored on its own because posts can be scheduled or run by someone else"*). Two weak sources within 24 hours, or any strong one, do count. A will whose guardians haven't accepted never leaves All good, however long the silence.
-
-**Advanced:** the [control panel](https://inheirit.xyz/demo) (`/demo`) is a lower-level control room for the same flow: **Make a test cast**, **Create the demo will**, then the guardian and signal buttons. The same steps run headlessly in `scripts/demo-cancel.ts` (cancel) and `scripts/demo-execute.ts` (release).
+**Advanced:** the [control panel](https://inheirit.xyz/demo) (`/demo`) is a lower-level control room for the same flow: **Make a test cast**, **Create the demo will**, then the guardian and signal buttons. Try to break "signals stop it, people start it" there: once the will has left All good, a lone **X post** (SIMULATED) doesn't count, and the verdict says why; two weak sources within 24 hours, or any strong one, do. A will whose guardians haven't accepted never leaves All good. The same steps run headlessly in `scripts/demo-cancel.ts` (cancel) and `scripts/demo-execute.ts` (release).
 
 **Your own will** (`/account`; a side bar on desktop, a drawer from the header button on phones):
 
