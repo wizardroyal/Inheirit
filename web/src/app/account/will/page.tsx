@@ -148,7 +148,7 @@ function MyWill({ will }: { will: Will }) {
   const { viewing } = useAccount();
   const s = stateName(will.state);
   const until = pausedUntil(will);
-  const status = until ? `Paused until ${dateText(until)}` : s === "Completed" ? "Completed" : "Active";
+  const status = until ? `Paused until ${dateText(until)}` : s === "Completed" ? "Completed" : s === "Active" ? "Active" : stateLabel(s);
   const editable = s === "Active" && !viewing;
   const st = schedule(will);
   return (

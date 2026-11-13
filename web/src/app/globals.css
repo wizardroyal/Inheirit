@@ -18,15 +18,16 @@
   --line-strong: #cbc3b4;
   /* Input borders need 3:1 against the card (WCAG 1.4.11); --line is decorative only. */
   --field: #8a8275;
-  --accent: #2f5d50;
+  /* Colours from the landing page (2026-11-13): meadow green for actions, dusk amber for attention, clay for danger. */
+  --accent: #3b6a2c;
   --accent-ink: #ffffff;
-  --accent-soft: #e3ece6;
+  --accent-soft: #e5eedb;
   /* Amber: fills and borders use --warn-fill; text uses --warn, darkened to keep AA on paper. */
   --warn: #8a5a12;
-  --warn-fill: #b7791f;
-  --warn-soft: #f6ead3;
-  --danger: #a3362a;
-  --danger-soft: #f6e1de;
+  --warn-fill: #e39b2d;
+  --warn-soft: #fbecd0;
+  --danger: #a3401f;
+  --danger-soft: #f8e3d8;
   --sim: #6b4fa0;
   --sim-soft: #ece6f5;
 }
@@ -34,19 +35,19 @@
 @media (prefers-color-scheme: dark) {
   :root {
     /* Warm charcoal, not pure black. */
-    --bg: #1d1b18;
-    --card: #262320;
-    --ink: #ece6dc;
-    --muted: #aaa294;
-    --line: #3a352f;
-    --line-strong: #514a41;
+    --bg: #151412;
+    --card: #1f1d1a;
+    --ink: #efe9df;
+    --muted: #a39b8e;
+    --line: #2f2c27;
+    --line-strong: #4a463f;
     --field: #857c6f;
-    --accent: #8cc0ac;
-    --accent-ink: #13201b;
-    --accent-soft: #283530;
-    --warn: #e3b268;
-    --warn-fill: #c98a2c;
-    --warn-soft: #3a2f1e;
+    --accent: #9fd3b8;
+    --accent-ink: #151412;
+    --accent-soft: #1f2c26;
+    --warn: #e7c27a;
+    --warn-fill: #e39b2d;
+    --warn-soft: #33281a;
     --danger: #ec8d81;
     --danger-soft: #3c2522;
     --sim: #bba5e8;
@@ -154,14 +155,14 @@ body {
   :root:not([data-theme="light"]) .sky {
     background:
       radial-gradient(60% 40% at 20% 30%, rgb(255 255 255 / 0.08), transparent 70%),
-      linear-gradient(180deg, #24364a 0%, #2b3440 50%, #1d1b18 100%);
+      linear-gradient(180deg, #24364a 0%, #2b3440 50%, #151412 100%);
     color: #f2ede4;
   }
 }
 :root[data-theme="dark"] .sky {
   background:
     radial-gradient(60% 40% at 20% 30%, rgb(255 255 255 / 0.08), transparent 70%),
-    linear-gradient(180deg, #24364a 0%, #2b3440 50%, #1d1b18 100%);
+    linear-gradient(180deg, #24364a 0%, #2b3440 50%, #151412 100%);
   color: #f2ede4;
 }
 .film {

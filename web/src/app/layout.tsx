@@ -17,7 +17,7 @@ export const metadata: Metadata = {
     "Private signs of life, never silence alone, reversible stages across NEAR, Ethereum and Bitcoin. Testnet demo.",
 };
 
-export const viewport: Viewport = { themeColor: "#2f5d50" };
+export const viewport: Viewport = { themeColor: "#3b6a2c" };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (

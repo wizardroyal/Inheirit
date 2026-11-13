@@ -16,7 +16,7 @@ const PRINCIPLES = [
   ["Private by construction", "The agent runs in an attested TDX enclave and reads only timestamps. A will written in plain English goes only to an attested NEAR AI Cloud model."],
   ["If Inheirit disappears", "The rules live in the contract: guardians still decide, NEAR slices are still paid, and a newly approved agent can resume Ethereum and Bitcoin from its records."],
   ["Alongside a legal will", "It complements a legal will; it doesn't replace one. Your lawyer can file a death certificate to shorten the waits, never to skip a step."],
-  ["Honest about limits", "Wills run on testnet; payout quotes are live mainnet. Sources not connected yet are marked coming soon."],
+  ["Testnet", "Wills run on testnet, mainnet coming next."],
 ];
 
 const em = (s: string) => <em className="italic">{s}</em>;
@@ -217,7 +217,6 @@ export default function Home() {
         <Link href="/account" className="inline-flex min-h-11 items-center rounded-full bg-[#fffdf9] px-6 py-3 font-medium text-[#1f2320] hover:opacity-90">
           Get started →
         </Link>
-        <p className="text-sm opacity-80">Next: gifts that release at milestones.</p>
       </section>
 
     </div>

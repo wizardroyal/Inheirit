@@ -8,7 +8,7 @@ export default function manifest(): MetadataRoute.Manifest {
     start_url: "/heartbeat",
     display: "standalone",
     background_color: "#f7f5f0",
-    theme_color: "#2f5d50",
+    theme_color: "#3b6a2c",
     icons: [{ src: "/icon.svg", sizes: "any", type: "image/svg+xml" }],
   };
 }
