@@ -111,7 +111,7 @@ function WillText({ will }: { will: Will }) {
   const foreign = will.foreign_chains.map((c) => (c === "Eth" ? "Ethereum" : "Bitcoin"));
   const sentences = will.heirs.map((h) => {
     const pct = h.near_share_bps / 100;
-    const value = nearUsd && vault ? ` (≈ $${Math.round(vault * (pct / 100) * nearUsd).toLocaleString()} today)` : "";
+    const value = nearUsd && vault ? ` (≈ $${Math.round(vault * (pct / 100) * nearUsd).toLocaleString()} at mainnet prices)` : "";
     const id = policy?.heirs.find((p) => p.near_account === h.account_id)?.id;
     const other = foreign.map((label) => {
       const share = id ? policy?.allocations.find((a) => a.asset === (label === "Ethereum" ? "ETH" : "BTC"))?.shares[id] : pct;
@@ -147,6 +147,7 @@ function MyWill({ will }: { will: Will }) {
   const status = until ? `Paused until ${dateText(until)}` : s === "Completed" ? "Completed" : s === "Active" ? "Active" : stateLabel(s);
   const editable = s === "Active" && !viewing;
   const st = schedule(will);
+  const speedrun = isSpeedrun(will);
   return (
     <div className="space-y-6">
       <StatusBar status={status}>{!viewing && <Actions will={will} />}</StatusBar>
@@ -162,12 +163,18 @@ function MyWill({ will }: { will: Will }) {
               <span>
                 Stage {i + 1}: {x.pct}%
               </span>
-              <span className="text-muted">then wait {duration(x.wait_after)}</span>
+              <span className="text-muted">
+                then wait {duration(speedrun ? (i === 0 ? REAL_SCHEDULE.firstWait : REAL_SCHEDULE.wait) : x.wait_after)}
+                {speedrun && ` (speedrun: ${duration(x.wait_after)})`}
+              </span>
             </li>
           ))}
           <li className="flex flex-wrap justify-between gap-3 text-muted">
             <span>Final secrets</span>
-            <span>after {duration(will.timings.secrets_buffer)} more</span>
+            <span>
+              after {duration(speedrun ? REAL_SCHEDULE.timings.secrets_buffer : will.timings.secrets_buffer)} more
+              {speedrun && ` (speedrun: ${duration(will.timings.secrets_buffer)})`}
+            </span>
           </li>
         </ol>
       </Card>

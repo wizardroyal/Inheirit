@@ -15,12 +15,17 @@ const pick = <T,>(xs: T[]) => xs[crypto.getRandomValues(new Uint32Array(1))[0] %
 
 /** A random three-word name, e.g. "HatYoungRace". */
 export function randomName(): string {
-  return `${pick(N)}${pick(A)}${pick(V)}`;
+  return `${pick(N)} ${pick(A)} ${pick(V)}`;
 }
+
+/** Names made before 2026-11-13 were written together ("PineTrueSpin"); show every username one way. */
+const spaced = (v: string) => (/^([A-Z][a-z]+){3}$/.test(v) ? v.replace(/([a-z])([A-Z])/g, "$1 $2") : v);
 
 function load(): Record<string, string> {
   try {
-    return JSON.parse(window.localStorage.getItem(KEY) ?? "{}");
+    const m = JSON.parse(window.localStorage.getItem(KEY) ?? "{}") as Record<string, string>;
+    for (const k of Object.keys(m)) m[k] = spaced(m[k]);
+    return m;
   } catch {
     return {};
   }
@@ -163,7 +168,9 @@ export function useNames(): Record<string, string> {
     },
     () => "{}",
   );
-  return JSON.parse(raw) as Record<string, string>;
+  const m = JSON.parse(raw) as Record<string, string>;
+  for (const k of Object.keys(m)) m[k] = spaced(m[k]);
+  return m;
 }
 
 

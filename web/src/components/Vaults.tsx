@@ -27,7 +27,7 @@ export function Vaults({ owner, will, children }: { owner: string; will: Will; c
   // Live prices (NEAR Intents token list) for "≈ $" next to each holding.
   const { data: tokens } = usePoll(() => agent.intentsTokens().catch(() => null), 10 * 60_000, []);
   const price = (symbol: string, chain: string) => tokens?.tokens.find((t) => t.symbol === symbol && t.blockchain === chain)?.price;
-  const usd = (amount: number, p?: number) => (p && amount > 0 ? <span className="text-muted"> ≈ ${(amount * p).toLocaleString(undefined, { maximumFractionDigits: 2 })}</span> : null);
+  const usd = (amount: number, p?: number) => (p && amount > 0 ? <span className="text-muted"> ≈ ${(amount * p).toLocaleString(undefined, { maximumFractionDigits: 2 })} at mainnet prices</span> : null);
   return (
     <Card title="Holdings">
       <ul className="space-y-3 text-lg">

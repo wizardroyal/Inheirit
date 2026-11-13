@@ -222,7 +222,7 @@ function BatchRow({ b }: { b: PayoutBatch }) {
             </>
           ) : (
             <>
-              ≈ ${b.amountUsd.toFixed(2)} of {b.originSymbol} → {amount ? <b>{amount}</b> : "…"} {b.destSymbol} on {chainLabel(b.destChain)}
+              ≈ ${b.amountUsd.toFixed(2)} (mainnet prices) of {b.originSymbol} → {amount ? <b>{amount}</b> : "…"} {b.destSymbol} on {chainLabel(b.destChain)}
             </>
           )}
         </span>
@@ -255,10 +255,10 @@ export function HeirPayoutList({ p, minUsd, mine }: { p: HeirPayouts; minUsd: nu
       {waiting.length > 0 && (
         <p className="rounded-lg bg-warn-soft px-3 py-2 text-sm text-warn">
           {p.pref
-            ? `${waiting.length} slice${waiting.length > 1 ? "s" : ""} (≈ $${usd.toFixed(2)}) waiting: under $${minUsd} is combined with the next.`
+            ? `${waiting.length} slice${waiting.length > 1 ? "s" : ""} (≈ $${usd.toFixed(2)} at mainnet prices) waiting: under $${minUsd} is combined with the next.`
             : mine
-              ? `Your inheritance is waiting (${waiting.length} slice${waiting.length > 1 ? "s" : ""}, ≈ $${usd.toFixed(2)}): choose how to receive it.`
-              : `${waiting.length} slice${waiting.length > 1 ? "s" : ""} (≈ $${usd.toFixed(2)}) waiting for the heir to choose.`}
+              ? `Your inheritance is waiting (${waiting.length} slice${waiting.length > 1 ? "s" : ""}, ≈ $${usd.toFixed(2)} at mainnet prices): choose how to receive it.`
+              : `${waiting.length} slice${waiting.length > 1 ? "s" : ""} (≈ $${usd.toFixed(2)} at mainnet prices) waiting for the heir to choose.`}
         </p>
       )}
       {p.waiting.some((w) => w.exhausted) && <p className="text-xs text-danger">Some slices failed three times and need attention.</p>}

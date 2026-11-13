@@ -65,10 +65,10 @@ export default function Home() {
             {[
               ["Heartbeat app", "strong"],
               ["On-chain transactions", "strong"],
-              ["Email", "medium"],
               ["Telegram replies", "medium"],
-              ["Calendar", "medium"],
-              ["Socials", "weak"],
+              ["GitHub", "weak"],
+              ["Email, calendar", "soon"],
+              ["Socials", "soon"],
             ].map(([a, b]) => (
               <div key={a} className={row}>
                 <span>{a}</span>

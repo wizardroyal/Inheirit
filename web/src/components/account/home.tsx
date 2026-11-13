@@ -1,4 +1,5 @@
 "use client";
+import { useSignalStatus } from "./strength";
 // Home: one status hero, the strength bar, one next step, one line of recent activity.
 import Link from "next/link";
 import { useEffect, useRef, useState, type ReactNode } from "react";
@@ -58,11 +59,27 @@ export function StatusHero({ will, refresh }: { will: Will; refresh: () => void 
     prev.current = s;
   }, [s]);
   const calm = s === "Active" || s === "Paused";
+  const { connected, watching } = useSignalStatus(will.owner);
+  const channels = [connected.phone_heartbeat && "the heartbeat app", connected.telegram && "Telegram", watching.email && "email"].filter(Boolean) as string[];
+  const via = channels.length ? listWords(channels) : "here in the app";
+  const people = ["your guardians", ...(will.contacts.length ? ["friends"] : []), ...(will.lawyer ? ["your lawyer"] : [])];
+  const yours: Partial<Record<string, string>> = {
+    Active: "Your signs of life are coming in. Nobody is asked anything.",
+    Quiet: `You've been quiet for longer than usual, so we're checking on you: ${via}. Any reply stops it.`,
+    WelfareCheck: `We haven't heard back, so we're asking ${listWords(people)} whether they've heard from you. Any sign of life stops it.`,
+    GuardianVote: "Your guardians are asked whether you have passed away. One “they're alive” stops it.",
+    Challenge: `Enough guardians confirmed. We're alerting you on ${via}; any sign of life cancels.`,
+    Executing: "Your assets go out in slices, with the longest wait after the first. A sign of life stops the rest.",
+    SecretsBuffer: "Everything is distributed. Your sealed notes wait one last period; a sign of life still stops them.",
+    SecretsReleased: "Each sealed note is re-sealed to its heir, who opens it in their browser.",
+    Completed: "Everything has been handed over.",
+  };
+  const detail = until || viewing ? step?.detail : (yours[s] ?? step?.detail);
   return (
     <section aria-live="polite" className={`rounded-2xl border p-6 sm:p-8 ${calm ? "border-line bg-card" : "border-warn bg-warn-soft"} ${snapped ? "snap-wash" : ""}`}>
       <p className="text-muted">Your will is</p>
       <h1 className="mt-1 font-serif text-4xl sm:text-5xl">{snapped ? "Back to All good" : step?.label ?? "…"}</h1>
-      <p className="mt-3 max-w-2xl text-lg">{step?.detail}</p>
+      <p className="mt-3 max-w-2xl text-lg">{detail}</p>
       <div className="mt-5 h-2 overflow-hidden rounded-full bg-line" aria-hidden>
         <div className="ladder-fill h-full rounded-full bg-accent" style={{ width: `${((Math.max(idx, 0) + 1) / LADDER.length) * 100}%` }} />
       </div>
@@ -104,4 +121,9 @@ export function RecentLine({ owner }: { owner: string }) {
       </Link>
     </p>
   );
+}
+
+/** "a, b and c" */
+function listWords(xs: string[]): string {
+  return xs.length < 2 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`;
 }

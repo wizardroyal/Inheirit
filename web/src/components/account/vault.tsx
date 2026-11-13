@@ -69,7 +69,9 @@ export function VaultSection({ will }: { will: Will }) {
     <div className="space-y-6">
       {!viewing && <VaultName owner={will.owner} />}
       <Card title="Holdings">
-        <p className="font-serif text-4xl">≈ ${total.toLocaleString(undefined, { maximumFractionDigits: 2, minimumFractionDigits: 2 })}</p>
+        <p className="font-serif text-4xl">
+          ≈ ${total.toLocaleString(undefined, { maximumFractionDigits: 2, minimumFractionDigits: 2 })} <span className="font-sans text-sm text-muted">at mainnet prices</span>
+        </p>
         <ul className="mt-4 divide-y divide-line">
           {rows.map((r) => (
             <li key={r.chain} className="flex items-center justify-between gap-3 py-3 text-lg">
