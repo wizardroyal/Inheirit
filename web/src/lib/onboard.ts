@@ -101,7 +101,7 @@ async function createPersonNow(owner: string, given?: string): Promise<{ account
   const name = given ?? randomPeople(1)[0];
   let accountId: string;
   if (keys.secret(owner)) {
-    accountId = await createSubaccount(owner, `p-${crypto.getRandomValues(new Uint32Array(1))[0].toString(36)}`, "0.1");
+    accountId = await createSubaccount(owner, `p-${crypto.getRandomValues(new Uint32Array(1))[0].toString(36)}`, "0.06");
   } else {
     const kp = newKeyPair();
     const res = await fetch("/api/onboard", {

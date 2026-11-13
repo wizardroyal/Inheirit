@@ -6,7 +6,7 @@ import { checkPolicy, nearShareBps, policyHash, type Policy } from "@agent/polic
 import { agent } from "./agent";
 import { stagesFor, type SchedulePreset } from "@agent/policy/schedule";
 import { keys, type Cast } from "./keys";
-import { accountExists, call, callMany, createSubaccount, createSubaccounts, nearToYocto, ROLE_TGAS, signRequest, view } from "./near";
+import { accountExists, balanceOf, call, callMany, createSubaccount, createSubaccounts, formatNear, nearToYocto, ROLE_TGAS, signRequest, view } from "./near";
 import { createCastAccounts, createDemoAccount } from "./onboard";
 import { bindNote, sealToBase64 } from "./sealed";
 import type { AgentKey } from "./will";
@@ -96,6 +96,17 @@ export async function createWill(owner: string, o: CreateWillOptions, progress: 
   if (missing.length) throw new Error(`These accounts don't exist on NEAR testnet: ${missing.join(", ")}. Check the spelling, or tap ↻ to create a test person.`);
   const bps = nearShareBps(o.policy);
   const deposit = Number(o.depositNear) > 0 ? nearToYocto(o.depositNear) : 0n;
+  // Creating a will costs about 0.32 NEAR on top of the vault deposit (storage and fees). Say so plainly
+  // before the wallet or the RPC answers with a raw "does not have enough balance".
+  const have = await balanceOf(owner).catch(() => null);
+  const overhead = nearToYocto("0.33");
+  if (have !== null && have < deposit + overhead) {
+    const max = have > overhead ? Math.floor(Number(formatNear(have - overhead)) * 100) / 100 : 0;
+    throw new Error(
+      `Your account holds ${formatNear(have, 2)} NEAR; starting this will needs about ${formatNear(deposit + overhead, 2)} (the vault deposit plus about 0.33 for storage and fees). ` +
+        (max > 0 ? `Put at most ${max} NEAR in the vault, or add NEAR to your account first.` : "Add NEAR to your account first."),
+    );
+  }
   progress(deposit ? `Creating the will on-chain and depositing ${o.depositNear} NEAR into the vault…` : "Creating the will on-chain…");
   // One transaction, so a wallet asks for one approval
   await callMany(owner, [
