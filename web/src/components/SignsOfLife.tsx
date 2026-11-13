@@ -36,32 +36,36 @@ export function SignsOfLife({ owner, will }: { owner: string; will: Will }) {
         {!isArmed(will) && <Pill tone="warn">not armed yet: guardians haven&apos;t accepted</Pill>}
       </div>
 
-      {/* The ladder as a progress bar */}
+      {/* The ladder: one strip of segments (names on hover or tap), the current step written out, and the
+          full list on request. No row of nine labels: they can't fit at every width or zoom. */}
       <div>
-        <div className="relative h-2 rounded-full bg-line">
-          <div
-            className="ladder-fill absolute inset-y-0 left-0 rounded-full bg-accent"
-            style={{ width: `${((Math.max(idx, 0) + 1) / LADDER.length) * 100}%` }}
-          />
-        </div>
-        <ol className="tech mt-2 grid gap-x-2 text-xs leading-tight text-muted [overflow-wrap:anywhere]" style={{ gridTemplateColumns: `repeat(${LADDER.length}, minmax(0, 1fr))` }}>
+        <ol className="flex gap-1" aria-label={`Step ${Math.max(idx, 0) + 1} of ${LADDER.length}`}>
           {LADDER.map((r, i) => (
-            <li key={r.state} className={`pr-1 ${i === idx ? "font-semibold text-ink" : ""} ${i > idx ? "text-muted" : ""}`}>
-              <span className="hidden sm:inline">{r.label}</span>
-              <span className="sm:hidden">{i === idx ? r.label : ""}</span>
+            <li
+              key={r.state}
+              title={r.label}
+              className={`h-2.5 flex-1 rounded-full transition-colors duration-700 ${i < idx ? "bg-accent" : i === idx ? "bg-accent ring-2 ring-accent/40 ring-offset-1 ring-offset-card" : "bg-line"}`}
+            >
+              <span className="sr-only">
+                {r.label}
+                {i === idx ? " (now)" : i < idx ? " (done)" : ""}
+              </span>
             </li>
           ))}
         </ol>
-        <div className="mt-2 flex flex-wrap items-center gap-3 text-sm">
-          <span className="font-medium">{LADDER[idx]?.label ?? state}</span>
+        <div className="mt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          <span className="text-sm text-muted">
+            Step {Math.max(idx, 0) + 1} of {LADDER.length}
+          </span>
+          <span className="text-xl font-semibold">{LADDER[idx]?.label ?? state}</span>
           {next && (
             <span className="text-muted">
               {next.seconds > 0 ? (
                 <>
-                  Next: {next.label} in <span className="font-medium tabular-nums text-ink">{duration(next.seconds)}</span>
+                  next: {next.label} in <span className="font-medium tabular-nums text-ink">{duration(next.seconds)}</span>
                 </>
               ) : (
-                <>Next: {next.label}, due now</>
+                <>next: {next.label}, due now</>
               )}
             </span>
           )}
@@ -71,6 +75,19 @@ export function SignsOfLife({ owner, will }: { owner: string; will: Will }) {
             </span>
           )}
         </div>
+        <details className="mt-2">
+          <summary className="inline-flex min-h-11 cursor-pointer items-center text-sm text-muted hover:text-ink">See all steps</summary>
+          <ol className="mt-1 space-y-1">
+            {LADDER.map((r, i) => (
+              <li key={r.state} className={`flex items-center gap-3 ${i === idx ? "font-semibold" : i > idx ? "text-muted" : ""}`}>
+                <span aria-hidden className={`w-4 text-center ${i <= idx ? "text-accent" : ""}`}>
+                  {i < idx ? "✓" : i === idx ? "●" : "○"}
+                </span>
+                {r.label}
+              </li>
+            ))}
+          </ol>
+        </details>
       </div>
 
       {agentDown && (
@@ -97,19 +114,21 @@ export function SignsOfLife({ owner, will }: { owner: string; will: Will }) {
       )}
 
       {/* One strip per source */}
-      <ul className="tech grid gap-1.5 sm:grid-cols-2">
+      <ul className="grid gap-1.5 sm:grid-cols-2">
         {seen.map((s) => {
           const at = data!.observations[s.source]!.at;
           const st = strength(s.weight);
           return (
-            <li key={`${s.source}-${pulsing[s.source] ?? 0}`} className="flex items-center justify-between gap-2 rounded-lg border border-line px-3 py-2 text-sm">
-              <span className="flex flex-wrap items-center gap-2">
-                <span className={`h-2 w-2 rounded-full ${st.label === "weak" ? "bg-muted" : "bg-accent"}`} aria-hidden />
+            <li key={`${s.source}-${pulsing[s.source] ?? 0}`} className="rounded-lg border border-line px-3 py-2">
+              <span className="flex items-center gap-2 font-medium">
+                <span className={`h-2 w-2 shrink-0 rounded-full ${st.label === "weak" ? "bg-muted" : "bg-accent"}`} aria-hidden />
                 {SOURCE_LABELS[s.source]}
+              </span>
+              <span className="mt-1 flex flex-wrap items-center gap-2 pl-4 text-xs text-muted">
                 <Pill tone={st.tone}>{st.label}</Pill>
                 {s.simulated && <SimulatedTag />}
+                <span>{ago(at)}</span>
               </span>
-              <span className="text-muted">{ago(at)}</span>
             </li>
           );
         })}
