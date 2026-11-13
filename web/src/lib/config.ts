@@ -22,3 +22,7 @@ export { DEMO_SCHEDULE, REAL_SCHEDULE } from "@agent/policy/schedule";
 export const SITE_URL = "https://inheirit.xyz";
 export const REPO_URL = "https://github.com/wizardroyal/Inheirit";
 export const X_POST_URL = process.env.NEXT_PUBLIC_X_POST_URL || "";
+
+/** The one mainnet story (final round, 2026-11-13): the same words on the landing page, /mainnet, the footer and the README. */
+export const MAINNET_STORY =
+  "Testnet is open to everyone. Mainnet is a capped showcase: two real payouts, Base → Solana (public) and Base → Arbitrum (confidential), signed by Chain Signatures through NEAR Intents, sent to our own test addresses.";

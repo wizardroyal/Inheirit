@@ -2,9 +2,9 @@
 
 Built at **NEAR HACKATHON** (November 2026).
 
-**Testnet: fully self-serve. Mainnet: live NEAR Intents quotes, and two real payouts already made (public Base → Solana, confidential Base → Arbitrum), signed by Chain Signatures and approved by a person one transaction at a time. Public mainnet vaults wait for a production TEE framework and an audit.**
+**Testnet is open to everyone. Mainnet is a capped showcase: two real payouts, Base → Solana (public) and Base → Arbitrum (confidential), signed by Chain Signatures through NEAR Intents, sent to our own test addresses.** Mainnet is paused for the hackathon: no further mainnet transactions or features.
 
-Inheirit notices the signs of life you already give off, privately, and only reaches out when you've gone quiet for longer than usual. It **never acts on silence alone**: people have to confirm you're gone, and you get a loud challenge period to say otherwise. Only then does it hand your assets on across **NEAR, Ethereum and Bitcoin**, in small, reversible slices. Sealed instructions for everything else reach the right heir **last**.
+Inheirit notices the signs of life you already give off, privately, and only reaches out when you've gone quiet for longer than usual. It **never acts on silence alone**: people have to confirm you're gone, and you get a loud challenge period to say otherwise. Only then does it hand your assets on across **NEAR, Ethereum and Bitcoin**, in slices, and unsent slices can still be stopped. Sealed instructions for everything else reach the right heir **last**.
 
 **Try it:** https://inheirit.xyz · Live mainnet quotes: https://inheirit.xyz/mainnet · Agent (TEE): https://d5b714731becca502b6bd054a5cf6ffa5ce71f61-3000.dstack-pha-prod9.phala.network · Contract: [`inheirit.testnet`](https://testnet.nearblocks.io/address/inheirit.testnet)
 
@@ -31,7 +31,7 @@ Inheirit notices the signs of life you already give off, privately, and only rea
 | Real cross-chain execution: NEAR, Ethereum (Sepolia) and Bitcoin (testnet4) released in stages, with explorer links | [Then the full run](#then-the-full-run-about-15-minutes) |
 | An attested TEE agent and private AI, verifiable on-chain | `npx tsx scripts/verify.ts`: one read-only command, PASS/FAIL per check (explained in [`docs/VERIFY.md`](docs/VERIFY.md)); the trust badges under *Signs of life*; [`deploy/tee-agent.json`](deploy/tee-agent.json) lists every deployed compose hash |
 | NEAR Intents on mainnet | two real payouts (public Base → Solana, confidential Base → Arbitrum) with explorer links on [`/mainnet`](https://inheirit.xyz/mainnet); live quotes on the heir page |
-| Tests and security work | 267 agent tests, 196 contract unit tests plus sandbox flows, run on every push ([CI](.github/workflows/ci.yml)); five adversarial review rounds logged finding by finding in [`CLAUDE.md`](CLAUDE.md) (Decision log) and summarised in [`docs/AUDITS.md`](docs/AUDITS.md) |
+| Tests and security work | 266 agent tests, 196 contract unit tests plus sandbox flows, run on every push ([CI](.github/workflows/ci.yml)); five adversarial review rounds logged finding by finding in [`CLAUDE.md`](CLAUDE.md) (Decision log) and summarised in [`docs/AUDITS.md`](docs/AUDITS.md) |
 | What's real and what's simulated | [Real vs simulated](#real-vs-simulated) |
 
 ### Real vs simulated
@@ -103,7 +103,21 @@ On **Try a speedrun**, pick another scenario. The card shows a checklist with a 
 
 **Advanced:** the [control panel](https://inheirit.xyz/demo) (`/demo`) is a lower-level control room for the same flow: **Make a test cast**, **Create the demo will**, then the guardian and signal buttons. The same steps run headlessly in `scripts/demo-cancel.ts` (cancel) and `scripts/demo-execute.ts` (release).
 
-**Your own will** (`/account`): one screen per job. **Home** (where the will stands, I'm here, strength, the next step) · **My will** (a status pill, *Draft*, *Active*, *Paused until …* or *Completed*, with **Try a speedrun** and **Pause** (1 to 90 days; it resumes by itself, with reminders 7 days and 1 day before) or **Resume**; the will in plain sentences; heirs (**+ Add heir**: a name, an Ethereum and a Bitcoin wallet with ↻ for a test wallet, or someone from Profile), guardians, lawyer and friends (**+ Add**: by name, which makes an invite link shown on their row with **Copy invite** until they accept; opening it makes them a key to sign in with), shares, removals and how many must confirm under ⚙; the schedule; **Close will** at the bottom) · **Signs of life** (one ranked list, heartbeat app first; extra NEAR and Ethereum wallets are *connected* and sign a message naming your will, no transaction and no access to funds; the quiet period, which we suggest from your history and you choose) · **Final secrets** · **Vault** (holdings with a total in dollars; **Deposit** picks a chain and shows the address to send test coins to; **Withdraw**, also while paused; payouts to heirs) · **Activity** (messages, releases with explorer links, the timeline; hashes and attestation under *Technical details*) · **Profile** (username, linked accounts, recovery key, then heirs, guardians with their status and invite, lawyer and friends, each with free-text contact details kept by the agent and never on-chain). Navigation is a side bar: your profile on top, the screens, **Try a speedrun**, **Mainnet**, **Sign out**; on a phone it slides in from the round profile button in the header. Invite links look like `https://inheirit.xyz/i/<code>`: no owner or names in the URL. The will can also be written **in plain English** (a private NEAR AI model drafts it, our code checks it and asks only for what's missing; you approve a summary that code, not the model, wrote). Lost your browser? **Restore from backup** on the sign-in screen, with your recovery key. `/heartbeat` is an installable app.
+**Your own will** (`/account`; a side bar on desktop, a drawer from the header button on phones):
+
+| Screen | What it's for |
+|---|---|
+| Home | Where the will stands, **I'm here**, will strength and the next step |
+| My will | The will in plain sentences; status (Active, Paused, Completed) with **Try a speedrun** and **Pause** / **Resume**; heirs, guardians, lawyer and friends (**+ Add** by name gives an invite link with **Copy invite**); **Close will** at the bottom |
+| Will in plain English | Write it in a sentence; a private NEAR AI model drafts it, code checks it and asks only for what's missing |
+| Signs of life | Ranked sources (heartbeat app first); connect extra NEAR or Ethereum wallets by signing a message; the quiet period |
+| Final secrets | Sealed notes per heir, released last |
+| Vault | Holdings in dollars; **Deposit** (pick a chain, copy the address) and **Withdraw**; payouts to heirs |
+| Activity | Messages sent, releases with explorer links, the timeline; hashes and attestation under *Technical details* |
+| Try a speedrun | The same will on a clock of minutes, scenarios a–d, and **View as** each role |
+| Profile | Username, linked accounts, recovery key, and your people with contact details (kept by the agent, never on-chain) |
+| Sign-in | Wallet, Google or a demo account; **Restore from backup** with your recovery key |
+| `/heartbeat` | An installable app: opening it is a strong sign of life |
 
 ## How it works
 
@@ -157,14 +171,14 @@ On testnet the onward swap to each heir runs on a SIMULATED 1Click client, becau
   - public, to USDC on Solana: [MPC signature](https://nearblocks.io/txns/FWPUnhyCSJrCHqzJBahCazgeLmURHGVPSsHdWtxdXcYH) · [sent on Base](https://basescan.org/tx/0xb70144f0f8ec0e99ab98c168a1925d2b69476d57aa1c2d59a1f306fe1a099c18) · [received on Solana](https://solscan.io/tx/65BJcb63tQkQnQ57Nsopv1v6cZKppy2GmnLmqiYJ2bCAsg9XYL1VuKyPyokGdzRyrw4kaDisvYvzhb8sbuRzpSaU);
   - confidential (Confidential Intents, `basic`), to USDC on Arbitrum: [MPC signature](https://nearblocks.io/txns/4RW7R4CsXYpYWaumCfT7DDCGs89Ph7faiJ797ypn8dDB) · [sent on Base](https://basescan.org/tx/0x2716595c73b267af1c03a87d737e24fdea4960274a99972af31209ca6b8f8790) · [received on Arbitrum](https://arbiscan.io/tx/0x448b42caa4165351684f87dede862c10d493aa36c5a01e50670e8e9e1d73e3d6).
 
-  They are sends from the demo vault, not slices of a testnet will (Intents has no testnet), and both recipient addresses are the builder's own wallets. Both are listed on [`/mainnet`](https://inheirit.xyz/mainnet);
+  They are sends from the demo vault, not slices of a testnet will (Intents has no testnet), and both recipient addresses are the builder's own wallets. Confidential hides the link between the deposit and the receipt, not the transfers themselves. Both are listed on [`/mainnet`](https://inheirit.xyz/mainnet);
 - the step-by-step, including a read-only `preflight` check, is [`docs/MAINNET.md`](docs/MAINNET.md).
 
 ## NEAR technology used, and where
 
 | Tech | Used for | Code |
 |---|---|---|
-| NEAR smart contract (Rust, near-sdk 5) | Will state machine (stage waits, secrets buffer, guardian consent, lawyer acceleration, Start over, one-time invite links), NEAR vault, signing gate, sealed-note storage, NEP-297 events | `agent-contract/src/will/` (173 unit tests, sandbox tests in `agent-contract/tests/will_flow_tests.rs`) |
+| NEAR smart contract (Rust, near-sdk 5) | Will state machine (stage waits, secrets buffer, guardian consent, lawyer acceleration, Start over, one-time invite links), NEAR vault, signing gate, sealed-note storage, NEP-297 events | `agent-contract/src/will/` (196 unit tests, sandbox tests in `agent-contract/tests/will_flow_tests.rs`) |
 | **Chain Signatures** (`v1.signer-prod.testnet`) | Vault addresses on Sepolia and BTC testnet4, derived from the contract account (`heirloom/<owner>/eth\|btc`); release and withdrawal signatures | gate: `agent-contract/src/will/agent.rs`; tx building: `src/chains/evm.ts`, `src/chains/btc.ts` (chainsig.js) |
 | **Shade Agent Framework** (TEE on Phala) | The will agent: liveness scoring and verdict, escalation and checks, execution, sealed-note crypto, Telegram bot. Registered with a real TDX attestation; measurements approved on-chain. | `src/index.ts`, `src/escalation/`, `src/liveness/`, `src/executor/`, `src/sealed/`, `src/telegram/`, `scripts/tee-agent.ts` |
 | **NEAR AI Cloud** (private inference) | Plain-English will → structured policy; heir claim guide. Will text goes only to a model whose attestation passes (TDX quote, NVIDIA GPU, signer bound to a fresh nonce; checked at startup and before each use), and every answer's signature must recover to the attested signer. | `src/ai/attestation.ts`, `src/ai/nearai.ts`, `src/ai/policy-parser.ts`, `src/ai/heir-guide.ts` |
@@ -273,7 +287,7 @@ npm run dev                             # agent on :3000
 
 A local agent can't register on `inheirit.testnet`, which accepts only the attested TEE agent. Give it its own local-mode contract (`npx tsx scripts/deploy-dev-contract.ts <your agent's account id>` creates it and whitelists that agent) and point both `.env` files at it.
 
-Contract: `cd agent-contract && cargo +1.86.0 test --lib` (193 unit tests). The sandbox tests (`cargo +1.86.0 test --tests`) need the wasm at `target/near/shade_contract_template.wasm` first: `cargo +1.86.0 near build non-reproducible-wasm --no-abi` (or the pinned `sourcescan/cargo-near` Docker image).
+Contract: `cd agent-contract && cargo +1.86.0 test --lib` (196 unit tests). The sandbox tests (`cargo +1.86.0 test --tests`) need the wasm at `target/near/shade_contract_template.wasm` first: `cargo +1.86.0 near build non-reproducible-wasm --no-abi` (or the pinned `sourcescan/cargo-near` Docker image).
 
 Headless scenario scripts:
 - `scripts/demo-cancel.ts`: Scenario A.

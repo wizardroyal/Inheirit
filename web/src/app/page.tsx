@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { Carousel } from "@/components/Carousel";
 import { HeroLoop } from "@/components/HeroLoop";
 import { Icon } from "@/components/icons";
+import { MAINNET_STORY } from "@/lib/config";
 
 const PROBLEMS = [
   ["Check-in fatigue", "Dead-man's switches make you prove you're alive. People forget.", "No check-ins. It reads activity you already produce."],
@@ -16,7 +17,7 @@ const PRINCIPLES = [
   ["Private by construction", "The agent runs in an attested TDX enclave and reads only timestamps. A will written in plain English goes only to an attested NEAR AI Cloud model."],
   ["If Inheirit disappears", "The rules live in the contract: guardians still decide, NEAR slices are still paid, and a newly approved agent can resume Ethereum and Bitcoin from its records."],
   ["Alongside a legal will", "It complements a legal will; it doesn't replace one. Your lawyer can file a death certificate to shorten the waits, never to skip a step."],
-  ["Testnet", "Wills run on testnet, mainnet coming next."],
+  ["Testnet and mainnet", MAINNET_STORY],
 ];
 
 const em = (s: string) => <em className="italic">{s}</em>;
@@ -25,7 +26,7 @@ const em = (s: string) => <em className="italic">{s}</em>;
 function Shot({ step, title, text, children }: { step: string; title: string; text: string; children: ReactNode }) {
   return (
     <figure className="w-72 shrink-0 snap-start space-y-3">
-      <div className="film-card tech h-56 rounded-2xl p-4 text-sm">{children}</div>
+      <div className="film-card tech h-60 rounded-2xl p-4 text-sm">{children}</div>
       <figcaption>
         <span className="block font-medium">
           <span className="text-muted">{step} · </span>
@@ -65,6 +66,7 @@ export default function Home() {
               ["Heartbeat app", "strong"],
               ["On-chain transactions", "strong"],
               ["Email", "medium"],
+              ["Telegram replies", "medium"],
               ["Calendar", "medium"],
               ["Socials", "weak"],
             ].map(([a, b]) => (
@@ -100,10 +102,10 @@ export default function Home() {
               </div>
             ))}
           </Shot>
-          <Shot step="4" title="Staged release" text="Slices, not a lump sum, with the longest wait after the first. Any sign of life stops the rest.">
+          <Shot step="4" title="Staged release" text="6 months after the first slice, then 3 months between the rest. Any sign of life stops the rest.">
             {[
-              [10, "after the challenge period", "w-[10%]"],
-              [20, "6 months later", "w-[20%]"],
+              [10, "first slice", "w-[10%]"],
+              [20, "6 months after the first", "w-[20%]"],
               [30, "3 months later", "w-[30%]"],
               [40, "3 months later", "w-[40%]"],
             ].map(([p, when, w]) => (

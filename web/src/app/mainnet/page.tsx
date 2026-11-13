@@ -3,6 +3,7 @@
 // JSON file, so the page needs no backend.
 import Link from "next/link";
 import { MainnetQuote } from "@/components/MainnetQuote";
+import { MAINNET_STORY } from "@/lib/config";
 import mainnetPayouts from "@/data/mainnet-payouts.json";
 
 type MainnetRecord = {
@@ -27,28 +28,9 @@ export default function MainnetPage() {
     <div className="max-w-3xl space-y-8">
       <div className="space-y-3">
         <h1 className="font-serif text-5xl">On mainnet</h1>
-        <p className="text-muted">
-          Wills run on testnet. NEAR Intents has no testnet, so heir payouts are priced live on mainnet.
-        </p>
+        <p className="text-lg">{MAINNET_STORY}</p>
+        <p className="text-sm text-muted">Confidential hides the link between the deposit and the receipt, not the transfers themselves.</p>
       </div>
-
-      <section className="grid gap-4 sm:grid-cols-2">
-        <div className="rounded-xl border border-line bg-card p-4">
-          <div className="font-serif text-xl">Testnet: open to everyone</div>
-          <p className="mt-1 text-sm text-muted">
-            Write a will and play every role. Payouts use a SIMULATED NEAR Intents client with live prices.
-          </p>
-        </div>
-        <div className="rounded-xl border border-line bg-card p-4">
-          <div className="font-serif text-xl">Mainnet: a showcase, not a service</div>
-          <p className="mt-1 text-sm text-muted">
-            Heirs see live quotes, public and confidential (&ldquo;Get live quotes&rdquo;).{" "}
-            {records.length
-              ? "Real payouts from our Base demo vault, each approved by a person, $5 cap. Listed below."
-              : "Real payouts would go from a Base demo vault, each approved by a person, $5 cap. None sent yet."}
-          </p>
-        </div>
-      </section>
 
       <section className="space-y-3">
         <h2 className="font-serif text-3xl">Try a live quote</h2>
@@ -80,7 +62,7 @@ export default function MainnetPage() {
                   </a>
                   {r.to.tx ? (
                     <a className="text-accent underline" href={r.to.tx} target="_blank" rel="noreferrer">
-                      Received by the heir
+                      Received
                     </a>
                   ) : (
                     <span className="text-muted">Receiving transaction not reported</span>
