@@ -25,15 +25,24 @@ export function usePoll<T>(fn: () => Promise<T>, ms: Interval, deps: unknown[] =
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const key = JSON.stringify(deps);
+  const keyRef = useRef(key);
+  keyRef.current = key;
+  const [loadedKey, setLoadedKey] = useState<string | null>(null);
   const fnRef = useRef(fn);
   fnRef.current = fn;
   const msRef = useRef(ms);
   msRef.current = ms;
   const refresh = useCallback(async (): Promise<boolean> => {
     try {
-      setData(await fnRef.current());
+      const forKey = keyRef.current;
+      const value = await fnRef.current();
+      // An answer for inputs that have since changed is dropped; the poll for the new inputs follows.
+      if (forKey !== keyRef.current) return true;
+      setData(value);
       setError(null);
       setLoaded(true);
+      setLoadedKey(forKey);
       return true;
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -76,7 +85,9 @@ export function usePoll<T>(fn: () => Promise<T>, ms: Interval, deps: unknown[] =
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refresh, ...deps]);
-  return { data, error, loaded, refresh };
+  // Until the current inputs have an answer: not loaded, no data (no flash of the previous owner's will).
+  const current = loadedKey === key;
+  return { data: current ? data : null, error, loaded: loaded && current, refresh };
 }
 
 /** The will from the contract: every 8 s, every 3 s when the next automatic step is under 20 s away. */

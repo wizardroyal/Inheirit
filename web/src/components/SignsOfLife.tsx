@@ -25,6 +25,7 @@ export function SignsOfLife({ owner, will }: { owner: string; will: Will }) {
   const movedThisRound = will.executions.some((e) => e.round === will.execution_round);
   const pulsing = usePulses(data?.observations);
   const idx = LADDER.findIndex((r) => r.state === state);
+  const verdictFresh = overview?.status?.state === state && (overview?.status?.last_alive_at ?? 0) >= will.last_alive_at;
   const next = nextStepIn(will, now);
   const seen = SOURCES.filter((s) => data?.observations[s.source]);
   const unseen = SOURCES.filter((s) => !data?.observations[s.source] && !s.simulated);
@@ -97,7 +98,15 @@ export function SignsOfLife({ owner, will }: { owner: string; will: Will }) {
       )}
 
       {/* Verdict */}
-      {data?.verdict && (
+      {/* The agent's verdict comes with the state and last sign of life it was written for (cached a few
+          seconds); one written for an older state or sign of life is never shown next to the current ladder.
+          Until a matching one arrives, the current step's own description stands in. */}
+      {data?.verdict && !verdictFresh && !snapped && (
+        <div className="rounded-lg bg-accent-soft px-4 py-3" role="status" aria-live="polite">
+          <p className="font-medium">{LADDER[idx]?.detail}</p>
+        </div>
+      )}
+      {data?.verdict && (verdictFresh || snapped > 0) && (
         <div className="rounded-lg bg-accent-soft px-4 py-3" role="status" aria-live="polite">
           {/* The agent's verdict can trail the chain by a poll; at the snap-back, say what just happened. */}
           <p className="font-medium">{snapped > 0

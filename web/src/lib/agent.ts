@@ -81,7 +81,7 @@ export interface Verdict {
 }
 
 export type Signals = { observations: Observations; heartbeat: string | null; verdict: Verdict | null };
-export type Status = { state: string; watching: unknown; has_policy: boolean; simulated_signals: Record<string, string> };
+export type Status = { state: string; last_alive_at?: number; watching: unknown; has_policy: boolean; simulated_signals: Record<string, string> };
 export type TelegramStatus = { enabled: boolean; bot?: string; linked: boolean };
 export interface Overview {
   status: Status | null;
