@@ -29,7 +29,7 @@
 ## 1. The hackathon (context that shapes decisions)
 
 ### 1.1 Facts
-- Event: NEAR HACKATHON — https://nearhackathon.com — rules for agents: https://nearhackathon.com/HACKATHON.md (copy kept in repo root; re-read before submission, it may change).
+- Event: NEAR HACKATHON — https://nearhackathon.com — rules for agents: https://nearhackathon.com/HACKATHON.md (re-read before submission, it may change).
 - Submission window: **2026-11-01T00:00Z → 2026-11-14T23:59Z**. Judging Nov 16–18. Development can start any time (organizers, NearBuilders chat, 2026-10-27).
 - Submission needs: **public GitHub repo** + **public demo post on X** (video or screenshots, says it was built at NEAR HACKATHON). One submission per team, cannot be edited.
 - Prize: $55K grand prize; $10K/$3K/$2K for 1st/2nd/3rd in each of 13 tracks. A project can be entered in several tracks.
@@ -153,7 +153,6 @@ Key facts confirmed from docs (Oct 26, 2026):
 ```
 /
 ├─ CLAUDE.md               ← this file
-├─ HACKATHON.md            ← copy of the official file
 ├─ README.md               ← judge-facing (see §11)
 ├─ .env.example
 ├─ contract/               ← Rust NEAR contract (extends Shade agent contract)
