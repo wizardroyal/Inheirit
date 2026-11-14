@@ -253,7 +253,7 @@ On testnet the onward swap to each heir runs on a SIMULATED 1Click client, becau
 ## Roadmap
 
 - **Several vaults with their own rules (conditional gifts).** One account, several vaults, each with its own people, conditions and schedule.
-- **Beyond wills: conditional gifts.** The will is the first product of a conditional-release engine: time or milestone conditions, attested by people, with a challenge window and staged release. The `not_before` condition is the first example: parsed and shown today; enforcement is next. Milestones and dates only; never conditions on relationships, beliefs or lifestyle.
+- **Beyond wills: conditional releases.** The will is the first product of a conditional-release engine: conditions attested by people, a challenge window, and staged release. The same pieces fit gifts on a milestone (a graduation, a first home), timed gifts (a birthday, a date), and payouts for competitions and bounties, where judges attest the winner instead of guardians attesting a death. The `not_before` condition is the first example: parsed and shown today; enforcement is next.
 - A human adjudicator for disputes and heir support.
 - Real wallet and email linking for Google Calendar, Gmail, X, Instagram and LinkedIn, with OAuth tokens kept in the TEE.
 - A quiet period that adapts over time, per source.
